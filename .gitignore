@@ -1,5 +1,7 @@
 # Dependencies
+node_modules/
 quizapp/node_modules/
+backend/auth-service/node_modules/
 .pnp
 .pnp.js
 
@@ -7,6 +9,13 @@ quizapp/node_modules/
 dist/
 build/
 .vite/
+
+# Secrets — never commit these
+backend/.env
+backend/auth-service/.env
+backend/google-services.json
+*.pem
+*.key
 
 # Environment variables
 .env

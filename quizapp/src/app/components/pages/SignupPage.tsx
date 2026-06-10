@@ -96,10 +96,7 @@ export function SignupPage() {
             <form onSubmit={handleSubmit}>
               <Stack spacing={2}>
                 <TextField label="Full Name" value={form.name} onChange={update('name')} fullWidth />
-                <TextField label="Username" value={form.username} onChange={update('username')}
-                  fullWidth
-                  InputProps={{ startAdornment: <InputAdornment position="start">@</InputAdornment> }}
-                />
+                
                 <TextField label="Email address" type="email" value={form.email} onChange={update('email')} fullWidth />
                 <TextField
                   label="Password"
