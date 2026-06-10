@@ -15,10 +15,10 @@ const refreshTokenSchema = new Schema<IRefreshToken>(
 
 const statsSchema = new Schema<IUserStats>(
   {
-    friends:       { type: Number, default: 0 },
-    posts:         { type: Number, default: 0 },
-    quizzesTaken:  { type: Number, default: 0 },
-    averageScore:  { type: Number, default: 0 },
+    friends:      { type: Number, default: 0 },
+    posts:        { type: Number, default: 0 },
+    quizzesTaken: { type: Number, default: 0 },
+    averageScore: { type: Number, default: 0 },
   },
   { _id: false }
 );
@@ -56,10 +56,10 @@ const userSchema = new Schema<IUser>(
       minlength: [6, 'Password must be at least 6 characters'],
       select: false,
     },
-    avatar:      { type: String, default: null },
-    coverImage:  { type: String, default: null },
-    bio:         { type: String, maxlength: [200, 'Bio cannot exceed 200 characters'], default: '' },
-    role:        { type: String, enum: ['user', 'admin'] as UserRole[], default: 'user' },
+    avatar:     { type: String, default: null },
+    coverImage: { type: String, default: null },
+    bio:        { type: String, maxlength: [200, 'Bio cannot exceed 200 characters'], default: '' },
+    role:       { type: String, enum: ['user', 'admin'] as UserRole[], default: 'user' },
 
     authProvider: {
       type: String,
@@ -86,14 +86,15 @@ const userSchema = new Schema<IUser>(
   {
     timestamps: true,
     toJSON: {
-      transform(_doc, ret) {
-        delete ret.password;
-        delete ret.refreshTokens;
-        delete ret.emailVerificationToken;
-        delete ret.emailVerificationExpires;
-        delete ret.passwordResetToken;
-        delete ret.passwordResetExpires;
-        delete ret.__v;
+      transform(_doc, ret: Record<string, unknown>) {
+        // Use undefined assignment instead of delete for optional fields
+        ret['password']                  = undefined;
+        ret['refreshTokens']             = undefined;
+        ret['emailVerificationToken']    = undefined;
+        ret['emailVerificationExpires']  = undefined;
+        ret['passwordResetToken']        = undefined;
+        ret['passwordResetExpires']      = undefined;
+        ret['__v']                       = undefined;
         return ret;
       },
     },
