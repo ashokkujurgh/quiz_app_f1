@@ -169,7 +169,7 @@ router.post('/google/firebase', (async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    let user = await User.findOne({ $or: [{ firebaseUid: uid }, { email }] }).select('+refreshTokens');
+    let user = (await User.findOne({ $or: [{ firebaseUid: uid }, { email }] }).select('+refreshTokens')) as IUser | null;
     const isNewUser = !user;
 
     if (user) {
@@ -180,7 +180,7 @@ router.post('/google/firebase', (async (req: AuthRequest, res: Response) => {
       user.isEmailVerified = email_verified ?? user.isEmailVerified;
       await user.save({ validateBeforeSave: false });
     } else {
-      user = await User.create({
+      const created = await User.create({
         name: name ?? email.split('@')[0],
         email,
         firebaseUid: uid,
@@ -190,7 +190,12 @@ router.post('/google/firebase', (async (req: AuthRequest, res: Response) => {
         isEmailVerified: email_verified ?? false,
         isOnline: true,
       });
-      user = await User.findById(user._id).select('+refreshTokens') as IUser;
+      user = (await User.findById(created._id).select('+refreshTokens')) as IUser | null;
+    }
+
+    if (!user) {
+      res.status(500).json({ success: false, message: 'Failed to create user.' });
+      return;
     }
 
     rabbitMQ.publish(isNewUser ? 'user.registered' : 'user.google_oauth', {
@@ -199,7 +204,7 @@ router.post('/google/firebase', (async (req: AuthRequest, res: Response) => {
       authProvider: 'google',
     }).catch(console.error);
 
-    await sendAuthResponse(res, req, user);
+    await sendAuthResponse(res, req, user as IUser);
   } catch (err) {
     const error = err as { code?: string; message?: string };
     console.error('Firebase Google auth error:', error);

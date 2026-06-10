@@ -1,31 +1,30 @@
-import amqplib, { type Connection, type Channel } from 'amqplib';
+import amqplib, { type ChannelModel, type Channel } from 'amqplib';
 import { AuthEvent, AuthEventType } from '../types';
 
 // ── Exchange / Queue names ────────────────────────────────
 export const EXCHANGE = 'quizhub.auth';
 export const QUEUES = {
-  AUTH_EVENTS: 'auth.events',
+  AUTH_EVENTS:          'auth.events',
   NOTIFICATION_SERVICE: 'notification.auth',
-  USER_SERVICE: 'user.auth',
+  USER_SERVICE:         'user.auth',
 } as const;
 
-// ── Routing keys ──────────────────────────────────────────
 export const ROUTING_KEYS: Record<AuthEventType, string> = {
-  'user.registered':                'auth.user.registered',
-  'user.logged_in':                 'auth.user.logged_in',
-  'user.logged_out':                'auth.user.logged_out',
-  'user.google_oauth':              'auth.user.google_oauth',
-  'user.email_verified':            'auth.user.email_verified',
-  'user.password_reset_requested':  'auth.user.password_reset_requested',
-  'user.password_reset':            'auth.user.password_reset',
-  'user.avatar_uploaded':           'auth.user.avatar_uploaded',
-  'user.profile_updated':           'auth.user.profile_updated',
+  'user.registered':               'auth.user.registered',
+  'user.logged_in':                'auth.user.logged_in',
+  'user.logged_out':               'auth.user.logged_out',
+  'user.google_oauth':             'auth.user.google_oauth',
+  'user.email_verified':           'auth.user.email_verified',
+  'user.password_reset_requested': 'auth.user.password_reset_requested',
+  'user.password_reset':           'auth.user.password_reset',
+  'user.avatar_uploaded':          'auth.user.avatar_uploaded',
+  'user.profile_updated':          'auth.user.profile_updated',
 };
 
 class RabbitMQClient {
-  private connection: Connection | null = null;
+  private connection: ChannelModel | null = null;
   private channel: Channel | null = null;
-  private reconnectDelay = 5000;
+  private reconnectDelay = 5_000;
   private isConnecting = false;
 
   async connect(): Promise<void> {
@@ -38,35 +37,33 @@ class RabbitMQClient {
       this.connection = await amqplib.connect(url);
       this.channel = await this.connection.createChannel();
 
-      // Declare topic exchange (durable — survives broker restarts)
+      // Topic exchange — durable (survives broker restarts)
       await this.channel.assertExchange(EXCHANGE, 'topic', { durable: true });
 
-      // Declare queues and bind routing keys
-      await this.channel.assertQueue(QUEUES.AUTH_EVENTS, { durable: true });
+      // Durable queues
+      await this.channel.assertQueue(QUEUES.AUTH_EVENTS,          { durable: true });
       await this.channel.assertQueue(QUEUES.NOTIFICATION_SERVICE, { durable: true });
-      await this.channel.assertQueue(QUEUES.USER_SERVICE, { durable: true });
+      await this.channel.assertQueue(QUEUES.USER_SERVICE,         { durable: true });
 
-      // Bind queues to exchange
-      await this.channel.bindQueue(QUEUES.AUTH_EVENTS, EXCHANGE, 'auth.#');
+      // Bind queues to exchange with routing keys
+      await this.channel.bindQueue(QUEUES.AUTH_EVENTS,          EXCHANGE, 'auth.#');
       await this.channel.bindQueue(QUEUES.NOTIFICATION_SERVICE, EXCHANGE, 'auth.user.registered');
       await this.channel.bindQueue(QUEUES.NOTIFICATION_SERVICE, EXCHANGE, 'auth.user.password_reset_requested');
-      await this.channel.bindQueue(QUEUES.USER_SERVICE, EXCHANGE, 'auth.user.registered');
-      await this.channel.bindQueue(QUEUES.USER_SERVICE, EXCHANGE, 'auth.user.profile_updated');
-      await this.channel.bindQueue(QUEUES.USER_SERVICE, EXCHANGE, 'auth.user.avatar_uploaded');
+      await this.channel.bindQueue(QUEUES.USER_SERVICE,         EXCHANGE, 'auth.user.registered');
+      await this.channel.bindQueue(QUEUES.USER_SERVICE,         EXCHANGE, 'auth.user.profile_updated');
+      await this.channel.bindQueue(QUEUES.USER_SERVICE,         EXCHANGE, 'auth.user.avatar_uploaded');
 
-      // Prefetch 10 messages at a time
       await this.channel.prefetch(10);
 
       this.isConnecting = false;
-      console.log('✅ RabbitMQ connected and exchange/queues ready');
+      console.log('✅ RabbitMQ connected — exchange & queues ready');
 
-      // Graceful reconnect on close
       this.connection.on('close', () => {
         this.connection = null;
-        this.channel = null;
+        this.channel    = null;
         this.isConnecting = false;
-        console.warn(`⚠️  RabbitMQ connection closed. Reconnecting in ${this.reconnectDelay / 1000}s...`);
-        setTimeout(() => this.connect(), this.reconnectDelay);
+        console.warn(`⚠️  RabbitMQ closed. Reconnecting in ${this.reconnectDelay / 1000}s...`);
+        setTimeout(() => void this.connect(), this.reconnectDelay);
       });
 
       this.connection.on('error', (err: Error) => {
@@ -76,7 +73,7 @@ class RabbitMQClient {
       this.isConnecting = false;
       console.error('❌ RabbitMQ connection failed:', (err as Error).message);
       console.warn(`Retrying in ${this.reconnectDelay / 1000}s...`);
-      setTimeout(() => this.connect(), this.reconnectDelay);
+      setTimeout(() => void this.connect(), this.reconnectDelay);
     }
   }
 
@@ -101,12 +98,16 @@ class RabbitMQClient {
     };
 
     try {
-      const buffer = Buffer.from(JSON.stringify(event));
-      this.channel.publish(EXCHANGE, routingKey, buffer, {
-        persistent: true,                 // survives broker restart
-        contentType: 'application/json',
-        headers: { 'x-service': 'auth-service' },
-      });
+      this.channel.publish(
+        EXCHANGE,
+        routingKey,
+        Buffer.from(JSON.stringify(event)),
+        {
+          persistent:   true,
+          contentType:  'application/json',
+          headers:      { 'x-service': 'auth-service' },
+        }
+      );
       console.log(`📤 RabbitMQ event published: ${routingKey}`);
       return true;
     } catch (err) {
@@ -116,26 +117,25 @@ class RabbitMQClient {
   }
 
   /**
-   * Subscribe to a queue (for consuming events in this service)
+   * Subscribe to a queue (consume events)
    */
   async subscribe(
     queue: string,
     handler: (event: AuthEvent) => Promise<void>
   ): Promise<void> {
-    if (!this.channel) {
-      throw new Error('RabbitMQ channel not initialised.');
-    }
+    if (!this.channel) throw new Error('RabbitMQ channel not initialised.');
 
-    await this.channel.consume(queue, async (msg) => {
+    const ch = this.channel;
+
+    await ch.consume(queue, async (msg) => {
       if (!msg) return;
       try {
-        const event: AuthEvent = JSON.parse(msg.content.toString());
+        const event = JSON.parse(msg.content.toString()) as AuthEvent;
         await handler(event);
-        this.channel!.ack(msg);
+        ch.ack(msg);
       } catch (err) {
         console.error('RabbitMQ consume error:', (err as Error).message);
-        // Requeue once, then dead-letter
-        this.channel!.nack(msg, false, !msg.fields.redelivered);
+        ch.nack(msg, false, !msg.fields.redelivered);
       }
     });
 
@@ -148,7 +148,7 @@ class RabbitMQClient {
       await this.connection?.close();
       console.log('RabbitMQ connection closed.');
     } catch {
-      // ignore close errors
+      // ignore
     }
   }
 
@@ -157,6 +157,5 @@ class RabbitMQClient {
   }
 }
 
-// Singleton
 const rabbitMQ = new RabbitMQClient();
 export default rabbitMQ;
