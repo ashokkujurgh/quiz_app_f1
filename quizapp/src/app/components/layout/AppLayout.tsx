@@ -6,7 +6,7 @@ import { LeftSidebar } from './LeftSidebar';
 import { RightSidebar } from './RightSidebar';
 import { MobileBottomNav } from './MobileBottomNav';
 
-const SIDEBAR_WIDTH = 260;
+const SIDEBAR_WIDTH = 10;
 
 export function AppLayout() {
   const theme = useTheme();
