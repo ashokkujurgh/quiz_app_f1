@@ -73,6 +73,7 @@ const userSchema = new Schema<IUser>(
 
     refreshTokens: { type: [refreshTokenSchema], default: [], select: false },
 
+    isActive: { type: Boolean, default: true },
     isOnline: { type: Boolean, default: false },
     lastSeen: { type: Date, default: Date.now },
 

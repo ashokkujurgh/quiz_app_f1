@@ -6,22 +6,41 @@ import {
 } from '@mui/material';
 import { Visibility, VisibilityOff, Google } from '@mui/icons-material';
 import { useAppDispatch } from '../../store/hooks';
-import { login } from '../../store/slices/authSlice';
+import { loginSuccess } from '../../store/slices/authSlice';
+
+const API = import.meta.env.VITE_API_URL ?? 'http://localhost:4001';
 
 export function LoginPage() {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
-  const [email, setEmail] = useState('');
+  const [email, setEmail]     = useState('');
   const [password, setPassword] = useState('');
-  const [showPw, setShowPw] = useState(false);
+  const [showPw, setShowPw]   = useState(false);
   const [remember, setRemember] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError]     = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) { setError('Please fill in all fields.'); return; }
-    dispatch(login({ email, password }));
-    navigate('/home');
+    setError('');
+    setLoading(true);
+    try {
+      const res = await fetch(`${API}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.message ?? 'Login failed.'); return; }
+      dispatch(loginSuccess({ user: data.user, accessToken: data.accessToken }));
+      navigate('/home');
+    } catch {
+      setError('Cannot connect to server. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -95,8 +114,15 @@ export function LoginPage() {
                   </Typography>
                 </Stack>
 
-                <Button type="submit" variant="contained" size="large" fullWidth sx={{ py: 1.5 }}>
-                  Sign In
+                <Button
+                  type="submit"
+                  variant="contained"
+                  size="large"
+                  fullWidth
+                  disabled={loading}
+                  sx={{ py: 1.5 }}
+                >
+                  {loading ? 'Signing in…' : 'Sign In'}
                 </Button>
 
                 <Divider>
@@ -109,7 +135,7 @@ export function LoginPage() {
                   fullWidth
                   startIcon={<Google />}
                   sx={{ py: 1.5 }}
-                  onClick={() => { dispatch(login({ email: 'google@example.com', password: '' })); navigate('/home'); }}
+                  disabled
                 >
                   Continue with Google
                 </Button>
