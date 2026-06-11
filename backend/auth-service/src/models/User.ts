@@ -1,4 +1,5 @@
 import mongoose, { Schema, Model } from 'mongoose';
+import bcrypt from 'bcryptjs';
 import { IUser, IRefreshToken, IUserStats, UserRole, AuthProvider } from '../types';
 
 // ── Sub-schemas ───────────────────────────────────────────
@@ -50,6 +51,11 @@ const userSchema = new Schema<IUser>(
       trim: true,
       match: [/^\S+@\S+\.\S+$/, 'Please provide a valid email'],
     },
+    password: {
+      type: String,
+      minlength: [6, 'Password must be at least 6 characters'],
+      select: false,
+    },
     avatar:     { type: String, default: null },
     coverImage: { type: String, default: null },
     bio:        { type: String, maxlength: [200, 'Bio cannot exceed 200 characters'], default: '' },
@@ -57,7 +63,7 @@ const userSchema = new Schema<IUser>(
 
     authProvider: {
       type: String,
-      enum: ['google', 'firebase'] as AuthProvider[],
+      enum: ['email', 'google', 'firebase'] as AuthProvider[],
       default: 'firebase',
     },
     firebaseUid: { type: String, unique: true, sparse: true },
@@ -84,10 +90,14 @@ const userSchema = new Schema<IUser>(
   }
 );
 
-// ── Indexes ───────────────────────────────────────────────
-userSchema.index({ email: 1 });
-userSchema.index({ username: 1 });
-userSchema.index({ firebaseUid: 1 });
+// indexes are declared inline on the schema fields above
+
+// ── Hash password before save ─────────────────────────────
+userSchema.pre('save', async function (next) {
+  if (!this.isModified('password') || !this.password) return next();
+  this.password = await bcrypt.hash(this.password, 12);
+  next();
+});
 
 // ── Auto-generate username from email ─────────────────────
 userSchema.pre('validate', function (next) {
@@ -100,6 +110,13 @@ userSchema.pre('validate', function (next) {
   }
   next();
 });
+
+// ── Instance method: compare password ─────────────────────
+userSchema.methods.comparePassword = function (
+  candidatePassword: string
+): Promise<boolean> {
+  return bcrypt.compare(candidatePassword, this.password as string);
+};
 
 const User: Model<IUser> = mongoose.model<IUser>('User', userSchema);
 export default User;

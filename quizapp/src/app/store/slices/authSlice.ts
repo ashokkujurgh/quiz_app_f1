@@ -4,12 +4,14 @@ import { currentUser } from '../../data/mockData';
 
 interface AuthState {
   user: User | null;
+  accessToken: string | null;
   isAuthenticated: boolean;
   loading: boolean;
 }
 
 const initialState: AuthState = {
   user: null,
+  accessToken: localStorage.getItem('access_token'),
   isAuthenticated: false,
   loading: false,
 };
@@ -19,9 +21,14 @@ const authSlice = createSlice({
   initialState,
   reducers: {
     login: (state, action: PayloadAction<{ email: string; password: string }>) => {
-      // Mock login - accept any credentials
       state.user = currentUser;
       state.isAuthenticated = true;
+    },
+    loginSuccess: (state, action: PayloadAction<{ user: User; accessToken: string }>) => {
+      state.user = action.payload.user;
+      state.accessToken = action.payload.accessToken;
+      state.isAuthenticated = true;
+      localStorage.setItem('access_token', action.payload.accessToken);
     },
     signup: (state, action: PayloadAction<Partial<User>>) => {
       state.user = { ...currentUser, ...action.payload };
@@ -29,7 +36,9 @@ const authSlice = createSlice({
     },
     logout: (state) => {
       state.user = null;
+      state.accessToken = null;
       state.isAuthenticated = false;
+      localStorage.removeItem('access_token');
     },
     updateUser: (state, action: PayloadAction<Partial<User>>) => {
       if (state.user) {
@@ -39,5 +48,5 @@ const authSlice = createSlice({
   },
 });
 
-export const { login, signup, logout, updateUser } = authSlice.actions;
+export const { login, loginSuccess, signup, logout, updateUser } = authSlice.actions;
 export default authSlice.reducer;

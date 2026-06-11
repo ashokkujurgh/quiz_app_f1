@@ -5,12 +5,14 @@ import { Navbar } from './Navbar';
 import { LeftSidebar } from './LeftSidebar';
 import { RightSidebar } from './RightSidebar';
 import { MobileBottomNav } from './MobileBottomNav';
+import { usePresence } from '../../hooks/usePresence';
 
 const SIDEBAR_WIDTH = 10;
 
 export function AppLayout() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  usePresence();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
