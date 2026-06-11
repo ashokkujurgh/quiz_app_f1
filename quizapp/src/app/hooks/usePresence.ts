@@ -24,16 +24,16 @@ export const usePresence = () => {
     const handleUnload = () => ping('offline', token, true);
     window.addEventListener('beforeunload', handleUnload);
 
-    // Re-mark online when user returns to the tab
+    // Re-mark online only when user comes back to the tab (not offline on hide)
     const handleVisible = () => {
       if (document.visibilityState === 'visible') ping('online', token);
-      else ping('offline', token);
     };
     document.addEventListener('visibilitychange', handleVisible);
 
     return () => {
       window.removeEventListener('beforeunload', handleUnload);
       document.removeEventListener('visibilitychange', handleVisible);
+      // Only mark offline on actual component unmount (logout/navigation away)
       ping('offline', token);
     };
   }, [token]);

@@ -28,8 +28,15 @@ export const adminLogin: RequestHandler = async (req: AuthRequest, res: Response
       return;
     }
 
+    user.isOnline = true;
     user.lastSeen = new Date();
     await user.save({ validateBeforeSave: false });
+
+    // Emit online status so admin panel reflects correctly
+    try {
+      const { broadcastUserStatus } = require('../config/socket');
+      broadcastUserStatus(user._id.toString(), true);
+    } catch {}
 
     const accessToken = signAccessToken({
       id: user._id.toString(),
@@ -53,15 +60,19 @@ export const listUsers: RequestHandler = async (req: AuthRequest, res: Response)
     const limit = Math.min(100, Math.max(1, parseInt((req.query.limit as string) ?? '20')));
     const search = (req.query.search as string) ?? '';
 
+    // Always exclude docs with no email (corrupted records)
+    const baseFilter = { email: { $exists: true, $not: { $in: [null, ''] } } };
+
     const filter = search
       ? {
+          ...baseFilter,
           $or: [
             { name:     { $regex: search, $options: 'i' } },
             { email:    { $regex: search, $options: 'i' } },
             { username: { $regex: search, $options: 'i' } },
           ],
         }
-      : {};
+      : baseFilter;
 
     const [users, total] = await Promise.all([
       User.find(filter)
@@ -80,6 +91,57 @@ export const listUsers: RequestHandler = async (req: AuthRequest, res: Response)
   } catch (err) {
     console.error('List users error:', err);
     res.status(500).json({ success: false, message: 'Failed to fetch users.' });
+  }
+};
+
+// ═══════════════════════════════════════════════════════════
+// PATCH /api/admin/users/:id/status
+// Enable or disable a user
+// ═══════════════════════════════════════════════════════════
+export const toggleUserStatus: RequestHandler = async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    // Prevent admin from disabling themselves
+    if (id === req.user!._id.toString()) {
+      res.status(400).json({ success: false, message: 'You cannot disable your own account.' });
+      return;
+    }
+
+    const user = await User.findById(id);
+    if (!user) {
+      res.status(404).json({ success: false, message: 'User not found.' });
+      return;
+    }
+
+    user.isActive = !user.isActive;
+
+    // If disabling, also mark offline and clear refresh tokens
+    if (!user.isActive) {
+      user.isOnline = false;
+      const fullUser = await User.findById(id).select('+refreshTokens');
+      if (fullUser) {
+        fullUser.isActive = false;
+        fullUser.isOnline = false;
+        fullUser.refreshTokens = [];
+        await fullUser.save({ validateBeforeSave: false });
+
+        try {
+          const { broadcastUserStatus, getIO } = require('../config/socket');
+          broadcastUserStatus(id, false);
+          getIO().to('admins').to(`user:${id}`).emit('user:disabled', { userId: id });
+        } catch {}
+
+        res.json({ success: true, isActive: false, user: fullUser });
+        return;
+      }
+    }
+
+    await user.save({ validateBeforeSave: false });
+    res.json({ success: true, isActive: user.isActive, user });
+  } catch (err) {
+    console.error('Toggle user status error:', err);
+    res.status(500).json({ success: false, message: 'Failed to update user status.' });
   }
 };
 

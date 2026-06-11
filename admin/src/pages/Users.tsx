@@ -1,7 +1,8 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import api from '../lib/api';
-import { connectSocket, disconnectSocket, subscribeToUsers, unsubscribeFromUsers } from '../lib/socket';
+import { connectSocket, disconnectSocket, subscribeToUsers, unsubscribeFromUsers, getSocket } from '../lib/socket';
 import CreateAdminModal from '../components/CreateAdminModal';
+import UserRow from '../components/UserRow';
 
 interface User {
   _id: string;
@@ -11,6 +12,7 @@ interface User {
   role: string;
   authProvider: string;
   isEmailVerified: boolean;
+  isActive: boolean;
   isOnline: boolean;
   createdAt: string;
   avatar?: string;
@@ -30,7 +32,8 @@ export default function Users() {
   const [search, setSearch]         = useState('');
   const [query, setQuery]           = useState('');
   const [loading, setLoading]       = useState(true);
-  const [showModal, setShowModal]   = useState(false);
+  const [showModal, setShowModal]         = useState(false);
+  const [toggling, setToggling]           = useState<string | null>(null);
   const [liveConnected, setLiveConnected] = useState(false);
   const socketRef = useRef<ReturnType<typeof connectSocket> | null>(null);
 
@@ -50,6 +53,10 @@ export default function Users() {
       subscribeToUsers(newIds);
       prevUserIdsRef.current = newIds;
 
+      // Ask the server for the latest online status for this page of users
+      const sock = getSocket();
+      if (sock?.connected) sock.emit('request:snapshot');
+
       setUsers(newUsers);
       setPagination(data.pagination);
     } finally {
@@ -64,16 +71,23 @@ export default function Users() {
     const socket = connectSocket();
     socketRef.current = socket;
 
-    const onConnect    = () => {
+    const onConnect = () => {
       setLiveConnected(true);
-      // Re-subscribe after reconnect
       if (prevUserIdsRef.current.length > 0) {
         subscribeToUsers(prevUserIdsRef.current);
       }
     };
     const onDisconnect = () => setLiveConnected(false);
 
-    // Per-user status event: { userId, isOnline, timestamp }
+    // Server sends snapshot of all currently online user IDs on connect
+    const onSnapshot = ({ onlineIds }: { onlineIds: string[] }) => {
+      const onlineSet = new Set(onlineIds);
+      setUsers((prev) =>
+        prev.map((u) => ({ ...u, isOnline: onlineSet.has(u._id) }))
+      );
+    };
+
+    // Per-user real-time status change
     const onUserStatus = ({ userId, isOnline }: { userId: string; isOnline: boolean }) => {
       setUsers((prev) =>
         prev.map((u) => u._id === userId ? { ...u, isOnline } : u)
@@ -81,18 +95,34 @@ export default function Users() {
     };
 
     if (socket.connected) setLiveConnected(true);
-    socket.on('connect',     onConnect);
-    socket.on('disconnect',  onDisconnect);
-    socket.on('user:status', onUserStatus);
+    socket.on('connect',        onConnect);
+    socket.on('disconnect',     onDisconnect);
+    socket.on('users:snapshot', onSnapshot);
+    socket.on('user:status',    onUserStatus);
 
     return () => {
-      socket.off('connect',     onConnect);
-      socket.off('disconnect',  onDisconnect);
-      socket.off('user:status', onUserStatus);
+      socket.off('connect',        onConnect);
+      socket.off('disconnect',     onDisconnect);
+      socket.off('users:snapshot', onSnapshot);
+      socket.off('user:status',    onUserStatus);
       unsubscribeFromUsers(prevUserIdsRef.current);
       disconnectSocket();
     };
   }, []);
+
+  const handleToggleStatus = async (user: User) => {
+    setToggling(user._id);
+    try {
+      const { data } = await api.patch(`/api/admin/users/${user._id}/status`);
+      setUsers((prev) =>
+        prev.map((u) => u._id === user._id ? { ...u, isActive: data.isActive } : u)
+      );
+    } catch (err: any) {
+      alert(err.response?.data?.message ?? 'Failed to update status.');
+    } finally {
+      setToggling(null);
+    }
+  };
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -182,57 +212,17 @@ export default function Users() {
                 <th className="text-left px-5 py-3.5 font-medium">Provider</th>
                 <th className="text-left px-5 py-3.5 font-medium">Status</th>
                 <th className="text-left px-5 py-3.5 font-medium">Joined</th>
+                <th className="px-5 py-3.5 font-medium text-right">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
               {users.map((user) => (
-                <tr key={user._id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
-                  <td className="px-5 py-3.5">
-                    <div className="flex items-center gap-3">
-                      {user.avatar ? (
-                        <img src={user.avatar} alt={user.name} className="w-8 h-8 rounded-full object-cover" />
-                      ) : (
-                        <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-600/20 flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-semibold text-xs">
-                          {(user.name ?? user.email ?? '?').charAt(0).toUpperCase()}
-                        </div>
-                      )}
-                      <div>
-                        <div className="font-medium text-gray-900 dark:text-white">{user.name ?? '—'}</div>
-                        <div className="text-gray-400 text-xs">{user.email}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-5 py-3.5 text-gray-500 dark:text-gray-400">
-                    {user.username ? `@${user.username}` : '—'}
-                  </td>
-                  <td className="px-5 py-3.5">
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ${
-                      user.role === 'admin'
-                        ? 'bg-purple-100 text-purple-700 dark:bg-purple-500/15 dark:text-purple-400'
-                        : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
-                    }`}>
-                      {user.role}
-                    </span>
-                  </td>
-                  <td className="px-5 py-3.5">
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">
-                      {user.authProvider}
-                    </span>
-                  </td>
-                  <td className="px-5 py-3.5">
-                    <div className="flex items-center gap-1.5">
-                      <span className={`w-1.5 h-1.5 rounded-full ${user.isOnline ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'}`} />
-                      <span className={`text-xs ${user.isOnline ? 'text-green-600 dark:text-green-400' : 'text-gray-400'}`}>
-                        {user.isOnline ? 'Online' : 'Offline'}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="px-5 py-3.5 text-gray-500 dark:text-gray-400 text-xs">
-                    {new Date(user.createdAt).toLocaleDateString('en-US', {
-                      year: 'numeric', month: 'short', day: 'numeric',
-                    })}
-                  </td>
-                </tr>
+                <UserRow
+                  key={user._id}
+                  user={user}
+                  toggling={toggling === user._id}
+                  onToggleStatus={handleToggleStatus}
+                />
               ))}
             </tbody>
           </table>

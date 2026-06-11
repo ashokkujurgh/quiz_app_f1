@@ -5,6 +5,7 @@ import { protect } from '../middleware/authMiddleware';
 import { AuthRequest, MulterS3File } from '../types';
 import {
   firebaseAuth,
+  emailLogin,
   refreshToken,
   logout,
   getMe,
@@ -30,6 +31,7 @@ const updateProfileRules = [
 
 // ── Routes ────────────────────────────────────────────────
 router.post('/firebase',  firebaseAuth);
+router.post('/login',     emailLogin);
 router.post('/refresh',   refreshToken);
 router.post('/logout',    protect, logout);
 router.get('/me',         protect, getMe);

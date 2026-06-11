@@ -9,14 +9,11 @@ import { AuthRequest, IUser, MulterS3File } from '../types';
 
 const emitUserStatus = (userId: string, isOnline: boolean) => {
   try {
-    const { getIO } = require('../config/socket');
-    getIO().to(`user:${userId}`).emit('user:status', {
-      userId,
-      isOnline,
-      timestamp: new Date(),
-    });
-  } catch {
-    // socket not yet initialized — skip silently
+    const { broadcastUserStatus } = require('../config/socket');
+    broadcastUserStatus(userId, isOnline);
+    console.log(`[status] emitted ${isOnline ? 'online' : 'offline'} for user ${userId}`);
+  } catch (err) {
+    console.warn('[status] broadcastUserStatus failed:', (err as Error).message);
   }
 };
 
@@ -57,6 +54,46 @@ export const sendAuthResponse = async (
   });
 
   res.status(statusCode).json({ success: true, accessToken, user });
+};
+
+// ═══════════════════════════════════════════════════════════
+// POST /api/auth/login  — email + password (quizapp users)
+// ═══════════════════════════════════════════════════════════
+export const emailLogin: RequestHandler = async (req: AuthRequest, res: Response) => {
+  try {
+    const { email, password } = req.body as { email?: string; password?: string };
+    if (!email || !password) {
+      res.status(400).json({ success: false, message: 'Email and password are required.' });
+      return;
+    }
+
+    const user = await User.findOne({ email }).select('+password +refreshTokens');
+    if (!user || !user.password) {
+      res.status(401).json({ success: false, message: 'Invalid credentials.' });
+      return;
+    }
+    if (!(await user.comparePassword(password))) {
+      res.status(401).json({ success: false, message: 'Invalid credentials.' });
+      return;
+    }
+    if (user.isActive === false) {
+      res.status(403).json({ success: false, message: 'Account disabled. Contact support.' });
+      return;
+    }
+
+    user.isOnline = true;
+    user.lastSeen = new Date();
+    await user.save({ validateBeforeSave: false });
+
+    emitUserStatus(user._id.toString(), true);
+
+    rabbitMQ.publish('user.logged_in', { userId: user._id.toString(), email: user.email }).catch(console.error);
+
+    await sendAuthResponse(res, req, user);
+  } catch (err) {
+    console.error('Email login error:', err);
+    res.status(500).json({ success: false, message: 'Login failed.' });
+  }
 };
 
 // ═══════════════════════════════════════════════════════════
@@ -112,6 +149,11 @@ export const firebaseAuth: RequestHandler = async (req: AuthRequest, res: Respon
 
     if (!user) {
       res.status(500).json({ success: false, message: 'Failed to create user.' });
+      return;
+    }
+
+    if (user.isActive === false) {
+      res.status(403).json({ success: false, message: 'Your account has been disabled. Please contact support.' });
       return;
     }
 

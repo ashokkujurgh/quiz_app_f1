@@ -5,8 +5,30 @@ import User from '../models/User';
 
 let io: SocketServer;
 
-// socketId → { userId, role } for disconnect lookup
+// socketId → { userId, role }
 const socketUserMap = new Map<string, { userId: string; role: string }>();
+
+/**
+ * Broadcast a user status change to:
+ *  - the `admins` room  (all connected admins receive it)
+ *  - the `user:{userId}` room  (for per-user subscriptions)
+ */
+export const broadcastUserStatus = (userId: string, isOnline: boolean) => {
+  if (!io) { console.warn('[socket] broadcastUserStatus called before io initialized'); return; }
+  const payload = { userId, isOnline, timestamp: new Date() };
+  io.to('admins').to(`user:${userId}`).emit('user:status', payload);
+  console.log(`[socket] broadcast user:status → userId=${userId} isOnline=${isOnline}`);
+};
+
+const sendSnapshot = (socket: Socket) => {
+  User.find({ isOnline: true }).select('_id').lean()
+    .then((users) => {
+      const onlineIds = users.map((u) => String(u._id));
+      socket.emit('users:snapshot', { onlineIds });
+      console.log(`[socket] snapshot sent: ${onlineIds.length} online`);
+    })
+    .catch(console.error);
+};
 
 export const initSocket = (httpServer: HttpServer): SocketServer => {
   io = new SocketServer(httpServer, {
@@ -21,7 +43,6 @@ export const initSocket = (httpServer: HttpServer): SocketServer => {
 
   io.on('connection', (socket: Socket) => {
     const token = socket.handshake.auth?.token as string | undefined;
-
     if (!token) { socket.disconnect(); return; }
 
     let userId: string;
@@ -37,56 +58,62 @@ export const initSocket = (httpServer: HttpServer): SocketServer => {
     }
 
     socketUserMap.set(socket.id, { userId, role });
+    console.log(`[socket] ${role} connected: ${userId} (${socket.id})`);
+
+    // Mark ANY connected user as online (admin or regular)
+    User.findByIdAndUpdate(userId, { isOnline: true, lastSeen: new Date() })
+      .then(() => broadcastUserStatus(userId, true))
+      .catch(console.error);
 
     if (role === 'admin') {
       socket.join('admins');
 
-      // Admin subscribes to specific user-id topics
+      // Push full online snapshot immediately
+      sendSnapshot(socket);
+
       socket.on('subscribe:users', (userIds: string[]) => {
         if (!Array.isArray(userIds)) return;
         userIds.forEach((id) => socket.join(`user:${id}`));
+        console.log(`[socket] admin subscribed to ${userIds.length} users`);
       });
 
-      // Admin unsubscribes from user-id topics
       socket.on('unsubscribe:users', (userIds: string[]) => {
         if (!Array.isArray(userIds)) return;
         userIds.forEach((id) => socket.leave(`user:${id}`));
       });
 
-    } else {
-      // Regular user — join their personal room and mark online
-      socket.join(`user:${userId}`);
+      // Per-user status pull
+      socket.on('request:user:status', (uid: string) => {
+        if (!uid) return;
+        User.findById(uid).select('isOnline isActive').lean()
+          .then((u) => {
+            if (u) socket.emit('user:status', {
+              userId: uid,
+              isOnline: (u as any).isOnline ?? false,
+              timestamp: new Date(),
+            });
+          })
+          .catch(console.error);
+      });
 
-      User.findByIdAndUpdate(userId, { isOnline: true, lastSeen: new Date() })
-        .then(() => {
-          io.to(`user:${userId}`).emit('user:status', {
-            userId,
-            isOnline: true,
-            timestamp: new Date(),
-          });
-        })
-        .catch(console.error);
+      // Full snapshot re-request (after page/search change)
+      socket.on('request:snapshot', () => sendSnapshot(socket));
+
+    } else {
+      socket.join(`user:${userId}`);
     }
 
     socket.on('disconnect', () => {
       const entry = socketUserMap.get(socket.id);
       socketUserMap.delete(socket.id);
-
-      if (!entry || entry.role === 'admin') return;
+      if (!entry) return;
 
       const { userId: uid } = entry;
-
-      // Only mark offline if no other socket for this user is active
+      // Only mark offline if no other socket is still connected for this user
       const stillConnected = [...socketUserMap.values()].some((e) => e.userId === uid);
       if (!stillConnected) {
         User.findByIdAndUpdate(uid, { isOnline: false, lastSeen: new Date() })
-          .then(() => {
-            io.to(`user:${uid}`).emit('user:status', {
-              userId: uid,
-              isOnline: false,
-              timestamp: new Date(),
-            });
-          })
+          .then(() => broadcastUserStatus(uid, false))
           .catch(console.error);
       }
     });

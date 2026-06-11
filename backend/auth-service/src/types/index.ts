@@ -36,6 +36,7 @@ export interface IUser extends Document {
   firebaseUid?: string;
   googleId?: string;
   isEmailVerified: boolean;
+  isActive: boolean;
   refreshTokens: IRefreshToken[];
   isOnline: boolean;
   lastSeen: Date;
