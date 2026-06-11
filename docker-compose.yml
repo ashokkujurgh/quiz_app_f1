@@ -36,6 +36,20 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  # ── Topic service ────────────────────────────────────────
+  topic-service:
+    build:
+      context: ./backend/topic-service
+      dockerfile: Dockerfile
+    container_name: quizhub-topic
+    ports:
+      - "7205:4002"
+    env_file:
+      - ./backend/topic-service/.env
+    environment:
+      ALLOWED_ORIGINS: http://localhost:7203,http://localhost:7204
+    restart: unless-stopped
+
   # ── Admin panel ──────────────────────────────────────────
   admin:
     build:

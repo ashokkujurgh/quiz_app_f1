@@ -3,6 +3,7 @@ import { ThemeProvider } from './lib/theme';
 import Login from './pages/Login';
 import Users from './pages/Users';
 import Quiz from './pages/Quiz';
+import Topics from './pages/Topics';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -40,6 +41,18 @@ export default function App() {
                   <Layout>
                     <ErrorBoundary>
                       <Quiz />
+                    </ErrorBoundary>
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/topics"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <ErrorBoundary>
+                      <Topics />
                     </ErrorBoundary>
                   </Layout>
                 </ProtectedRoute>
