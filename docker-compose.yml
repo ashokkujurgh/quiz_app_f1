@@ -1,0 +1,52 @@
+services:
+
+  # ── RabbitMQ ─────────────────────────────────────────────
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: quizhub-rabbitmq
+    ports:
+      - "7200:5672"
+      - "7201:15672"   # management UI at http://localhost:7201
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Auth service ──────────────────────────────────────────
+  auth-service:
+    build:
+      context: ./backend/auth-service
+      dockerfile: Dockerfile
+    container_name: quizhub-auth
+    ports:
+      - "7202:4001"
+    env_file:
+      - ./backend/auth-service/.env
+    environment:
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      CLIENT_URL: http://localhost:7203
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ── Frontend ──────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./quizapp
+      dockerfile: Dockerfile
+    container_name: quizhub-frontend
+    ports:
+      - "7203:80"
+    depends_on:
+      - auth-service
+    restart: unless-stopped
+
+volumes:
+  rabbitmq_data:
