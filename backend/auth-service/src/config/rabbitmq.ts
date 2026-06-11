@@ -10,15 +10,11 @@ export const QUEUES = {
 } as const;
 
 export const ROUTING_KEYS: Record<AuthEventType, string> = {
-  'user.registered':               'auth.user.registered',
-  'user.logged_in':                'auth.user.logged_in',
-  'user.logged_out':               'auth.user.logged_out',
-  'user.google_oauth':             'auth.user.google_oauth',
-  'user.email_verified':           'auth.user.email_verified',
-  'user.password_reset_requested': 'auth.user.password_reset_requested',
-  'user.password_reset':           'auth.user.password_reset',
-  'user.avatar_uploaded':          'auth.user.avatar_uploaded',
-  'user.profile_updated':          'auth.user.profile_updated',
+  'user.registered':    'auth.user.registered',
+  'user.logged_in':     'auth.user.logged_in',
+  'user.logged_out':    'auth.user.logged_out',
+  'user.avatar_uploaded': 'auth.user.avatar_uploaded',
+  'user.profile_updated': 'auth.user.profile_updated',
 };
 
 class RabbitMQClient {

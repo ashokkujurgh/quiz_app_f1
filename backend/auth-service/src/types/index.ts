@@ -3,7 +3,7 @@ import { Document, Types } from 'mongoose';
 
 // ── User roles ────────────────────────────────────────────
 export type UserRole = 'user' | 'admin';
-export type AuthProvider = 'email' | 'google' | 'firebase';
+export type AuthProvider = 'google' | 'firebase';
 
 // ── Refresh token subdocument ─────────────────────────────
 export interface IRefreshToken {
@@ -27,7 +27,6 @@ export interface IUser extends Document {
   name: string;
   username?: string;
   email: string;
-  password?: string;
   avatar?: string;
   coverImage?: string;
   bio?: string;
@@ -36,17 +35,12 @@ export interface IUser extends Document {
   firebaseUid?: string;
   googleId?: string;
   isEmailVerified: boolean;
-  emailVerificationToken?: string;
-  emailVerificationExpires?: Date;
-  passwordResetToken?: string;
-  passwordResetExpires?: Date;
   refreshTokens: IRefreshToken[];
   isOnline: boolean;
   lastSeen: Date;
   stats: IUserStats;
   createdAt: Date;
   updatedAt: Date;
-  comparePassword(candidatePassword: string): Promise<boolean>;
 }
 
 // ── JWT payload ───────────────────────────────────────────
@@ -74,10 +68,6 @@ export type AuthEventType =
   | 'user.registered'
   | 'user.logged_in'
   | 'user.logged_out'
-  | 'user.google_oauth'
-  | 'user.email_verified'
-  | 'user.password_reset_requested'
-  | 'user.password_reset'
   | 'user.avatar_uploaded'
   | 'user.profile_updated';
 
@@ -86,13 +76,6 @@ export interface AuthEvent<T = Record<string, unknown>> {
   timestamp: string;
   serviceSource: string;
   data: T;
-}
-
-// ── Email helpers ─────────────────────────────────────────
-export interface SendEmailOptions {
-  to: string;
-  subject: string;
-  html: string;
 }
 
 // ── Token pair ────────────────────────────────────────────

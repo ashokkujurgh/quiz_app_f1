@@ -1,9 +1,7 @@
-import crypto from 'crypto';
 import { Response, RequestHandler } from 'express';
 import { validationResult } from 'express-validator';
 import User from '../models/User';
 import { createTokenPair, verifyRefreshToken } from '../utils/jwt';
-import { sendVerificationEmail, sendPasswordResetEmail } from '../utils/email';
 import { getFirebaseAuth } from '../config/firebase';
 import { deleteFileByUrl } from '../config/spaces';
 import rabbitMQ from '../config/rabbitmq';
@@ -27,7 +25,6 @@ export const sendAuthResponse = async (
 ): Promise<void> => {
   const { accessToken, refreshToken, refreshExpiresAt } = createTokenPair(user);
 
-  // Store refresh token (re-fetch with select so array is writable)
   const fullUser = await User.findById(user._id).select('+refreshTokens');
   if (fullUser) {
     fullUser.refreshTokens.push({
@@ -50,83 +47,11 @@ export const sendAuthResponse = async (
 };
 
 // ═══════════════════════════════════════════════════════════
-// POST /api/auth/register
+// POST /api/auth/firebase
+// Accepts a Firebase ID token from either email/password or
+// Google OAuth sign-in. The client always sends the same shape.
 // ═══════════════════════════════════════════════════════════
-export const register: RequestHandler = async (req: AuthRequest, res: Response) => {
-  if (handleValidation(req, res)) return;
-
-  try {
-    const { name, email, password, username } = req.body as {
-      name: string; email: string; password: string; username?: string;
-    };
-
-    if (await User.findOne({ email })) {
-      res.status(409).json({ success: false, message: 'Email already registered.' });
-      return;
-    }
-    if (username && (await User.findOne({ username }))) {
-      res.status(409).json({ success: false, message: 'Username already taken.' });
-      return;
-    }
-
-    const verificationToken = crypto.randomBytes(32).toString('hex');
-    const user = await User.create({
-      name, email, password, username,
-      authProvider: 'email',
-      emailVerificationToken: verificationToken,
-      emailVerificationExpires: new Date(Date.now() + 24 * 60 * 60 * 1000),
-    });
-
-    // Non-blocking side-effects
-    sendVerificationEmail(user, verificationToken).catch(console.error);
-    rabbitMQ.publish('user.registered', {
-      userId: user._id.toString(),
-      name: user.name,
-      email: user.email,
-      authProvider: 'email',
-    }).catch(console.error);
-
-    await sendAuthResponse(res, req, user, 201);
-  } catch (err) {
-    console.error('Register error:', err);
-    res.status(500).json({ success: false, message: 'Registration failed. Please try again.' });
-  }
-};
-
-// ═══════════════════════════════════════════════════════════
-// POST /api/auth/login
-// ═══════════════════════════════════════════════════════════
-export const login: RequestHandler = async (req: AuthRequest, res: Response) => {
-  if (handleValidation(req, res)) return;
-
-  try {
-    const { email, password } = req.body as { email: string; password: string };
-
-    const user = await User.findOne({ email }).select('+password +refreshTokens');
-    if (!user?.password || !(await user.comparePassword(password))) {
-      res.status(401).json({ success: false, message: 'Invalid credentials.' });
-      return;
-    }
-
-    user.isOnline = true;
-    user.lastSeen = new Date();
-
-    rabbitMQ.publish('user.logged_in', {
-      userId: user._id.toString(),
-      email: user.email,
-    }).catch(console.error);
-
-    await sendAuthResponse(res, req, user);
-  } catch (err) {
-    console.error('Login error:', err);
-    res.status(500).json({ success: false, message: 'Login failed. Please try again.' });
-  }
-};
-
-// ═══════════════════════════════════════════════════════════
-// POST /api/auth/google/firebase
-// ═══════════════════════════════════════════════════════════
-export const googleFirebase: RequestHandler = async (req: AuthRequest, res: Response) => {
+export const firebaseAuth: RequestHandler = async (req: AuthRequest, res: Response) => {
   try {
     const { idToken } = req.body as { idToken?: string };
     if (!idToken) {
@@ -134,14 +59,16 @@ export const googleFirebase: RequestHandler = async (req: AuthRequest, res: Resp
       return;
     }
 
-    const firebaseAuth = getFirebaseAuth();
-    const decoded = await firebaseAuth.verifyIdToken(idToken);
-    const { uid, email, name, picture, email_verified } = decoded;
+    const firebaseAdmin = getFirebaseAuth();
+    const decoded = await firebaseAdmin.verifyIdToken(idToken);
+    const { uid, email, name, picture, email_verified, firebase } = decoded;
 
     if (!email) {
-      res.status(400).json({ success: false, message: 'No email associated with this Google account.' });
+      res.status(400).json({ success: false, message: 'No email associated with this account.' });
       return;
     }
+
+    const provider = (firebase?.sign_in_provider === 'google.com') ? 'google' : 'firebase';
 
     let user = (await User.findOne({ $or: [{ firebaseUid: uid }, { email }] }).select('+refreshTokens')) as IUser | null;
     const isNewUser = !user;
@@ -149,6 +76,7 @@ export const googleFirebase: RequestHandler = async (req: AuthRequest, res: Resp
     if (user) {
       if (!user.firebaseUid) user.firebaseUid = uid;
       if (picture && !user.avatar) user.avatar = picture;
+      if (provider === 'google' && !user.googleId) user.googleId = uid;
       user.isOnline = true;
       user.lastSeen = new Date();
       user.isEmailVerified = email_verified ?? user.isEmailVerified;
@@ -158,9 +86,9 @@ export const googleFirebase: RequestHandler = async (req: AuthRequest, res: Resp
         name: name ?? email.split('@')[0],
         email,
         firebaseUid: uid,
-        googleId: uid,
+        googleId: provider === 'google' ? uid : undefined,
         avatar: picture ?? null,
-        authProvider: 'google',
+        authProvider: provider,
         isEmailVerified: email_verified ?? false,
         isOnline: true,
       });
@@ -172,21 +100,21 @@ export const googleFirebase: RequestHandler = async (req: AuthRequest, res: Resp
       return;
     }
 
-    rabbitMQ.publish(isNewUser ? 'user.registered' : 'user.google_oauth', {
+    rabbitMQ.publish(isNewUser ? 'user.registered' : 'user.logged_in', {
       userId: user._id.toString(),
       email: user.email,
-      authProvider: 'google',
+      authProvider: provider,
     }).catch(console.error);
 
-    await sendAuthResponse(res, req, user as IUser);
+    await sendAuthResponse(res, req, user as IUser, isNewUser ? 201 : 200);
   } catch (err) {
     const error = err as { code?: string; message?: string };
-    console.error('Firebase Google auth error:', error);
+    console.error('Firebase auth error:', error);
     if (error.code === 'auth/id-token-expired') {
-      res.status(401).json({ success: false, message: 'Google token expired. Please sign in again.' });
+      res.status(401).json({ success: false, message: 'Token expired. Please sign in again.' });
       return;
     }
-    res.status(401).json({ success: false, message: 'Google authentication failed.' });
+    res.status(401).json({ success: false, message: 'Firebase authentication failed.' });
   }
 };
 
@@ -217,7 +145,6 @@ export const refreshToken: RequestHandler = async (req: AuthRequest, res: Respon
       return;
     }
 
-    // Rotate
     user.refreshTokens = user.refreshTokens.filter((t) => t.token !== token);
     await sendAuthResponse(res, req, user);
   } catch {
@@ -256,107 +183,6 @@ export const logout: RequestHandler = async (req: AuthRequest, res: Response) =>
 // ═══════════════════════════════════════════════════════════
 export const getMe: RequestHandler = (req: AuthRequest, res: Response): void => {
   res.json({ success: true, user: req.user });
-};
-
-// ═══════════════════════════════════════════════════════════
-// GET /api/auth/verify-email
-// ═══════════════════════════════════════════════════════════
-export const verifyEmail: RequestHandler = async (req: AuthRequest, res: Response) => {
-  try {
-    const { token } = req.query as { token?: string };
-    if (!token) {
-      res.status(400).json({ success: false, message: 'Verification token is required.' });
-      return;
-    }
-
-    const user = await User.findOne({
-      emailVerificationToken: token,
-      emailVerificationExpires: { $gt: Date.now() },
-    });
-
-    if (!user) {
-      res.status(400).json({ success: false, message: 'Token invalid or expired.' });
-      return;
-    }
-
-    user.isEmailVerified = true;
-    user.emailVerificationToken = undefined;
-    user.emailVerificationExpires = undefined;
-    await user.save({ validateBeforeSave: false });
-
-    rabbitMQ.publish('user.email_verified', {
-      userId: user._id.toString(),
-      email: user.email,
-    }).catch(console.error);
-
-    res.json({ success: true, message: 'Email verified successfully.' });
-  } catch {
-    res.status(500).json({ success: false, message: 'Email verification failed.' });
-  }
-};
-
-// ═══════════════════════════════════════════════════════════
-// POST /api/auth/forgot-password
-// ═══════════════════════════════════════════════════════════
-export const forgotPassword: RequestHandler = async (req: AuthRequest, res: Response) => {
-  if (handleValidation(req, res)) return;
-
-  try {
-    const { email } = req.body as { email: string };
-    const user = await User.findOne({ email });
-
-    if (user) {
-      const resetToken = crypto.randomBytes(32).toString('hex');
-      user.passwordResetToken = crypto.createHash('sha256').update(resetToken).digest('hex');
-      user.passwordResetExpires = new Date(Date.now() + 60 * 60 * 1000);
-      await user.save({ validateBeforeSave: false });
-
-      sendPasswordResetEmail(user, resetToken).catch(console.error);
-      rabbitMQ.publish('user.password_reset_requested', {
-        userId: user._id.toString(),
-        email: user.email,
-      }).catch(console.error);
-    }
-
-    // Always return success (prevents email enumeration)
-    res.json({ success: true, message: 'If that email exists, a reset link was sent.' });
-  } catch {
-    res.status(500).json({ success: false, message: 'Failed to process request.' });
-  }
-};
-
-// ═══════════════════════════════════════════════════════════
-// POST /api/auth/reset-password
-// ═══════════════════════════════════════════════════════════
-export const resetPassword: RequestHandler = async (req: AuthRequest, res: Response) => {
-  if (handleValidation(req, res)) return;
-
-  try {
-    const { token, password } = req.body as { token: string; password: string };
-    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
-
-    const user = await User.findOne({
-      passwordResetToken: hashedToken,
-      passwordResetExpires: { $gt: Date.now() },
-    }).select('+refreshTokens');
-
-    if (!user) {
-      res.status(400).json({ success: false, message: 'Reset token invalid or expired.' });
-      return;
-    }
-
-    user.password = password;
-    user.passwordResetToken = undefined;
-    user.passwordResetExpires = undefined;
-    user.refreshTokens = [];
-    await user.save();
-
-    rabbitMQ.publish('user.password_reset', { userId: user._id.toString() }).catch(console.error);
-
-    res.json({ success: true, message: 'Password reset successfully. Please log in.' });
-  } catch {
-    res.status(500).json({ success: false, message: 'Password reset failed.' });
-  }
 };
 
 // ═══════════════════════════════════════════════════════════
