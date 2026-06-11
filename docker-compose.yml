@@ -36,6 +36,18 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  # ── Admin panel ──────────────────────────────────────────
+  admin:
+    build:
+      context: ./admin
+      dockerfile: Dockerfile
+    container_name: quizhub-admin
+    ports:
+      - "7204:80"
+    depends_on:
+      - auth-service
+    restart: unless-stopped
+
   # ── Frontend ──────────────────────────────────────────────
   frontend:
     build:

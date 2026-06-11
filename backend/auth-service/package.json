@@ -8,6 +8,7 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
+    "seed:admin": "ts-node --transpile-only src/scripts/seedAdmin.ts",
     "lint": "eslint src --ext .ts"
   },
   "dependencies": {
@@ -29,6 +30,7 @@
     "multer": "^1.4.5-lts.1",
     "multer-s3": "^3.0.1",
     "nodemailer": "^6.9.14",
+    "socket.io": "^4.8.3",
     "uuid": "^10.0.0"
   },
   "devDependencies": {

@@ -8,6 +8,8 @@ import {
   refreshToken,
   logout,
   getMe,
+  setOnline,
+  setOffline,
   uploadAvatar,
   uploadCover,
   updateProfile,
@@ -31,6 +33,8 @@ router.post('/firebase',  firebaseAuth);
 router.post('/refresh',   refreshToken);
 router.post('/logout',    protect, logout);
 router.get('/me',         protect, getMe);
+router.post('/online',    protect, setOnline);
+router.post('/offline',   protect, setOffline);
 
 // Upload routes
 router.post('/upload/avatar', protect, (req: AuthRequest, res: Response): void => {

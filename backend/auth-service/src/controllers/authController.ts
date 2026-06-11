@@ -7,6 +7,19 @@ import { deleteFileByUrl } from '../config/spaces';
 import rabbitMQ from '../config/rabbitmq';
 import { AuthRequest, IUser, MulterS3File } from '../types';
 
+const emitUserStatus = (userId: string, isOnline: boolean) => {
+  try {
+    const { getIO } = require('../config/socket');
+    getIO().to(`user:${userId}`).emit('user:status', {
+      userId,
+      isOnline,
+      timestamp: new Date(),
+    });
+  } catch {
+    // socket not yet initialized — skip silently
+  }
+};
+
 // ── Helpers ───────────────────────────────────────────────
 export const handleValidation = (req: AuthRequest, res: Response): boolean => {
   const errors = validationResult(req);
@@ -81,6 +94,7 @@ export const firebaseAuth: RequestHandler = async (req: AuthRequest, res: Respon
       user.lastSeen = new Date();
       user.isEmailVerified = email_verified ?? user.isEmailVerified;
       await user.save({ validateBeforeSave: false });
+      emitUserStatus(user._id.toString(), true);
     } else {
       const created = await User.create({
         name: name ?? email.split('@')[0],
@@ -93,6 +107,7 @@ export const firebaseAuth: RequestHandler = async (req: AuthRequest, res: Respon
         isOnline: true,
       });
       user = (await User.findById(created._id).select('+refreshTokens')) as IUser | null;
+      if (user) emitUserStatus(user._id.toString(), true);
     }
 
     if (!user) {
@@ -166,6 +181,7 @@ export const logout: RequestHandler = async (req: AuthRequest, res: Response) =>
       user.isOnline = false;
       user.lastSeen = new Date();
       await user.save({ validateBeforeSave: false });
+      emitUserStatus(user._id.toString(), false);
     }
 
     rabbitMQ.publish('user.logged_out', { userId: req.user!._id.toString() }).catch(console.error);
@@ -183,6 +199,32 @@ export const logout: RequestHandler = async (req: AuthRequest, res: Response) =>
 // ═══════════════════════════════════════════════════════════
 export const getMe: RequestHandler = (req: AuthRequest, res: Response): void => {
   res.json({ success: true, user: req.user });
+};
+
+// ═══════════════════════════════════════════════════════════
+// POST /api/auth/online   — called on page load / app resume
+// POST /api/auth/offline  — called on page unload (keepalive)
+// ═══════════════════════════════════════════════════════════
+export const setOnline: RequestHandler = async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!._id.toString();
+    await User.findByIdAndUpdate(userId, { isOnline: true, lastSeen: new Date() });
+    emitUserStatus(userId, true);
+    res.json({ success: true });
+  } catch {
+    res.status(500).json({ success: false });
+  }
+};
+
+export const setOffline: RequestHandler = async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!._id.toString();
+    await User.findByIdAndUpdate(userId, { isOnline: false, lastSeen: new Date() });
+    emitUserStatus(userId, false);
+    res.json({ success: true });
+  } catch {
+    res.status(500).json({ success: false });
+  }
 };
 
 // ═══════════════════════════════════════════════════════════

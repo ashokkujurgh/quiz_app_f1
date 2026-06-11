@@ -15,6 +15,7 @@ export const ROUTING_KEYS: Record<AuthEventType, string> = {
   'user.logged_out':    'auth.user.logged_out',
   'user.avatar_uploaded': 'auth.user.avatar_uploaded',
   'user.profile_updated': 'auth.user.profile_updated',
+  'admin.user_created':   'auth.admin.user_created',
 };
 
 class RabbitMQClient {

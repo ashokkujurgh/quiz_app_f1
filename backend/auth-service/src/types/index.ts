@@ -3,7 +3,7 @@ import { Document, Types } from 'mongoose';
 
 // ── User roles ────────────────────────────────────────────
 export type UserRole = 'user' | 'admin';
-export type AuthProvider = 'google' | 'firebase';
+export type AuthProvider = 'email' | 'google' | 'firebase';
 
 // ── Refresh token subdocument ─────────────────────────────
 export interface IRefreshToken {
@@ -27,6 +27,7 @@ export interface IUser extends Document {
   name: string;
   username?: string;
   email: string;
+  password?: string;
   avatar?: string;
   coverImage?: string;
   bio?: string;
@@ -41,6 +42,7 @@ export interface IUser extends Document {
   stats: IUserStats;
   createdAt: Date;
   updatedAt: Date;
+  comparePassword(candidatePassword: string): Promise<boolean>;
 }
 
 // ── JWT payload ───────────────────────────────────────────
@@ -69,7 +71,8 @@ export type AuthEventType =
   | 'user.logged_in'
   | 'user.logged_out'
   | 'user.avatar_uploaded'
-  | 'user.profile_updated';
+  | 'user.profile_updated'
+  | 'admin.user_created';
 
 export interface AuthEvent<T = Record<string, unknown>> {
   event: AuthEventType;
