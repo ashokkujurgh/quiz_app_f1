@@ -50,6 +50,20 @@ services:
       ALLOWED_ORIGINS: http://localhost:7203,http://localhost:7204
     restart: unless-stopped
 
+  # ── Question service ─────────────────────────────────────
+  question-service:
+    build:
+      context: ./backend/question-service
+      dockerfile: Dockerfile
+    container_name: quizhub-question
+    ports:
+      - "7206:4003"
+    env_file:
+      - ./backend/question-service/.env
+    environment:
+      ALLOWED_ORIGINS: http://localhost:7203,http://localhost:7204
+    restart: unless-stopped
+
   # ── Admin panel ──────────────────────────────────────────
   admin:
     build:

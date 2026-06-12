@@ -4,6 +4,7 @@ import Login from './pages/Login';
 import Users from './pages/Users';
 import Quiz from './pages/Quiz';
 import Topics from './pages/Topics';
+import Questions from './pages/Questions';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -53,6 +54,18 @@ export default function App() {
                   <Layout>
                     <ErrorBoundary>
                       <Topics />
+                    </ErrorBoundary>
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/questions"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <ErrorBoundary>
+                      <Questions />
                     </ErrorBoundary>
                   </Layout>
                 </ProtectedRoute>

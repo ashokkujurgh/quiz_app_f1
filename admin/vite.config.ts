@@ -6,6 +6,10 @@ export default defineConfig({
   server: {
     port: 5174,
     proxy: {
+      '/api/questions': {
+        target: 'http://localhost:4003',
+        changeOrigin: true,
+      },
       '/api/topics': {
         target: 'http://localhost:4002',
         changeOrigin: true,
