@@ -1,5 +1,8 @@
-openai==1.35.3
-pinecone==4.1.0
+langchain>=0.3.0
+langchain-openai>=0.2.0
+langchain-pinecone>=0.2.0
+langchain-core>=0.3.0
+pinecone>=4.1.0
 apscheduler==3.10.4
 requests==2.32.3
 python-dotenv==1.0.1
