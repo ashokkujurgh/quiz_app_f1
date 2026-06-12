@@ -1,7 +1,7 @@
 import { useState, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../lib/api';
-import { setToken } from '../lib/auth';
+import { setToken, setAdminProfile } from '../lib/auth';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -17,6 +17,7 @@ export default function Login() {
     try {
       const { data } = await api.post('/api/admin/login', { email, password });
       setToken(data.accessToken);
+      setAdminProfile(data.user);
       navigate('/');
     } catch (err: any) {
       setError(err.response?.data?.message ?? 'Login failed. Check your credentials.');

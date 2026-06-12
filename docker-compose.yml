@@ -50,6 +50,20 @@ services:
       ALLOWED_ORIGINS: http://localhost:7203,http://localhost:7204
     restart: unless-stopped
 
+  # ── Post service ─────────────────────────────────────────
+  post-service:
+    build:
+      context: ./backend/post-service
+      dockerfile: Dockerfile
+    container_name: quizhub-post
+    ports:
+      - "7207:4004"
+    env_file:
+      - ./backend/post-service/.env
+    environment:
+      ALLOWED_ORIGINS: http://localhost:7203,http://localhost:7204
+    restart: unless-stopped
+
   # ── Question service ─────────────────────────────────────
   question-service:
     build:
@@ -62,6 +76,20 @@ services:
       - ./backend/question-service/.env
     environment:
       ALLOWED_ORIGINS: http://localhost:7203,http://localhost:7204
+    restart: unless-stopped
+
+  # ── Agentic question generator (cron every 20 min) ───────
+  agentic:
+    build:
+      context: ./agentic
+      dockerfile: Dockerfile
+    container_name: quizhub-agentic
+    env_file:
+      - ./agentic/.env
+    depends_on:
+      - auth-service
+      - topic-service
+      - question-service
     restart: unless-stopped
 
   # ── Admin panel ──────────────────────────────────────────

@@ -52,6 +52,20 @@ export const adminLogin: RequestHandler = async (req: AuthRequest, res: Response
 };
 
 // ═══════════════════════════════════════════════════════════
+// GET /api/admin/me
+// ═══════════════════════════════════════════════════════════
+export const getMe: RequestHandler = async (req: AuthRequest, res: Response) => {
+  try {
+    const user = await User.findById(req.user!._id).select('-refreshTokens');
+    if (!user) { res.status(404).json({ success: false, message: 'User not found.' }); return; }
+    res.json({ success: true, user });
+  } catch (err) {
+    console.error('Get me error:', err);
+    res.status(500).json({ success: false, message: 'Failed to fetch profile.' });
+  }
+};
+
+// ═══════════════════════════════════════════════════════════
 // GET /api/admin/users
 // ═══════════════════════════════════════════════════════════
 export const listUsers: RequestHandler = async (req: AuthRequest, res: Response) => {
