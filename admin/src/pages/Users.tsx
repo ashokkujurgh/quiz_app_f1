@@ -4,6 +4,7 @@ import { connectSocket, disconnectSocket, subscribeToUsers, unsubscribeFromUsers
 import CreateAdminModal from '../components/CreateAdminModal';
 import UserRow from '../components/UserRow';
 
+  
 interface User {
   _id: string;
   name: string;
@@ -110,6 +111,7 @@ export default function Users() {
     };
   }, []);
 
+  
   const handleToggleStatus = async (user: User) => {
     setToggling(user._id);
     try {
@@ -117,8 +119,9 @@ export default function Users() {
       setUsers((prev) =>
         prev.map((u) => u._id === user._id ? { ...u, isActive: data.isActive } : u)
       );
-    } catch (err: any) {
-      alert(err.response?.data?.message ?? 'Failed to update status.');
+    } catch (err) {
+      const error = err as { response?: { data?: { message?: string } } };
+      alert(error.response?.data?.message ?? 'Failed to update status.');
     } finally {
       setToggling(null);
     }
