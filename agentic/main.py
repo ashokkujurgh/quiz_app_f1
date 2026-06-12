@@ -9,6 +9,7 @@ from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from config import CRON_INTERVAL_MINUTES
 from agent import run_agent
+from seed_topics import seed_topics
 
 logging.basicConfig(
     level=logging.INFO,
@@ -41,6 +42,7 @@ def main() -> None:
         "Scheduler started — running every %d minutes. Press Ctrl+C to stop.",
         CRON_INTERVAL_MINUTES,
     )
+    seed_topics()
     # Run once immediately on startup, then on schedule
     run_agent()
     scheduler.start()

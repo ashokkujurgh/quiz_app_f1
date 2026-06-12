@@ -25,8 +25,8 @@ EMBED_DIM        = 1536
 # Similarity threshold — cosine score above this means "already exists"
 SIMILARITY_THRESHOLD = 0.92
 
-# Cron: every 20 minutes
-CRON_INTERVAL_MINUTES = 20
+# Cron: every 10 minutes
+CRON_INTERVAL_MINUTES = 10
 
 # How many subtopics to pick per run
 SUBTOPICS_PER_RUN = 1

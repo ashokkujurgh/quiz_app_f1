@@ -1,12 +1,12 @@
 """
-Main agent job: pick random subtopics → generate question → embed →
-check Pinecone for duplicates → if new, save to Pinecone + backend.
+Main agent job: pick random subtopics → RAG-augmented generation →
+check Pinecone for duplicates → if new, save to backend + Pinecone.
 """
 import logging
 import random
 from topic_client import fetch_all_subtopics
-from openai_client import generate_question, embed_text
-from pinecone_client import question_exists, upsert_question
+from generator import generate_question
+from rag_store import question_exists, upsert_question
 from question_client import save_question
 from config import SUBTOPICS_PER_RUN
 
@@ -41,13 +41,7 @@ def run_agent() -> None:
             logger.warning("No question generated for '%s'. Skipping.", subtopic_name)
             continue
 
-        try:
-            embedding = embed_text(question["text"])
-        except Exception as exc:
-            logger.error("Embedding failed for '%s': %s", subtopic_name, exc)
-            continue
-
-        exists, matched_id = question_exists(embedding)
+        exists, matched_id = question_exists(question["text"])
         if exists:
             logger.info(
                 "Duplicate question detected (matched=%s) for '%s'. Skipping.",
@@ -62,7 +56,7 @@ def run_agent() -> None:
 
         upsert_question(
             question_id=saved["_id"],
-            embedding=embedding,
+            text=question["text"],
             metadata={
                 "question_id": saved["_id"],
                 "topic":       topic_name,
