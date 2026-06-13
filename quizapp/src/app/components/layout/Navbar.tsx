@@ -145,13 +145,15 @@ export function Navbar({ onMenuToggle }: Props) {
           </Tooltip>
 
           {/* Profile */}
-          {user && (
-            <Tooltip title="Profile">
-              <IconButton onClick={(e) => setProfileAnchor(e.currentTarget)} sx={{ p: 0.5 }}>
+          <Tooltip title="Profile">
+            <IconButton onClick={(e) => setProfileAnchor(e.currentTarget)} sx={{ p: 0.5 }}>
+              {user ? (
                 <UserAvatar user={user} size={34} />
-              </IconButton>
-            </Tooltip>
-          )}
+              ) : (
+                <Avatar sx={{ width: 34, height: 34 }} />
+              )}
+            </IconButton>
+          </Tooltip>
         </Stack>
 
         {/* Notification Menu */}
@@ -213,12 +215,10 @@ export function Navbar({ onMenuToggle }: Props) {
           transformOrigin={{ horizontal: 'right', vertical: 'top' }}
           anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
         >
-          {user && (
-            <Box sx={{ px: 2, py: 1.5 }}>
-              <Typography variant="subtitle2" fontWeight={700}>{user.name}</Typography>
-              <Typography variant="caption" color="text.secondary">@{user.username}</Typography>
-            </Box>
-          )}
+          <Box sx={{ px: 2, py: 1.5 }}>
+            <Typography variant="subtitle2" fontWeight={700}>{user?.name ?? ''}</Typography>
+            <Typography variant="caption" color="text.secondary">@{user?.username ?? ''}</Typography>
+          </Box>
           <Divider />
           <MenuItem onClick={() => { navigate('/profile'); setProfileAnchor(null); }}>
             <ListItemIcon><Person fontSize="small" /></ListItemIcon>
