@@ -11,10 +11,18 @@ function isValidId(id: string): boolean {
 }
 
 // ── GET /api/questions ────────────────────────────────────────────────────────
-// Query params: topic, subTopic, difficulty, page, limit, search
+// Query params: ids (comma-separated), topic, subTopic, difficulty, page, limit, search
 export const getQuestions: RequestHandler = async (req: Request, res: Response) => {
   try {
-    const { topic, subTopic, difficulty, page = '1', limit = '20', search } = req.query as Record<string, string>;
+    const { ids, topic, subTopic, difficulty, page = '1', limit = '20', search } = req.query as Record<string, string>;
+
+    // When specific IDs are requested (e.g. fetching quiz questions), return exactly those
+    if (ids) {
+      const idList = ids.split(',').filter(isValidId).map((id) => new mongoose.Types.ObjectId(id));
+      const questions = await Question.find({ _id: { $in: idList } }).lean();
+      res.json({ success: true, questions, pagination: { total: questions.length, page: 1, limit: questions.length, pages: 1 } });
+      return;
+    }
 
     const filter: Record<string, unknown> = { isActive: true };
 
@@ -34,7 +42,7 @@ export const getQuestions: RequestHandler = async (req: Request, res: Response) 
     }
 
     const pageNum  = Math.max(1, parseInt(page,  10) || 1);
-    const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
+    const limitNum = Math.min(200, Math.max(1, parseInt(limit, 10) || 20));
     const skip     = (pageNum - 1) * limitNum;
 
     const [questions, total] = await Promise.all([

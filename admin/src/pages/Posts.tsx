@@ -123,6 +123,8 @@ function CreatePostModal({
 }) {
   const [content, setContent]               = useState('');
   const [image, setImage]                   = useState('');
+  const [imageFile, setImageFile]           = useState<File | null>(null);
+  const [uploading, setUploading]           = useState(false);
   const [selectedTopicId, setSelectedTopicId]   = useState(topics[0]?._id ?? '');
   const [selectedTopicName, setSelectedTopicName] = useState(topics[0]?.name ?? '');
   const [subTopics, setSubTopics]           = useState<SubTopic[]>([]);
@@ -181,9 +183,20 @@ function CreatePostModal({
 
     setSaving(true); setError('');
     try {
+      let imageUrl = image.trim() || null;
+      if (imageFile) {
+        setUploading(true);
+        const fd = new FormData();
+        fd.append('image', imageFile);
+        const { data: uploadData } = await api.post('/api/auth/upload/image', fd, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        imageUrl = uploadData.url ?? null;
+        setUploading(false);
+      }
       const { data } = await api.post('/api/posts', {
         content:        content.trim(),
-        image:          image.trim() || null,
+        image:          imageUrl,
         topic:          selectedTopicName,
         subTopic:       subTopicName,
         timezone,
@@ -339,28 +352,46 @@ function CreatePostModal({
             </p>
           </div>
 
-          {/* Image URL */}
+          {/* Image Upload */}
           <div>
             <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Image URL <span className="text-gray-400 font-normal">(optional)</span>
+              Image <span className="text-gray-400 font-normal">(optional)</span>
             </label>
-            <input
-              type="url"
-              value={image}
-              onChange={(e) => setImage(e.target.value)}
-              placeholder="https://example.com/image.jpg"
-              className="w-full text-sm rounded-xl px-3 py-2 border
-                bg-white border-gray-200 text-gray-900 placeholder-gray-400
-                dark:bg-gray-800 dark:border-gray-700 dark:text-white dark:placeholder-gray-500
-                focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-            {image.trim() && (
-              <img
-                src={image}
-                alt="preview"
-                className="mt-2 w-full h-32 object-cover rounded-xl border border-gray-200 dark:border-gray-700"
-                onError={(e) => (e.currentTarget.style.display = 'none')}
-              />
+            {image ? (
+              <div className="relative mt-1">
+                <img
+                  src={image}
+                  alt="preview"
+                  className="w-full h-32 object-cover rounded-xl border border-gray-200 dark:border-gray-700"
+                />
+                <button
+                  type="button"
+                  onClick={() => { setImage(''); setImageFile(null); }}
+                  className="absolute top-2 right-2 p-1 bg-black/50 hover:bg-black/70 text-white rounded-lg transition-colors"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            ) : (
+              <label className="mt-1 flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-xl cursor-pointer hover:border-indigo-400 transition-colors">
+                <svg className="w-6 h-6 text-gray-400 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <span className="text-xs text-gray-400">Click to upload (JPEG, PNG, WebP — max 5MB)</span>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/gif,image/webp"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (!f) return;
+                    setImageFile(f);
+                    setImage(URL.createObjectURL(f));
+                  }}
+                />
+              </label>
             )}
           </div>
         </form>
@@ -378,11 +409,11 @@ function CreatePostModal({
           <button
             type="submit"
             form="cpform"
-            disabled={saving || !content.trim()}
+            disabled={saving || uploading || !content.trim()}
             className="px-5 py-2 text-sm font-semibold bg-indigo-600 hover:bg-indigo-500
               text-white rounded-xl disabled:opacity-50 transition-colors"
           >
-            {saving ? 'Publishing…' : 'Publish Post'}
+            {uploading ? 'Uploading image…' : saving ? 'Publishing…' : 'Publish Post'}
           </button>
         </div>
       </div>

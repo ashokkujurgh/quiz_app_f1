@@ -1,13 +1,7 @@
 import mongoose, { Schema, Model, Document, Types } from 'mongoose';
 
-export type QuizTopic =
-  | 'General Science' | 'Electrical' | 'History' | 'Geography'
-  | 'Mathematics' | 'Physics' | 'Chemistry' | 'Technology';
-
-export const TOPICS: QuizTopic[] = [
-  'General Science', 'Electrical', 'History', 'Geography',
-  'Mathematics', 'Physics', 'Chemistry', 'Technology',
-];
+export type QuizTopic = string;
+export const TOPICS: QuizTopic[] = []; // no longer restricted — topic comes from topic-service
 
 // ── Embedded author snapshot (denormalised) ───────────────────────────────────
 export interface IAuthorSnapshot {
@@ -75,7 +69,7 @@ const quizResultSchema = new Schema<IQuizResult>(
   {
     quizId:     { type: String, required: true },
     quizTitle:  { type: String, required: true },
-    category:   { type: String, enum: TOPICS, required: true },
+    category:   { type: String, required: true },
     score:      { type: Number, required: true },
     total:      { type: Number, required: true },
     percentage: { type: Number, required: true },
@@ -102,7 +96,7 @@ const postSchema = new Schema<IPost>(
     author:     { type: authorSchema, required: true },
     content:    { type: String, required: true, trim: true, maxlength: 2000 },
     image:      { type: String, default: null },
-    topic:      { type: String, enum: TOPICS, required: true },
+    topic:      { type: String, required: true },
     subTopic:   { type: String, default: null },
     timezone:   { type: String, default: 'UTC' },
     likes:      { type: Number, default: 0 },

@@ -59,7 +59,7 @@ router.post('/upload/cover', protect, (req: AuthRequest, res: Response): void =>
 // Generic image upload — returns CDN URL, no user record update
 router.post('/upload/image', protect, (req: AuthRequest, res: Response): void => {
   imageUpload.single('image')(req, res, (err) => {
-    if (err) { res.status(400).json({ success: false, message: (err as Error).message }); return; }
+    if (err) { console.error('Upload err full:', err); res.status(400).json({ success: false, message: (err as Error).message || JSON.stringify(err) }); return; }
     const file = req.file as MulterS3File | undefined;
     if (!file) { res.status(400).json({ success: false, message: 'No file uploaded.' }); return; }
     res.json({ success: true, url: file.location });
