@@ -266,11 +266,14 @@ export function PostCard({ post }: Props) {
             />
             <IconButton
               size="small"
-              color="primary"
               onClick={handleAddComment}
               disabled={!commentText.trim() || submitting}
+              sx={{
+                color: commentText.trim() && !submitting ? 'primary.main' : 'text.disabled',
+                transition: 'color 0.2s',
+              }}
             >
-              {submitting ? <CircularProgress size={18} /> : <SendOutlined fontSize="small" />}
+              {submitting ? <CircularProgress size={18} color="primary" /> : <SendOutlined fontSize="small" />}
             </IconButton>
           </Stack>
         </Box>
