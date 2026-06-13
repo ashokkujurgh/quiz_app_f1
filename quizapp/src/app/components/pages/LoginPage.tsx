@@ -5,39 +5,54 @@ import {
   Divider, FormControlLabel, Checkbox, IconButton, InputAdornment, Alert,
 } from '@mui/material';
 import { Visibility, VisibilityOff, Google } from '@mui/icons-material';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '../../config/firebase';
 import { useAppDispatch } from '../../store/hooks';
 import { loginSuccess } from '../../store/slices/authSlice';
 
-const API = import.meta.env.VITE_API_URL ?? 'http://localhost:4001';
+const API = import.meta.env.VITE_API_URL ?? '';
 
 export function LoginPage() {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
-  const [email, setEmail]     = useState('');
+  const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
-  const [showPw, setShowPw]   = useState(false);
+  const [showPw, setShowPw]     = useState(false);
   const [remember, setRemember] = useState(false);
-  const [error, setError]     = useState('');
-  const [loading, setLoading] = useState(false);
+  const [error, setError]       = useState('');
+  const [loading, setLoading]   = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) { setError('Please fill in all fields.'); return; }
-    setError('');
-    setLoading(true);
+    setError(''); setLoading(true);
     try {
-      const res = await fetch(`${API}/api/auth/login`, {
+      // Step 1 — Sign in with Firebase
+      const credential = await signInWithEmailAndPassword(auth, email, password);
+      const idToken    = await credential.user.getIdToken();
+
+      // Step 2 — Exchange Firebase ID token with backend
+      const res = await fetch(`${API}/api/auth/firebase`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ idToken }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.message ?? 'Login failed.'); return; }
       dispatch(loginSuccess({ user: data.user, accessToken: data.accessToken }));
       navigate('/home');
-    } catch {
-      setError('Cannot connect to server. Please try again.');
+    } catch (err: any) {
+      const code = err?.code ?? '';
+      if (code === 'auth/user-not-found' || code === 'auth/wrong-password' || code === 'auth/invalid-credential') {
+        setError('Invalid email or password.');
+      } else if (code === 'auth/too-many-requests') {
+        setError('Too many attempts. Please try again later.');
+      } else if (code === 'auth/network-request-failed') {
+        setError('Network error. Please check your connection.');
+      } else {
+        setError(err?.message ?? 'Login failed. Please try again.');
+      }
     } finally {
       setLoading(false);
     }

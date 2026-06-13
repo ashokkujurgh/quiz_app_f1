@@ -5,31 +5,67 @@ import {
   Avatar, IconButton, InputAdornment, Alert,
 } from '@mui/material';
 import { Visibility, VisibilityOff, CameraAlt } from '@mui/icons-material';
+import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { auth } from '../../config/firebase';
 import { useAppDispatch } from '../../store/hooks';
-import { signup } from '../../store/slices/authSlice';
+import { loginSuccess } from '../../store/slices/authSlice';
+
+const API = import.meta.env.VITE_API_URL ?? '';
 
 export function SignupPage() {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
-  const [form, setForm] = useState({ name: '', username: '', email: '', password: '', confirm: '' });
+  const [form, setForm] = useState({ name: '', email: '', password: '', confirm: '' });
   const [showPw, setShowPw] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError]   = useState('');
+  const [loading, setLoading] = useState(false);
 
   const update = (field: string) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((f) => ({ ...f, [field]: e.target.value }));
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.name || !form.username || !form.email || !form.password) {
-      setError('Please fill in all fields.');
-      return;
+    if (!form.name || !form.email || !form.password) {
+      setError('Please fill in all fields.'); return;
     }
     if (form.password !== form.confirm) {
-      setError('Passwords do not match.');
-      return;
+      setError('Passwords do not match.'); return;
     }
-    dispatch(signup({ name: form.name, username: form.username, email: form.email }));
-    navigate('/home');
+    if (form.password.length < 6) {
+      setError('Password must be at least 6 characters.'); return;
+    }
+    setError(''); setLoading(true);
+    try {
+      // Step 1 — Create user in Firebase
+      const credential = await createUserWithEmailAndPassword(auth, form.email, form.password);
+      await updateProfile(credential.user, { displayName: form.name });
+      const idToken = await credential.user.getIdToken();
+
+      // Step 2 — Exchange Firebase ID token with backend
+      const res = await fetch(`${API}/api/auth/firebase`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ idToken, name: form.name }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.message ?? 'Registration failed.'); return; }
+      dispatch(loginSuccess({ user: data.user, accessToken: data.accessToken }));
+      navigate('/home');
+    } catch (err: any) {
+      const code = err?.code ?? '';
+      if (code === 'auth/email-already-in-use') {
+        setError('Email is already registered. Please sign in.');
+      } else if (code === 'auth/weak-password') {
+        setError('Password is too weak. Use at least 6 characters.');
+      } else if (code === 'auth/network-request-failed') {
+        setError('Network error. Please check your connection.');
+      } else {
+        setError(err?.message ?? 'Registration failed. Please try again.');
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -96,7 +132,6 @@ export function SignupPage() {
             <form onSubmit={handleSubmit}>
               <Stack spacing={2}>
                 <TextField label="Full Name" value={form.name} onChange={update('name')} fullWidth />
-                
                 <TextField label="Email address" type="email" value={form.email} onChange={update('email')} fullWidth />
                 <TextField
                   label="Password"
@@ -121,8 +156,8 @@ export function SignupPage() {
                   onChange={update('confirm')}
                   fullWidth
                 />
-                <Button type="submit" variant="contained" size="large" fullWidth sx={{ py: 1.5 }}>
-                  Create Account
+                <Button type="submit" variant="contained" size="large" fullWidth disabled={loading} sx={{ py: 1.5 }}>
+                  {loading ? 'Creating account…' : 'Create Account'}
                 </Button>
                 <Typography variant="body2" textAlign="center">
                   Already have an account?{' '}

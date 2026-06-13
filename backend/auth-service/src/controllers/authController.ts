@@ -57,6 +57,45 @@ export const sendAuthResponse = async (
 };
 
 // ═══════════════════════════════════════════════════════════
+// POST /api/auth/register  — email + password registration
+// ═══════════════════════════════════════════════════════════
+export const emailRegister: RequestHandler = async (req: AuthRequest, res: Response) => {
+  try {
+    const { name, email, password } = req.body as {
+      name?: string; email?: string; password?: string;
+    };
+
+    if (!name?.trim() || !email?.trim() || !password) {
+      res.status(400).json({ success: false, message: 'name, email and password are required.' });
+      return;
+    }
+    if (password.length < 6) {
+      res.status(400).json({ success: false, message: 'Password must be at least 6 characters.' });
+      return;
+    }
+
+    const exists = await User.findOne({ email });
+    if (exists) {
+      res.status(409).json({ success: false, message: 'Email is already registered.' });
+      return;
+    }
+
+    const user = await User.create({
+      name:     name.trim(),
+      email:    email.trim().toLowerCase(),
+      password,
+      role:     'user',
+    });
+
+    rabbitMQ.publish('user.registered', { userId: user._id.toString(), email: user.email }).catch(console.error);
+
+    await sendAuthResponse(res, req, user as IUser);
+  } catch (err) {
+    console.error('Register error:', err);
+    res.status(500).json({ success: false, message: 'Registration failed.' });
+  }
+};
+
 // POST /api/auth/login  — email + password (quizapp users)
 // ═══════════════════════════════════════════════════════════
 export const emailLogin: RequestHandler = async (req: AuthRequest, res: Response) => {
@@ -103,7 +142,7 @@ export const emailLogin: RequestHandler = async (req: AuthRequest, res: Response
 // ═══════════════════════════════════════════════════════════
 export const firebaseAuth: RequestHandler = async (req: AuthRequest, res: Response) => {
   try {
-    const { idToken } = req.body as { idToken?: string };
+    const { idToken, name: bodyName } = req.body as { idToken?: string; name?: string };
     if (!idToken) {
       res.status(400).json({ success: false, message: 'Firebase ID token is required.' });
       return;
@@ -134,7 +173,7 @@ export const firebaseAuth: RequestHandler = async (req: AuthRequest, res: Respon
       emitUserStatus(user._id.toString(), true);
     } else {
       const created = await User.create({
-        name: name ?? email.split('@')[0],
+        name:     bodyName ?? name ?? email.split('@')[0],
         email,
         firebaseUid: uid,
         googleId: provider === 'google' ? uid : undefined,

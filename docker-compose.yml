@@ -135,6 +135,15 @@ services:
     build:
       context: ./quizapp
       dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ""
+        VITE_FIREBASE_API_KEY: "AIzaSyBcg92zjeSQCW0eoP99wY6mvT35H1rcFNQ"
+        VITE_FIREBASE_AUTH_DOMAIN: "quzmyt.firebaseapp.com"
+        VITE_FIREBASE_PROJECT_ID: "quzmyt"
+        VITE_FIREBASE_STORAGE_BUCKET: "quzmyt.appspot.com"
+        VITE_FIREBASE_MESSAGING_SENDER_ID: "558270493970"
+        VITE_FIREBASE_APP_ID: "1:558270493970:web:9466de6f1a3662d39e2fcb"
+        VITE_FIREBASE_MEASUREMENT_ID: "G-MVVH10W1V7"
     container_name: quizhub-frontend
     ports:
       - "7203:80"

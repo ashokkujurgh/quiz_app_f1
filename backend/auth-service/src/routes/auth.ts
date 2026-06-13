@@ -6,6 +6,7 @@ import { AuthRequest, MulterS3File } from '../types';
 import {
   firebaseAuth,
   emailLogin,
+  emailRegister,
   refreshToken,
   logout,
   getMe,
@@ -32,6 +33,7 @@ const updateProfileRules = [
 
 // ── Routes ────────────────────────────────────────────────
 router.post('/firebase',  firebaseAuth);
+router.post('/register',  emailRegister);
 router.post('/login',     emailLogin);
 router.post('/refresh',   refreshToken);
 router.post('/logout',    protect, logout);
