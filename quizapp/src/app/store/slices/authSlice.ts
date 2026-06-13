@@ -9,10 +9,15 @@ interface AuthState {
   loading: boolean;
 }
 
+const storedUser = (() => {
+  try { return JSON.parse(localStorage.getItem('auth_user') ?? 'null') as User | null; }
+  catch { return null; }
+})();
+
 const initialState: AuthState = {
-  user: null,
+  user: storedUser,
   accessToken: localStorage.getItem('access_token'),
-  isAuthenticated: false,
+  isAuthenticated: !!storedUser,
   loading: false,
 };
 
@@ -29,6 +34,7 @@ const authSlice = createSlice({
       state.accessToken = action.payload.accessToken;
       state.isAuthenticated = true;
       localStorage.setItem('access_token', action.payload.accessToken);
+      localStorage.setItem('auth_user', JSON.stringify(action.payload.user));
     },
     signup: (state, action: PayloadAction<Partial<User>>) => {
       state.user = { ...currentUser, ...action.payload };
@@ -39,6 +45,7 @@ const authSlice = createSlice({
       state.accessToken = null;
       state.isAuthenticated = false;
       localStorage.removeItem('access_token');
+      localStorage.removeItem('auth_user');
     },
     updateUser: (state, action: PayloadAction<Partial<User>>) => {
       if (state.user) {
