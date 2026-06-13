@@ -140,6 +140,10 @@ services:
       - "7203:80"
     depends_on:
       - auth-service
+      - topic-service
+      - question-service
+      - quiz-service
+      - post-service
     restart: unless-stopped
 
 volumes:
