@@ -1,6 +1,6 @@
 import { Response, RequestHandler } from 'express';
 import mongoose from 'mongoose';
-import Post, { TOPICS, IQuizResult } from '../models/Post';
+import Post, { IQuizResult } from '../models/Post';
 import { AuthRequest } from '../middleware/auth';
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -15,17 +15,20 @@ function withUserFlags(post: Record<string, unknown>, userId?: string) {
   const savedBy  = (post['savedBy']  as string[]) ?? [];
   const liked  = userId ? likedBy.some((id) => id.toString() === userId) : false;
   const saved  = userId ? savedBy.some((id) => id.toString() === userId) : false;
-  const { likedBy: _l, savedBy: _s, ...rest } = post;
-  return { ...rest, liked, saved, commentsCount: (post['comments'] as unknown[])?.length ?? 0 };
+  const commentsCount = (post['comments'] as unknown[])?.length ?? 0;
+  const { likedBy: _l, savedBy: _s, comments: _c, ...rest } = post;
+  return { ...rest, liked, saved, commentsCount };
 }
 
 // ── GET /api/posts ────────────────────────────────────────────────────────────
 export const getPosts: RequestHandler = async (req: AuthRequest, res: Response) => {
   try {
-    const { topic, page = '1', limit = '20' } = req.query as Record<string, string>;
+    const { topic, subTopic, page = '1', limit = '20' } = req.query as Record<string, string>;
 
     const filter: Record<string, unknown> = { isActive: true };
-    if (topic && topic !== 'All' && TOPICS.includes(topic as never)) {
+    if (subTopic && subTopic !== 'All') {
+      filter.subTopic = subTopic;
+    } else if (topic && topic !== 'All') {
       filter.topic = topic;
     }
 
@@ -38,7 +41,6 @@ export const getPosts: RequestHandler = async (req: AuthRequest, res: Response) 
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limitNum)
-        .select('-comments') // comments fetched separately
         .lean(),
       Post.countDocuments(filter),
     ]);
@@ -72,6 +74,24 @@ export const getPost: RequestHandler = async (req: AuthRequest, res: Response) =
   }
 };
 
+// ── Content policy filter (calls post-filter service) ────────────────────────
+const POST_FILTER_URL = process.env.POST_FILTER_URL ?? 'http://post-filter:5100';
+
+async function checkContentPolicy(content: string, imageUrl?: string | null): Promise<{ allowed: boolean; reason?: string }> {
+  try {
+    const res = await fetch(`${POST_FILTER_URL}/filter`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content, image_url: imageUrl ?? null }),
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!res.ok) return { allowed: true };
+    return await res.json() as { allowed: boolean; reason?: string };
+  } catch {
+    return { allowed: true }; // fail open — don't block if filter is down
+  }
+}
+
 // ── POST /api/posts ───────────────────────────────────────────────────────────
 export const createPost: RequestHandler = async (req: AuthRequest, res: Response) => {
   try {
@@ -97,6 +117,31 @@ export const createPost: RequestHandler = async (req: AuthRequest, res: Response
       res.status(400).json({ success: false, message: 'Author name and username are required.' }); return;
     }
 
+    const userType: 'user' | 'admin' = (req.user as { role?: string })?.role === 'admin' ? 'admin' : 'user';
+
+    // Always check image for nudity regardless of role; check text only for regular users
+    if (image) {
+      const imagePolicy = await checkContentPolicy('', image);
+      if (!imagePolicy.allowed) {
+        res.status(422).json({
+          success: false,
+          message: `⚠️ The image was rejected: ${imagePolicy.reason ?? 'explicit content detected'}. Please use an appropriate image.`,
+        });
+        return;
+      }
+    }
+
+    if (userType === 'user' && content.trim()) {
+      const textPolicy = await checkContentPolicy(content.trim());
+      if (!textPolicy.allowed) {
+        res.status(422).json({
+          success: false,
+          message: "⚠️ Your post couldn't be published. It appears to contain content that violates our Community Guidelines — including hate speech, harassment, explicit material, or harmful language. Please review and revise your post to keep QuizHub a safe and respectful space for everyone.",
+        });
+        return;
+      }
+    }
+
     const post = await Post.create({
       author: {
         userId:   toObjId(req.user!.id),
@@ -104,6 +149,7 @@ export const createPost: RequestHandler = async (req: AuthRequest, res: Response
         username: authorUsername,
         avatar:   authorAvatar ?? null,
       },
+      userType,
       content:    content.trim(),
       image:      image ?? null,
       topic,
@@ -371,7 +417,6 @@ export const getUserPosts: RequestHandler = async (req: AuthRequest, res: Respon
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limitNum)
-        .select('-comments')
         .lean(),
       Post.countDocuments({ 'author.userId': toObjId(req.params.userId), isActive: true }),
     ]);

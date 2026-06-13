@@ -50,6 +50,20 @@ services:
       ALLOWED_ORIGINS: http://localhost:7203,http://localhost:7204
     restart: unless-stopped
 
+  # ── Post filter (content moderation via Ollama) ──────────
+  post-filter:
+    build:
+      context: ./agentic/post-filter
+      dockerfile: Dockerfile
+    container_name: quizhub-post-filter
+    ports:
+      - "5100:5100"
+    env_file:
+      - ./agentic/post-filter/.env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
   # ── Post service ─────────────────────────────────────────
   post-service:
     build:
@@ -62,6 +76,9 @@ services:
       - ./backend/post-service/.env
     environment:
       ALLOWED_ORIGINS: http://localhost:7203,http://localhost:7204
+      POST_FILTER_URL: http://post-filter:5100
+    depends_on:
+      - post-filter
     restart: unless-stopped
 
   # ── Question service ─────────────────────────────────────

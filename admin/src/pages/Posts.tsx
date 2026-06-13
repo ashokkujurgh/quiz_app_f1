@@ -1,6 +1,13 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import api from '../lib/api';
 import { getAdminProfile, setAdminProfile, type AdminProfile } from '../lib/auth';
+
+// NSFW.js is loaded from CDN via index.html script tag
+declare const nsfwjs: {
+  load: (modelPath?: string) => Promise<{
+    classify: (img: HTMLImageElement) => Promise<Array<{ className: string; probability: number }>>;
+  }>;
+};
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -125,6 +132,8 @@ function CreatePostModal({
   const [image, setImage]                   = useState('');
   const [imageFile, setImageFile]           = useState<File | null>(null);
   const [uploading, setUploading]           = useState(false);
+  const [nsfwChecking, setNsfwChecking]     = useState(false);
+  const nsfwModel = useRef<Awaited<ReturnType<typeof nsfwjs.load>> | null>(null);
   const [selectedTopicId, setSelectedTopicId]   = useState(topics[0]?._id ?? '');
   const [selectedTopicName, setSelectedTopicName] = useState(topics[0]?.name ?? '');
   const [subTopics, setSubTopics]           = useState<SubTopic[]>([]);
@@ -375,20 +384,68 @@ function CreatePostModal({
                 </button>
               </div>
             ) : (
-              <label className="mt-1 flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-xl cursor-pointer hover:border-indigo-400 transition-colors">
-                <svg className="w-6 h-6 text-gray-400 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-                <span className="text-xs text-gray-400">Click to upload (JPEG, PNG, WebP — max 5MB)</span>
+              <label className={`mt-1 flex flex-col items-center justify-center w-full h-24 border-2 border-dashed rounded-xl transition-colors ${
+                nsfwChecking
+                  ? 'border-yellow-300 dark:border-yellow-600 cursor-wait'
+                  : 'border-gray-300 dark:border-gray-700 cursor-pointer hover:border-indigo-400'
+              }`}>
+                {nsfwChecking ? (
+                  <>
+                    <svg className="w-5 h-5 text-yellow-500 animate-spin mb-1" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                    </svg>
+                    <span className="text-xs text-yellow-600 dark:text-yellow-400">Checking image safety…</span>
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-6 h-6 text-gray-400 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <span className="text-xs text-gray-400">Click to upload (JPEG, PNG, WebP — max 5MB)</span>
+                  </>
+                )}
                 <input
                   type="file"
                   accept="image/jpeg,image/png,image/gif,image/webp"
                   className="hidden"
-                  onChange={(e) => {
+                  onChange={async (e) => {
                     const f = e.target.files?.[0];
                     if (!f) return;
-                    setImageFile(f);
-                    setImage(URL.createObjectURL(f));
+                    e.target.value = '';
+
+                    const objectUrl = URL.createObjectURL(f);
+                    setNsfwChecking(true);
+                    setError('');
+
+                    try {
+                      if (!nsfwModel.current) {
+                        nsfwModel.current = await nsfwjs.load();
+                      }
+                      const img = new Image();
+                      img.src = objectUrl;
+                      await new Promise((res, rej) => {
+                        img.onload = res;
+                        img.onerror = rej;
+                      });
+                      const predictions = await nsfwModel.current.classify(img);
+                      const blocked = ['Porn', 'Hentai', 'Sexy'];
+                      const flagged = predictions.find(
+                        (p) => blocked.includes(p.className) && p.probability > 0.4,
+                      );
+                      if (flagged) {
+                        URL.revokeObjectURL(objectUrl);
+                        setError(`Inappropriate image detected (${flagged.className} ${Math.round(flagged.probability * 100)}%). Please choose a different image.`);
+                        return;
+                      }
+                      setImageFile(f);
+                      setImage(objectUrl);
+                    } catch (err) {
+                      URL.revokeObjectURL(objectUrl);
+                      setError('Image safety check failed. Please try a different image.');
+                    } finally {
+                      setNsfwChecking(false);
+                    }
                   }}
                 />
               </label>
@@ -409,11 +466,11 @@ function CreatePostModal({
           <button
             type="submit"
             form="cpform"
-            disabled={saving || uploading || !content.trim()}
+            disabled={saving || uploading || nsfwChecking || !content.trim()}
             className="px-5 py-2 text-sm font-semibold bg-indigo-600 hover:bg-indigo-500
               text-white rounded-xl disabled:opacity-50 transition-colors"
           >
-            {uploading ? 'Uploading image…' : saving ? 'Publishing…' : 'Publish Post'}
+            {nsfwChecking ? 'Checking image…' : uploading ? 'Uploading image…' : saving ? 'Publishing…' : 'Publish Post'}
           </button>
         </div>
       </div>

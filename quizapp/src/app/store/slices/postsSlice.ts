@@ -1,6 +1,5 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import type { Post, QuizTopic } from '../../types';
-import { mockPosts } from '../../data/mockData';
 
 interface PostsState {
   posts: Post[];
@@ -9,7 +8,7 @@ interface PostsState {
 }
 
 const initialState: PostsState = {
-  posts: mockPosts,
+  posts: [],
   activeTopic: 'All',
   loading: false,
 };
@@ -28,6 +27,17 @@ const postsSlice = createSlice({
         post.likes += post.liked ? 1 : -1;
       }
     },
+    syncLike: (state, action: PayloadAction<{ id: string; liked: boolean; likes: number }>) => {
+      const post = state.posts.find((p) => p.id === action.payload.id);
+      if (post) {
+        post.liked = action.payload.liked;
+        post.likes = action.payload.likes;
+      }
+    },
+    incrementComments: (state, action: PayloadAction<string>) => {
+      const post = state.posts.find((p) => p.id === action.payload);
+      if (post) post.comments += 1;
+    },
     toggleSave: (state, action: PayloadAction<string>) => {
       const post = state.posts.find((p) => p.id === action.payload);
       if (post) {
@@ -37,8 +47,14 @@ const postsSlice = createSlice({
     addPost: (state, action: PayloadAction<Post>) => {
       state.posts.unshift(action.payload);
     },
+    setPosts: (state, action: PayloadAction<Post[]>) => {
+      state.posts = action.payload;
+    },
+    setLoading: (state, action: PayloadAction<boolean>) => {
+      state.loading = action.payload;
+    },
   },
 });
 
-export const { setActiveTopic, toggleLike, toggleSave, addPost } = postsSlice.actions;
+export const { setActiveTopic, toggleLike, syncLike, toggleSave, addPost, setPosts, setLoading, incrementComments } = postsSlice.actions;
 export default postsSlice.reducer;

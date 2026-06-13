@@ -1,0 +1,9 @@
+fastapi==0.115.0
+uvicorn==0.30.6
+langchain>=0.3.0
+langchain-ollama>=0.2.0
+langchain-core>=0.3.0
+python-dotenv==1.0.1
+requests==2.32.3
+Pillow==10.4.0
+nudenet==3.4.2

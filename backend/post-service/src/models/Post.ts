@@ -37,6 +37,7 @@ export interface IComment {
 export interface IPost extends Document {
   _id: Types.ObjectId;
   author: IAuthorSnapshot;
+  userType: 'user' | 'admin';
   content: string;
   image: string | null;
   topic: QuizTopic;
@@ -94,6 +95,7 @@ const commentSchema = new Schema<IComment>(
 const postSchema = new Schema<IPost>(
   {
     author:     { type: authorSchema, required: true },
+    userType:   { type: String, enum: ['user', 'admin'], default: 'user' },
     content:    { type: String, required: true, trim: true, maxlength: 2000 },
     image:      { type: String, default: null },
     topic:      { type: String, required: true },
