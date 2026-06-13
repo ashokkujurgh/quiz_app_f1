@@ -90,8 +90,8 @@ export const createPost: RequestHandler = async (req: AuthRequest, res: Response
     if (!content?.trim()) {
       res.status(400).json({ success: false, message: 'Post content is required.' }); return;
     }
-    if (!topic || !TOPICS.includes(topic as never)) {
-      res.status(400).json({ success: false, message: `Topic must be one of: ${TOPICS.join(', ')}.` }); return;
+    if (!topic?.trim()) {
+      res.status(400).json({ success: false, message: 'Topic is required.' }); return;
     }
     if (!authorName || !authorUsername) {
       res.status(400).json({ success: false, message: 'Author name and username are required.' }); return;
@@ -139,7 +139,7 @@ export const updatePost: RequestHandler = async (req: AuthRequest, res: Response
 
     if (content   !== undefined) post.content  = content.trim();
     if (image     !== undefined) post.image    = image;
-    if (topic     !== undefined && TOPICS.includes(topic as never)) post.topic = topic as never;
+    if (topic?.trim()) post.topic = topic.trim();
     if (subTopic  !== undefined) post.subTopic = subTopic ?? null;
     if (timezone  !== undefined) post.timezone = timezone;
     if (isActive  !== undefined) post.isActive = isActive;

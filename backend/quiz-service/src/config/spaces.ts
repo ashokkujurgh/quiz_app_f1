@@ -1,4 +1,6 @@
 import { S3Client, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { NodeHttpHandler } from '@smithy/node-http-handler';
+import { Agent } from 'https';
 import multer from 'multer';
 import multerS3 from 'multer-s3';
 import path from 'path';
@@ -13,12 +15,16 @@ function buildEndpoint(): string {
 
 export const s3Client = new S3Client({
   endpoint: buildEndpoint(),
-  region:   'us-east-1', // required by AWS SDK; DO ignores the value but the SDK validates it
+  region:   'us-east-1',
   credentials: {
     accessKeyId:     process.env.DO_SPACES_KEY!,
     secretAccessKey: process.env.DO_SPACES_SECRET!,
   },
   forcePathStyle: false,
+  // Force IPv4 — Docker containers can't route IPv6 to external hosts
+  requestHandler: new NodeHttpHandler({
+    httpsAgent: new Agent({ family: 4 }),
+  }),
 });
 
 const ALLOWED_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
@@ -29,7 +35,7 @@ export const quizImageUploader = multer({
     s3:          s3Client,
     bucket:      process.env.DO_SPACES_BUCKET!,
     acl:         'public-read',
-    contentType: multerS3.AUTO_CONTENT_TYPE,
+    contentType: (_req: Request, file: Express.Multer.File, cb: (err: Error | null, mime: string) => void) => cb(null, file.mimetype),
     key: (_req: Request, file: Express.Multer.File, cb: (err: Error | null, key: string) => void) => {
       const ext = path.extname(file.originalname).toLowerCase();
       cb(null, `quiz-images/${uuidv4()}${ext}`);

@@ -30,7 +30,7 @@ router.post('/:id/start',                 protect, adminOnly, startQuiz);
 router.post('/:id/end',                   protect, adminOnly, endQuiz);
 
 // Image
-router.post('/upload-image',               quizImageUploader.single('image'), uploadImage);
+router.post('/upload-image',              protect, adminOnly, quizImageUploader.single('image'), uploadImage);
 router.post('/:id/image',                 protect, adminOnly, quizImageUploader.single('image'), updateQuiz);
 router.delete('/:id/image',               protect, adminOnly, removeImage);
 
