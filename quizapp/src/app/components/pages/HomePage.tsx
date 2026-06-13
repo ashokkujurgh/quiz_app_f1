@@ -2,11 +2,11 @@ import { useState, useRef, useEffect } from 'react';
 import {
   Box, Stack, Button, Chip, Card, CardContent,
   Avatar, Dialog, DialogTitle, DialogContent, DialogActions,
-  TextField, MenuItem, IconButton, CircularProgress, Alert, Typography,
+  TextField, MenuItem, IconButton, CircularProgress, Alert, Typography, Skeleton,
 } from '@mui/material';
-import { Add, Image, EmojiEmotions, Close } from '@mui/icons-material';
+import { Add, Image, Close } from '@mui/icons-material';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
-import { setActiveTopic, addPost } from '../../store/slices/postsSlice';
+import { setActiveTopic, addPost, setPosts, setLoading } from '../../store/slices/postsSlice';
 import { PostCard } from '../shared/PostCard';
 import { PostSkeleton } from '../shared/LoadingSkeleton';
 import { EmptyState } from '../shared/EmptyState';
@@ -18,55 +18,96 @@ const API = import.meta.env.VITE_API_URL ?? '';
 interface ApiTopic { _id: string; name: string; }
 interface ApiSubTopic { _id: string; name: string; topic: string; }
 
-const filterTopics: QuizTopic[] = [
-  'All', 'General Science', 'Electrical', 'History', 'Geography',
-  'Mathematics', 'Physics', 'Chemistry', 'Technology',
-];
-
 export function HomePage() {
   const dispatch = useAppDispatch();
-  const { posts, activeTopic } = useAppSelector((s) => s.posts);
+  const { posts, activeTopic, loading: isLoading } = useAppSelector((s) => s.posts);
   const { user, accessToken } = useAppSelector((s) => s.auth);
   const displayName = user?.name?.split(' ')[0] ?? 'there';
-  const [isLoading] = useState(false);
 
-  const filtered = activeTopic === 'All' ? posts : posts.filter((p) => p.topic === activeTopic);
-
-  // all subtopics flattened from all topics
+  // ── Topics & subtopics from API ───────────────────────────────────────────────
+  const [topics, setTopics]             = useState<ApiTopic[]>([]);
   const [allSubTopics, setAllSubTopics] = useState<ApiSubTopic[]>([]);
-  const [selectedSubTopicId, setSelectedSubTopicId] = useState('');
+  const [topicsLoading, setTopicsLoading] = useState(true);
+  const [activeSubTopicId, setActiveSubTopicId] = useState<string | null>(null);
 
   useEffect(() => {
     fetch(`${API}/api/topics`)
       .then((r) => r.json())
       .then(async (d) => {
         if (!d.success || !d.topics?.length) return;
+        const active = (d.topics as ApiTopic[]).filter((t: ApiTopic & { isActive?: boolean }) => t.isActive !== false);
+        setTopics(active);
         const results = await Promise.all(
-          (d.topics as ApiTopic[]).map((t) =>
+          active.map((t) =>
             fetch(`${API}/api/topics/${t._id}/subtopics`)
               .then((r) => r.json())
-              .then((sd) => (sd.subtopics ?? []) as ApiSubTopic[])
+              .then((sd) => ((sd.subtopics ?? []) as (ApiSubTopic & { isActive?: boolean })[]).filter((s) => s.isActive !== false))
               .catch(() => [] as ApiSubTopic[])
           )
         );
         setAllSubTopics(results.flat());
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setTopicsLoading(false));
   }, []);
 
-  // dialog state
-  const [open, setOpen] = useState(false);
-  const [content, setContent] = useState('');
-  const [imageFile, setImageFile] = useState<File | null>(null);
+  // ── Posts from API ────────────────────────────────────────────────────────────
+  useEffect(() => {
+    dispatch(setLoading(true));
+    const params = new URLSearchParams({ page: '1', limit: '20' });
+    const activeSub = allSubTopics.find((s) => s._id === activeSubTopicId);
+    if (activeSub) params.set('subTopic', activeSub.name);
+    fetch(`${API}/api/posts?${params}`, {
+      credentials: 'include',
+      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+    })
+      .then((r) => r.json())
+      .then((d) => {
+        if (!d.success) return;
+        const mapped = (d.posts as Record<string, unknown>[]).map((p) => {
+          const author = (p['author'] as Record<string, unknown>) ?? {};
+          return {
+            id: (p['_id'] ?? p['id']) as string,
+            author: {
+              id: (author['userId'] ?? author['_id'] ?? '') as string,
+              name: (author['name'] ?? '') as string,
+              username: (author['username'] ?? '') as string,
+              email: (author['email'] ?? '') as string,
+              avatar: author['avatar'] as string | undefined,
+              isOnline: false,
+              role: 'user' as const,
+              stats: { friends: 0, posts: 0, quizzesTaken: 0, averageScore: 0 },
+              joinedAt: (p['createdAt'] ?? new Date().toISOString()) as string,
+            },
+            content: p['content'] as string,
+            image: p['image'] as string | undefined,
+            topic: (p['topic'] ?? 'General') as QuizTopic,
+            timestamp: (p['createdAt'] ?? new Date().toISOString()) as string,
+            likes: (p['likes'] as number) ?? 0,
+            comments: (p['commentsCount'] as number) ?? 0,
+            shares: (p['shares'] as number) ?? 0,
+            liked: (p['liked'] as boolean) ?? false,
+            saved: (p['saved'] as boolean) ?? false,
+          };
+        });
+        dispatch(setPosts(mapped));
+      })
+      .catch(() => {})
+      .finally(() => dispatch(setLoading(false)));
+  }, [activeSubTopicId, allSubTopics, accessToken]);
+
+  // ── Create post dialog ────────────────────────────────────────────────────────
+  const [open, setOpen]               = useState(false);
+  const [content, setContent]         = useState('');
+  const [imageFile, setImageFile]     = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState('');
+  const [submitting, setSubmitting]   = useState(false);
+  const [error, setError]             = useState('');
+  const [selectedSubTopicId, setSelectedSubTopicId] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
 
   const openDialog = () => {
-    setContent('');
-    setImageFile(null); setImagePreview('');
-    setError(''); setOpen(true);
+    setContent(''); setImageFile(null); setImagePreview(''); setError(''); setOpen(true);
   };
 
   const handleImagePick = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -75,8 +116,6 @@ export function HomePage() {
     setImageFile(file);
     setImagePreview(URL.createObjectURL(file));
   };
-
-  const removeImage = () => { setImageFile(null); setImagePreview(''); };
 
   const handleSubmit = async () => {
     if (!content.trim()) { setError('Please write something.'); return; }
@@ -96,6 +135,11 @@ export function HomePage() {
         imageUrl = d.url as string;
       }
 
+      const selectedSub = allSubTopics.find((s) => s._id === selectedSubTopicId);
+      const parentTopic = selectedSub
+        ? topics.find((t) => t._id === selectedSub.topic)?.name ?? selectedSub.name
+        : 'General';
+
       const res = await fetch(`${API}/api/posts`, {
         method: 'POST', credentials: 'include',
         headers: {
@@ -104,10 +148,12 @@ export function HomePage() {
         },
         body: JSON.stringify({
           content: content.trim(),
-          topic: allSubTopics.find((s) => s._id === selectedSubTopicId)?.name ?? 'General',
-          ...(selectedSubTopicId ? { subTopic: allSubTopics.find((s) => s._id === selectedSubTopicId)?.name } : {}),
+          topic: parentTopic,
+          ...(selectedSub ? { subTopic: selectedSub.name } : {}),
           ...(imageUrl ? { image: imageUrl } : {}),
-          authorName: user?.name, authorAvatar: user?.avatar,
+          authorName: user?.name,
+          authorUsername: user?.username ?? user?.email?.split('@')[0] ?? 'user',
+          authorAvatar: user?.avatar,
         }),
       });
       const data = await res.json();
@@ -164,35 +210,53 @@ export function HomePage() {
             </Box>
           </Stack>
           <Stack direction="row" spacing={1} justifyContent="flex-end">
-          
             <Button startIcon={<Add />} variant="contained" size="small" onClick={openDialog}>Post</Button>
           </Stack>
         </CardContent>
       </Card>
 
-      {/* Topic Filters */}
+      {/* Subtopic filter chips */}
       <Box sx={{ mb: 2, overflowX: 'auto', pb: 0.5 }}>
         <Stack direction="row" spacing={1} sx={{ minWidth: 'max-content' }}>
-          {filterTopics.map((t) => (
-            <Chip key={t} label={t} clickable
-              onClick={() => dispatch(setActiveTopic(t))}
-              variant={activeTopic === t ? 'filled' : 'outlined'}
-              color={activeTopic === t ? 'primary' : 'default'}
-              sx={{ fontWeight: activeTopic === t ? 700 : 500 }}
-            />
-          ))}
+          {topicsLoading ? (
+            [1, 2, 3, 4, 5].map((i) => (
+              <Skeleton key={i} variant="rounded" width={80} height={32} sx={{ borderRadius: 4 }} />
+            ))
+          ) : (
+            <>
+              <Chip
+                label="All"
+                clickable
+                onClick={() => setActiveSubTopicId(null)}
+                variant={activeSubTopicId === null ? 'filled' : 'outlined'}
+                color={activeSubTopicId === null ? 'primary' : 'default'}
+                sx={{ fontWeight: activeSubTopicId === null ? 700 : 500 }}
+              />
+              {allSubTopics.map((s) => (
+                <Chip
+                  key={s._id}
+                  label={s.name}
+                  clickable
+                  onClick={() => setActiveSubTopicId(activeSubTopicId === s._id ? null : s._id)}
+                  variant={activeSubTopicId === s._id ? 'filled' : 'outlined'}
+                  color={activeSubTopicId === s._id ? 'primary' : 'default'}
+                  sx={{ fontWeight: activeSubTopicId === s._id ? 700 : 500 }}
+                />
+              ))}
+            </>
+          )}
         </Stack>
       </Box>
 
       {/* Feed */}
       {isLoading ? (
         <><PostSkeleton /><PostSkeleton /></>
-      ) : filtered.length === 0 ? (
+      ) : posts.length === 0 ? (
         <EmptyState icon={Inbox} title="No posts found"
           description="Be the first to post in this topic!"
           actionLabel="Create Post" onAction={openDialog} />
       ) : (
-        filtered.map((post) => <PostCard key={post.id} post={post} />)
+        posts.map((post) => <PostCard key={post.id} post={post} />)
       )}
 
       {/* Create Post Dialog */}
@@ -213,12 +277,25 @@ export function HomePage() {
             </Avatar>
             <Box flex={1}>
               <Typography fontWeight={700} variant="subtitle2">{user?.name}</Typography>
-              <TextField select size="small" value={selectedSubTopicId}
+              <TextField
+                select size="small" value={selectedSubTopicId}
                 onChange={(e) => setSelectedSubTopicId(e.target.value)}
-                label=" Topic (optional)" sx={{ mt: 0.5, minWidth: 200 }}
-                disabled={allSubTopics.length === 0}>
+                label="Topic (optional)" sx={{ mt: 0.5, minWidth: 200 }}
+                disabled={allSubTopics.length === 0}
+              >
                 <MenuItem value=""><em>None</em></MenuItem>
-                {allSubTopics.map((s) => <MenuItem key={s._id} value={s._id}>{s.name}</MenuItem>)}
+                {topics.map((t) => {
+                  const subs = allSubTopics.filter((s) => s.topic === t._id);
+                  if (subs.length === 0) return null;
+                  return [
+                    <MenuItem key={`topic-${t._id}`} disabled sx={{ fontWeight: 700, opacity: 0.6, fontSize: '0.75rem' }}>
+                      {t.name}
+                    </MenuItem>,
+                    ...subs.map((s) => (
+                      <MenuItem key={s._id} value={s._id} sx={{ pl: 3 }}>{s.name}</MenuItem>
+                    )),
+                  ];
+                })}
               </TextField>
             </Box>
           </Stack>
@@ -232,7 +309,7 @@ export function HomePage() {
             <Box sx={{ position: 'relative', mb: 2 }}>
               <Box component="img" src={imagePreview}
                 sx={{ width: '100%', borderRadius: 2, maxHeight: 240, objectFit: 'cover' }} />
-              <IconButton size="small" onClick={removeImage}
+              <IconButton size="small" onClick={() => { setImageFile(null); setImagePreview(''); }}
                 sx={{ position: 'absolute', top: 4, right: 4, bgcolor: 'rgba(0,0,0,0.5)', color: 'white' }}>
                 <Close fontSize="small" />
               </IconButton>
