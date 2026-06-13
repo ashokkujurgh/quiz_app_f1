@@ -78,7 +78,33 @@ services:
       ALLOWED_ORIGINS: http://localhost:7203,http://localhost:7204
     restart: unless-stopped
 
-  # ── Agentic question generator (cron every 20 min) ───────
+  # ── Quiz service ─────────────────────────────────────────
+  quiz-service:
+    build:
+      context: ./backend/quiz-service
+      dockerfile: Dockerfile
+    container_name: quizhub-quiz
+    ports:
+      - "7208:4005"
+    env_file:
+      - ./backend/quiz-service/.env
+    environment:
+      ALLOWED_ORIGINS: http://localhost:7203,http://localhost:7204
+      QUESTION_SERVICE_URL: http://question-service:4003
+      TOPIC_SERVICE_URL: http://topic-service:4002
+      DO_SPACES_KEY: DO00M8M3Q9LGTPAGNH8L
+      DO_SPACES_SECRET: DO00M8M3Q9LGTPAGNH8L
+      DO_SPACES_ENDPOINT: https://quiz-ashok.sfo3.digitaloceanspaces.com
+      DO_SPACES_REGION: blr1
+      DO_SPACES_BUCKET: quizhub-media
+      DO_SPACES_CDN_URL: https://quiz-ashok.sfo3.cdn.digitaloceanspaces.com
+    depends_on:
+      - question-service
+      - topic-service
+      - auth-service
+    restart: unless-stopped
+
+  # ── Agentic question generator (cron every 10 min) ───────
   agentic:
     build:
       context: ./agentic

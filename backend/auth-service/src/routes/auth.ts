@@ -21,6 +21,7 @@ const router = express.Router();
 // ── Uploaders ─────────────────────────────────────────────
 const avatarUpload = createUploader('avatars');
 const coverUpload  = createUploader('covers');
+const imageUpload  = createUploader('images');
 
 // ── Validation rules ──────────────────────────────────────
 const updateProfileRules = [
@@ -52,6 +53,16 @@ router.post('/upload/cover', protect, (req: AuthRequest, res: Response): void =>
     if (err) { res.status(400).json({ success: false, message: (err as Error).message }); return; }
     if (!req.file) { res.status(400).json({ success: false, message: 'No file uploaded.' }); return; }
     uploadCover(req, res);
+  });
+});
+
+// Generic image upload — returns CDN URL, no user record update
+router.post('/upload/image', protect, (req: AuthRequest, res: Response): void => {
+  imageUpload.single('image')(req, res, (err) => {
+    if (err) { res.status(400).json({ success: false, message: (err as Error).message }); return; }
+    const file = req.file as MulterS3File | undefined;
+    if (!file) { res.status(400).json({ success: false, message: 'No file uploaded.' }); return; }
+    res.json({ success: true, url: file.location });
   });
 });
 
