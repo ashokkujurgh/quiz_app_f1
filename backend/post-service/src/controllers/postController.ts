@@ -29,7 +29,7 @@ export const getPosts: RequestHandler = async (req: AuthRequest, res: Response) 
     if (subTopic && subTopic !== 'All') {
       filter.subTopic = subTopic;
     } else if (topic && topic !== 'All') {
-      filter.topic = topic;
+      filter.topic = { $regex: new RegExp(`^${topic}$`, 'i') };
     }
 
     const pageNum  = Math.max(1, parseInt(page, 10) || 1);

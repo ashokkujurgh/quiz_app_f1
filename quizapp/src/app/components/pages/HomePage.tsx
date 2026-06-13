@@ -326,6 +326,7 @@ export function HomePage() {
         <DialogActions sx={{ px: 3, py: 2 }}>
           <Button onClick={() => setOpen(false)} disabled={submitting}>Cancel</Button>
           <Button variant="contained" onClick={handleSubmit}
+            sx={{ color: 'white', '&.Mui-disabled': { color: 'rgba(255,255,255,0.6)' } }}
             disabled={submitting || !content.trim()}
             startIcon={submitting ? <CircularProgress size={16} color="inherit" /> : null}>
             {submitting ? 'Posting…' : 'Post'}
