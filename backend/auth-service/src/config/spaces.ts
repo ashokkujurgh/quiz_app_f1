@@ -5,11 +5,21 @@ import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { Request } from 'express';
 
+// DO Spaces endpoint must be https://{region}.digitaloceanspaces.com (no bucket prefix).
+// If the env var contains the bucket subdomain (e.g. bucket.region.digitaloceanspaces.com),
+// strip it down to the region-only endpoint.
+function buildEndpoint(): string {
+  const raw = process.env.DO_SPACES_ENDPOINT ?? '';
+  const bucket = process.env.DO_SPACES_BUCKET ?? '';
+  // Remove bucket subdomain if present: "https://bucket.region.do..." → "https://region.do..."
+  return raw.replace(`${bucket}.`, '');
+}
+
 export const s3Client = new S3Client({
-  endpoint: process.env.DO_SPACES_ENDPOINT!,
-  region: process.env.DO_SPACES_REGION ?? 'nyc3',
+  endpoint: buildEndpoint(),
+  region: 'us-east-1', // required by AWS SDK; DO ignores it but SDK validates it
   credentials: {
-    accessKeyId: process.env.DO_SPACES_KEY!,
+    accessKeyId:     process.env.DO_SPACES_KEY!,
     secretAccessKey: process.env.DO_SPACES_SECRET!,
   },
   forcePathStyle: false,
