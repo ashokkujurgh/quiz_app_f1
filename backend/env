@@ -15,7 +15,7 @@ JWT_REFRESH_EXPIRES_IN=30d
 FIREBASE_SERVICE_ACCOUNT_PATH=../../google-services.json
 
 # ── DigitalOcean Spaces ──────────────────────────────────
-DO_SPACES_KEY=DO00M8M3Q9LGTPAGNH8L
+DO_SPACES_KEY=DO801YME9E2JKCEWC4Z6
 DO_SPACES_SECRET=YSVcKqoC+8xynsZ4NgMt8TCHJ3b6vNsYt4qXE8qOAtI
 DO_SPACES_ENDPOINT=https://quiz-ashok.sfo3.digitaloceanspaces.com
 DO_SPACES_REGION=blr1
