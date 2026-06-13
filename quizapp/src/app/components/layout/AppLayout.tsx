@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Outlet } from 'react-router';
 import { Box, useMediaQuery, useTheme } from '@mui/material';
 import { Navbar } from './Navbar';
@@ -6,14 +6,35 @@ import { LeftSidebar } from './LeftSidebar';
 import { RightSidebar } from './RightSidebar';
 import { MobileBottomNav } from './MobileBottomNav';
 import { usePresence } from '../../hooks/usePresence';
+import { useAppDispatch, useAppSelector } from '../../store/hooks';
+import { loginSuccess } from '../../store/slices/authSlice';
 
+const API = import.meta.env.VITE_API_URL ?? '';
 const SIDEBAR_WIDTH = 10;
 
 export function AppLayout() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   usePresence();
+  const dispatch = useAppDispatch();
+  const { accessToken, user } = useAppSelector((s) => s.auth);
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  useEffect(() => {
+    if (accessToken && !user) {
+      fetch(`${API}/api/auth/me`, {
+        credentials: 'include',
+        headers: { Authorization: `Bearer ${accessToken}` },
+      })
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.success && data.user) {
+            dispatch(loginSuccess({ user: data.user, accessToken }));
+          }
+        })
+        .catch(() => {});
+    }
+  }, [accessToken, user, dispatch]);
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>

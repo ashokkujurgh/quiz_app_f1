@@ -1,7 +1,7 @@
 import { useNavigate, useLocation } from 'react-router';
 import {
   Drawer, List, ListItemButton, ListItemIcon, ListItemText,
-  Box, Typography, Divider, Stack, Badge, useTheme,
+  Box, Typography, Divider, Stack, Badge, Avatar, useTheme,
 } from '@mui/material';
 import {
   Home, Quiz, People, Message, EmojiEvents, History,
@@ -44,20 +44,22 @@ export function LeftSidebar({ open, onClose, variant = 'permanent' }: Props) {
   const drawer = (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', pt: '64px' }}>
       {/* User summary */}
-      {user && (
-        <Box
-          sx={{ px: 2, py: 2, cursor: 'pointer' }}
-          onClick={() => handleNav('/profile')}
-        >
-          <Stack direction="row" spacing={1.5} alignItems="center">
+      <Box
+        sx={{ px: 2, py: 2, cursor: 'pointer' }}
+        onClick={() => handleNav('/profile')}
+      >
+        <Stack direction="row" spacing={1.5} alignItems="center">
+          {user ? (
             <UserAvatar user={user} size={44} showOnline />
-            <Box minWidth={0}>
-              <Typography variant="subtitle2" fontWeight={700} noWrap>{user.name}</Typography>
-              <Typography variant="caption" color="text.secondary" noWrap>@{user.username}</Typography>
-            </Box>
-          </Stack>
-        </Box>
-      )}
+          ) : (
+            <Avatar sx={{ width: 44, height: 44 }} />
+          )}
+          <Box minWidth={0}>
+            <Typography variant="subtitle2" fontWeight={700} noWrap>{user?.name ?? ''}</Typography>
+            <Typography variant="caption" color="text.secondary" noWrap>{user?.email ?? ''}</Typography>
+          </Box>
+        </Stack>
+      </Box>
       <Divider sx={{ mx: 2 }} />
 
       {/* Nav */}
