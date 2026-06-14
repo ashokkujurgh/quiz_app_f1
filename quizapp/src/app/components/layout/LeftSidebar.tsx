@@ -2,25 +2,28 @@ import { useNavigate, useLocation } from 'react-router';
 import {
   Drawer, List, ListItemButton, ListItemIcon, ListItemText,
   Box, Typography, Divider, Stack, Badge, Avatar, useTheme,
+  Dialog, DialogTitle, DialogContent, DialogActions, Button,
 } from '@mui/material';
 import {
   Home, Quiz, People, Message, EmojiEvents, History,
-  Person, Settings, AdminPanelSettings,
+  Person, Settings, AdminPanelSettings, Lock,
 } from '@mui/icons-material';
+import { useState } from 'react';
 import { useAppSelector } from '../../store/hooks';
+import { useOnlineUsers } from '../../context/OnlineUsersContext';
 import { UserAvatar } from '../shared/UserAvatar';
 
 const DRAWER_WIDTH = 260;
 
 const navItems = [
-  { label: 'Home', icon: Home, path: '/home' },
-  { label: 'Quizzes', icon: Quiz, path: '/quizzes' },
-  { label: 'Friends', icon: People, path: '/friends' },
-  { label: 'Messages', icon: Message, path: '/messages' },
-  { label: 'Leaderboard', icon: EmojiEvents, path: '/leaderboard' },
-  { label: 'History', icon: History, path: '/history' },
-  { label: 'Profile', icon: Person, path: '/profile' },
-  { label: 'Settings', icon: Settings, path: '/settings' },
+  { label: 'Home',        icon: Home,       path: '/home',        auth: false },
+  { label: 'Quizzes',     icon: Quiz,       path: '/quizzes',     auth: false },
+  { label: 'Friends',     icon: People,     path: '/friends',     auth: true },
+  { label: 'Messages',    icon: Message,    path: '/messages',    auth: true },
+  { label: 'Leaderboard', icon: EmojiEvents,path: '/leaderboard', auth: true },
+  { label: 'History',     icon: History,    path: '/history',     auth: true },
+  { label: 'Profile',     icon: Person,     path: '/profile',     auth: true },
+  { label: 'Settings',    icon: Settings,   path: '/settings',    auth: true },
 ];
 
 interface Props {
@@ -33,10 +36,13 @@ export function LeftSidebar({ open, onClose, variant = 'permanent' }: Props) {
   const navigate = useNavigate();
   const location = useLocation();
   const theme = useTheme();
-  const { user } = useAppSelector((s) => s.auth);
+  const { user, accessToken } = useAppSelector((s) => s.auth);
+  const { isOnline } = useOnlineUsers();
   const unreadMessages = useAppSelector((s) => s.messages.chats.reduce((a, c) => a + c.unreadCount, 0));
+  const [loginPrompt, setLoginPrompt] = useState(false);
 
-  const handleNav = (path: string) => {
+  const handleNav = (path: string, requiresAuth: boolean) => {
+    if (requiresAuth && !accessToken) { setLoginPrompt(true); return; }
     navigate(path);
     onClose();
   };
@@ -46,17 +52,22 @@ export function LeftSidebar({ open, onClose, variant = 'permanent' }: Props) {
       {/* User summary */}
       <Box
         sx={{ px: 2, py: 2, cursor: 'pointer' }}
-        onClick={() => handleNav('/profile')}
+        onClick={() => handleNav('/profile', true)}
       >
         <Stack direction="row" spacing={1.5} alignItems="center">
           {user ? (
-            <UserAvatar user={user} size={44} showOnline />
+            <UserAvatar user={{ ...user, isOnline: isOnline(user.id) }} size={44} showOnline />
           ) : (
             <Avatar sx={{ width: 44, height: 44 }} />
           )}
           <Box minWidth={0}>
             <Typography variant="subtitle2" fontWeight={700} noWrap>{user?.name ?? ''}</Typography>
-            <Typography variant="caption" color="text.secondary" noWrap>{user?.email ?? ''}</Typography>
+            <Stack direction="row" spacing={0.5} alignItems="center">
+              <Box sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: isOnline(user?.id ?? '') ? '#44b700' : 'text.disabled' }} />
+              <Typography variant="caption" color="text.secondary" noWrap>
+                {isOnline(user?.id ?? '') ? 'Online' : 'Offline'}
+              </Typography>
+            </Stack>
           </Box>
         </Stack>
       </Box>
@@ -64,15 +75,16 @@ export function LeftSidebar({ open, onClose, variant = 'permanent' }: Props) {
 
       {/* Nav */}
       <List sx={{ px: 1, flex: 1, pt: 1 }}>
-        {navItems.map(({ label, icon: Icon, path }) => {
+        {navItems.map(({ label, icon: Icon, path, auth }) => {
           const isActive = location.pathname === path;
           const badge = label === 'Messages' ? unreadMessages : 0;
+          const locked = auth && !accessToken;
           return (
             <ListItemButton
               key={path}
               selected={isActive}
-              onClick={() => handleNav(path)}
-              sx={{ mb: 0.25, borderRadius: 2, py: 1 }}
+              onClick={() => handleNav(path, auth)}
+              sx={{ mb: 0.25, borderRadius: 2, py: 1, opacity: locked ? 0.65 : 1 }}
             >
               <ListItemIcon sx={{ minWidth: 40, color: isActive ? 'primary.main' : 'text.secondary' }}>
                 {badge > 0 ? (
@@ -91,6 +103,7 @@ export function LeftSidebar({ open, onClose, variant = 'permanent' }: Props) {
                   color: isActive ? 'primary.main' : 'text.primary',
                 }}
               />
+              {locked && <Lock sx={{ fontSize: 13, color: 'text.disabled', ml: 0.5 }} />}
             </ListItemButton>
           );
         })}
@@ -100,7 +113,7 @@ export function LeftSidebar({ open, onClose, variant = 'permanent' }: Props) {
             <Divider sx={{ my: 1 }} />
             <ListItemButton
               selected={location.pathname === '/admin'}
-              onClick={() => handleNav('/admin')}
+              onClick={() => handleNav('/admin', true)}
               sx={{ mb: 0.25, borderRadius: 2, py: 1 }}
             >
               <ListItemIcon sx={{ minWidth: 40, color: location.pathname === '/admin' ? 'primary.main' : 'text.secondary' }}>
@@ -125,21 +138,44 @@ export function LeftSidebar({ open, onClose, variant = 'permanent' }: Props) {
   );
 
   return (
-    <Drawer
-      variant={variant}
-      open={variant === 'temporary' ? open : true}
-      onClose={onClose}
-      sx={{
-        width: DRAWER_WIDTH,
-        flexShrink: 0,
-        '& .MuiDrawer-paper': {
+    <>
+      <Drawer
+        variant={variant}
+        open={variant === 'temporary' ? open : true}
+        onClose={onClose}
+        sx={{
           width: DRAWER_WIDTH,
-          boxSizing: 'border-box',
-          bgcolor: 'background.paper',
-        },
-      }}
-    >
-      {drawer}
-    </Drawer>
+          flexShrink: 0,
+          '& .MuiDrawer-paper': {
+            width: DRAWER_WIDTH,
+            boxSizing: 'border-box',
+            bgcolor: 'background.paper',
+          },
+        }}
+      >
+        {drawer}
+      </Drawer>
+
+      {/* Login required dialog */}
+      <Dialog open={loginPrompt} onClose={() => setLoginPrompt(false)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Lock color="primary" fontSize="small" /> Sign in required
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary">
+            You need to be signed in to access this feature.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setLoginPrompt(false)}>Cancel</Button>
+          <Button variant="outlined" onClick={() => { setLoginPrompt(false); navigate('/signup'); }}>
+            Create Account
+          </Button>
+          <Button variant="contained" onClick={() => { setLoginPrompt(false); navigate('/login'); }}>
+            Sign In
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </>
   );
 }

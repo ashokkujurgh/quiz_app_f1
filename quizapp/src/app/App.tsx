@@ -6,6 +6,7 @@ import { store } from './store';
 import { router } from './router';
 import { buildMuiTheme } from './theme/muiTheme';
 import { useAppSelector } from './store/hooks';
+import { OnlineUsersProvider } from './context/OnlineUsersContext';
 
 function ThemedApp() {
   const themeMode = useAppSelector((s) => s.theme.mode);
@@ -14,8 +15,10 @@ function ThemedApp() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      {/* MARKER-MAKE-KIT-INVOKED */}
-      <RouterProvider router={router} />
+      <OnlineUsersProvider>
+        {/* MARKER-MAKE-KIT-INVOKED */}
+        <RouterProvider router={router} />
+      </OnlineUsersProvider>
     </ThemeProvider>
   );
 }

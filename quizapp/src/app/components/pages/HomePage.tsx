@@ -4,9 +4,11 @@ import {
   Avatar, Dialog, DialogTitle, DialogContent, DialogActions,
   TextField, MenuItem, IconButton, CircularProgress, Alert, Typography, Skeleton,
 } from '@mui/material';
-import { Add, Image, Close } from '@mui/icons-material';
+import { Add, Image, Close, Login, PersonAdd, EditNote } from '@mui/icons-material';
+import { useNavigate } from 'react-router';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import { setActiveTopic, addPost, setPosts, setLoading } from '../../store/slices/postsSlice';
+import { useOnlineUsers } from '../../context/OnlineUsersContext';
 import { PostCard } from '../shared/PostCard';
 import { PostSkeleton } from '../shared/LoadingSkeleton';
 import { EmptyState } from '../shared/EmptyState';
@@ -20,8 +22,11 @@ interface ApiSubTopic { _id: string; name: string; topic: string; }
 
 export function HomePage() {
   const dispatch = useAppDispatch();
+  const navigate = useNavigate();
   const { posts, activeTopic, loading: isLoading } = useAppSelector((s) => s.posts);
   const { user, accessToken } = useAppSelector((s) => s.auth);
+  const { isOnline } = useOnlineUsers();
+  const isGuest = !accessToken;
   const displayName = user?.name?.split(' ')[0] ?? 'there';
 
   // ── Topics & subtopics from API ───────────────────────────────────────────────
@@ -69,7 +74,7 @@ export function HomePage() {
           return {
             id: (p['_id'] ?? p['id']) as string,
             author: {
-              id: (author['userId'] ?? author['_id'] ?? '') as string,
+              id: String(author['userId'] ?? author['_id'] ?? ''),
               name: (author['name'] ?? '') as string,
               username: (author['username'] ?? '') as string,
               email: (author['email'] ?? '') as string,
@@ -191,29 +196,73 @@ export function HomePage() {
 
   return (
     <Box>
-      {/* Create Post Card */}
-      <Card sx={{ mb: 2 }}>
-        <CardContent>
-          <Stack direction="row" spacing={1.5} alignItems="center" mb={1.5}>
-            <Avatar src={user?.avatar} sx={{ width: 40, height: 40 }}>
-              {user?.name?.[0]}
-            </Avatar>
-            <Box
-              onClick={openDialog}
-              sx={{
-                flex: 1, bgcolor: 'action.hover', borderRadius: 3,
-                px: 2, py: 1.25, cursor: 'pointer', color: 'text.secondary',
-                fontSize: '0.875rem', '&:hover': { bgcolor: 'action.selected' },
-              }}
-            >
-              What's on your mind, {displayName}?
-            </Box>
-          </Stack>
-          <Stack direction="row" spacing={1} justifyContent="flex-end">
-            <Button startIcon={<Add />} variant="contained" size="small" onClick={openDialog}>Post</Button>
-          </Stack>
-        </CardContent>
-      </Card>
+      {/* Create Post / Guest Banner */}
+      {isGuest ? (
+        <Card sx={{
+          mb: 2, overflow: 'hidden',
+          background: (t) => t.palette.mode === 'dark'
+            ? 'linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)'
+            : 'linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%)',
+          border: '1px solid', borderColor: 'primary.main', borderOpacity: 0.3,
+        }}>
+          <CardContent sx={{ py: 3 }}>
+            <Typography variant="h6" fontWeight={800} gutterBottom>
+              Welcome to QuizHub 👋
+            </Typography>
+            <Typography variant="body2" color="text.secondary" mb={2.5}>
+              Join the community — share posts, take quizzes, and compete on the leaderboard.
+            </Typography>
+            <Stack direction="row" spacing={1.5}>
+              <Button variant="contained" startIcon={<Login />} onClick={() => navigate('/login')} size="small">
+                Sign In
+              </Button>
+              <Button variant="outlined" startIcon={<PersonAdd />} onClick={() => navigate('/signup')} size="small">
+                Create Account
+              </Button>
+            </Stack>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card sx={{ mb: 2 }}>
+          <CardContent sx={{ pb: '12px !important' }}>
+            <Stack direction="row" spacing={1.5} alignItems="center">
+              <Box sx={{ position: 'relative', flexShrink: 0 }}>
+                <Avatar src={user?.avatar} sx={{ width: 42, height: 42, bgcolor: 'primary.main' }}>
+                  {user?.name?.[0]}
+                </Avatar>
+                <Box sx={{
+                  position: 'absolute', bottom: 1, right: 1,
+                  width: 10, height: 10, borderRadius: '50%',
+                  bgcolor: isOnline(user?.id ?? '') ? '#44b700' : 'text.disabled',
+                  border: '2px solid', borderColor: 'background.paper',
+                }} />
+              </Box>
+              <Box
+                onClick={openDialog}
+                sx={{
+                  flex: 1, bgcolor: 'action.hover', borderRadius: 3,
+                  px: 2, py: 1.4, cursor: 'pointer', color: 'text.secondary',
+                  fontSize: '0.875rem',
+                  border: '1px solid transparent',
+                  transition: 'all 0.15s',
+                  '&:hover': { bgcolor: 'action.selected', borderColor: 'divider' },
+                }}
+              >
+                What's on your mind, {displayName}?
+              </Box>
+              <Button
+                startIcon={<EditNote />}
+                variant="contained"
+                size="small"
+                onClick={openDialog}
+                sx={{ flexShrink: 0, borderRadius: 2 }}
+              >
+                Post
+              </Button>
+            </Stack>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Subtopic filter chips */}
       <Box sx={{ mb: 2, overflowX: 'auto', pb: 0.5 }}>

@@ -16,7 +16,7 @@ const socketUserMap = new Map<string, { userId: string; role: string }>();
 export const broadcastUserStatus = (userId: string, isOnline: boolean) => {
   if (!io) { console.warn('[socket] broadcastUserStatus called before io initialized'); return; }
   const payload = { userId, isOnline, timestamp: new Date() };
-  io.to('admins').to(`user:${userId}`).emit('user:status', payload);
+  io.emit('user:status', payload);
   console.log(`[socket] broadcast user:status → userId=${userId} isOnline=${isOnline}`);
 };
 
@@ -42,8 +42,13 @@ export const initSocket = (httpServer: HttpServer): SocketServer => {
   });
 
   io.on('connection', (socket: Socket) => {
+    console.log(`[socket] new connection attempt: ${socket.id}`);
     const token = socket.handshake.auth?.token as string | undefined;
-    if (!token) { socket.disconnect(); return; }
+    if (!token) {
+      console.warn(`[socket] rejected: no token (${socket.id})`);
+      socket.disconnect();
+      return;
+    }
 
     let userId: string;
     let role: string;
@@ -52,7 +57,8 @@ export const initSocket = (httpServer: HttpServer): SocketServer => {
       const payload = verifyAccessToken(token);
       userId = payload.id;
       role   = payload.role;
-    } catch {
+    } catch (err) {
+      console.warn(`[socket] rejected: invalid token (${socket.id})`, (err as Error).message);
       socket.disconnect();
       return;
     }
@@ -65,11 +71,11 @@ export const initSocket = (httpServer: HttpServer): SocketServer => {
       .then(() => broadcastUserStatus(userId, true))
       .catch(console.error);
 
+    // Send snapshot to ALL connecting users so they see who's online immediately
+    sendSnapshot(socket);
+
     if (role === 'admin') {
       socket.join('admins');
-
-      // Push full online snapshot immediately
-      sendSnapshot(socket);
 
       socket.on('subscribe:users', (userIds: string[]) => {
         if (!Array.isArray(userIds)) return;
