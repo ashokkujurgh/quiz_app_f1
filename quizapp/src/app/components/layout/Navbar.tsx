@@ -59,33 +59,13 @@ export function Navbar({ onMenuToggle }: Props) {
         <IconButton onClick={onMenuToggle} sx={{ display: { md: 'none' } }}>
           <MenuIcon />
         </IconButton>
-        <Stack direction="row" alignItems="center" spacing={1} sx={{ minWidth: 160, display: { xs: 'none', sm: 'flex' } }}>
-          <Box
-            sx={{
-              width: 36, height: 36,
-              borderRadius: 2,
-              background: 'linear-gradient(135deg, #5563DE, #E91E8C)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer',
-            }}
-            onClick={() => navigate('/home')}
-          >
-            <Typography sx={{ fontSize: 18, color: 'white', fontWeight: 800 }}>Q</Typography>
-          </Box>
-          <Typography
-            variant="h6"
-            fontWeight={800}
-            sx={{
-              background: 'linear-gradient(135deg, #5563DE, #E91E8C)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              cursor: 'pointer',
-            }}
-            onClick={() => navigate('/home')}
-          >
-            QuizHub
-          </Typography>
-        </Stack>
+        <Box
+          component="img"
+          src="/src/assets/logo.png"
+          alt="Meenzo"
+          sx={{ height: 40, maxWidth: 140, objectFit: 'contain', cursor: 'pointer', display: { xs: 'none', sm: 'block' } }}
+          onClick={() => navigate('/home')}
+        />
 
         {/* Search */}
         <Box

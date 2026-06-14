@@ -1,7 +1,7 @@
 {
-  "name": "quizhub-auth-service",
+  "name": "meenzo-auth-service",
   "version": "1.0.0",
-  "description": "QuizHub Authentication Microservice (TypeScript)",
+  "description": "Meenzo Authentication Microservice (TypeScript)",
   "main": "dist/server.js",
   "type": "commonjs",
   "scripts": {

@@ -4,7 +4,7 @@ export const currentUser: User = {
   id: 'u1',
   name: 'Alex Johnson',
   username: 'alexj',
-  email: 'alex@quizhub.com',
+  email: 'alex@meenzo.app',
   avatar: 'https://i.pravatar.cc/150?img=11',
   bio: 'Quiz enthusiast & science nerd. Top 10 on the leaderboard!',
   coverImage: 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=1200&q=80',
@@ -79,7 +79,7 @@ export const mockPosts: Post[] = [
   {
     id: 'p5',
     author: currentUser,
-    content: 'Practicing circuit analysis problems today. Electrical engineering quizzes on QuizHub are seriously top-tier. What are your favorite categories?',
+    content: 'Practicing circuit analysis problems today. Electrical engineering quizzes on Meenzo are seriously top-tier. What are your favorite categories?',
     topic: 'Electrical',
     timestamp: '2024-06-03T18:45:00Z',
     likes: 62,

@@ -136,7 +136,7 @@ export const createPost: RequestHandler = async (req: AuthRequest, res: Response
       if (!textPolicy.allowed) {
         res.status(422).json({
           success: false,
-          message: "⚠️ Your post couldn't be published. It appears to contain content that violates our Community Guidelines — including hate speech, harassment, explicit material, or harmful language. Please review and revise your post to keep QuizHub a safe and respectful space for everyone.",
+          message: "⚠️ Your post couldn't be published. It appears to contain content that violates our Community Guidelines — including hate speech, harassment, explicit material, or harmful language. Please review and revise your post to keep Meenzo a safe and respectful space for everyone.",
         });
         return;
       }

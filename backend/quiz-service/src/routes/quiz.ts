@@ -4,19 +4,24 @@ import {
   createQuiz, getQuizzes, getQuiz, updateQuiz, deleteQuiz,
   addQuestions, removeQuestion, getQuizQuestions,
   startQuiz, endQuiz, getActiveQuizzes,
-  uploadImage, removeImage,
+  uploadImage, removeImage, getLeaderboard,
+  getMyHistory, getGameHistory,
+  getInvitedQuizzes, getMyQuizzes,
 } from '../controllers/quizController';
 import { quizImageUploader } from '../config/spaces';
 
 const router = express.Router();
 
-// Public
-router.get('/active', getActiveQuizzes);
-router.get('/',       getQuizzes);
-router.get('/:id',    getQuiz);
+// Public / user-specific (static routes MUST come before /:id)
+router.get('/active',       getActiveQuizzes);
+router.get('/my/history',   protect, getMyHistory);
+router.get('/my/quizzes',   protect, getMyQuizzes);
+router.get('/my/invited',   protect, getInvitedQuizzes);
+router.get('/',             getQuizzes);
+router.get('/:id',          getQuiz);
 
-// Admin — create / manage
-router.post('/',                          protect, adminOnly, createQuiz);
+// Create quiz — any authenticated user
+router.post('/',                          protect, createQuiz);
 router.patch('/:id',                      protect, adminOnly, updateQuiz);
 router.delete('/:id',                     protect, adminOnly, deleteQuiz);
 
@@ -28,6 +33,10 @@ router.delete('/:id/questions/:questionId', protect, adminOnly, removeQuestion);
 // Lifecycle
 router.post('/:id/start',                 protect, adminOnly, startQuiz);
 router.post('/:id/end',                   protect, adminOnly, endQuiz);
+
+// Leaderboard & history
+router.get('/:id/leaderboard',   getLeaderboard);
+router.get('/:id/my-history',    protect, getGameHistory);
 
 // Image
 router.post('/upload-image',              protect, adminOnly, quizImageUploader.single('image'), uploadImage);

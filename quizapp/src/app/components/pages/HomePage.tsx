@@ -207,7 +207,7 @@ export function HomePage() {
         }}>
           <CardContent sx={{ py: 3 }}>
             <Typography variant="h6" fontWeight={800} gutterBottom>
-              Welcome to QuizHub 👋
+              Welcome to Meenzo 👋
             </Typography>
             <Typography variant="body2" color="text.secondary" mb={2.5}>
               Join the community — share posts, take quizzes, and compete on the leaderboard.

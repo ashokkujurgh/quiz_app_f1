@@ -14,7 +14,7 @@ export const protect: RequestHandler = (req: AuthRequest, res: Response, next: N
   try {
     const token = authHeader.split(' ')[1];
     const decoded = jwt.verify(token, process.env.JWT_SECRET!, {
-      issuer: 'quizhub-auth',
+      issuer: 'meenzo-auth',
     }) as { id: string; email: string; role: string };
     req.user = decoded;
     next();

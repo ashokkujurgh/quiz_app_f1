@@ -97,4 +97,21 @@ router.get('/blocked', protect, async (req: AuthRequest, res: Response): Promise
   res.json({ success: true, blockedUsers: ids });
 });
 
+// User search — any authenticated user, for participant selection
+router.get('/users/search', protect, async (req: AuthRequest, res: Response): Promise<void> => {
+  const q = ((req.query.q as string) ?? '').trim();
+  if (!q || q.length < 2) { res.json({ success: true, users: [] }); return; }
+  const filter = {
+    _id:      { $ne: req.user!._id },
+    isActive: { $ne: false },
+    $or: [
+      { name:     { $regex: q, $options: 'i' } },
+      { email:    { $regex: q, $options: 'i' } },
+      { username: { $regex: q, $options: 'i' } },
+    ],
+  };
+  const users = await User.find(filter).select('_id name email username avatar').limit(20).lean();
+  res.json({ success: true, users });
+});
+
 export default router;

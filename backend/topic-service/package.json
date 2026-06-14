@@ -1,7 +1,7 @@
 {
-  "name": "quizhub-topic-service",
+  "name": "meenzo-topic-service",
   "version": "1.0.0",
-  "description": "QuizHub Topic & SubTopic Microservice",
+  "description": "Meenzo Topic & SubTopic Microservice",
   "main": "dist/server.js",
   "type": "commonjs",
   "scripts": {

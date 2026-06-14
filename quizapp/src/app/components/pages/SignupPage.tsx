@@ -83,16 +83,12 @@ export function SignupPage() {
       <Box sx={{ width: '100%', maxWidth: 440 }}>
         <Stack alignItems="center" spacing={1} mb={4}>
           <Box
-            sx={{
-              width: 56, height: 56,
-              borderRadius: 3,
-              background: 'linear-gradient(135deg, #5563DE, #E91E8C)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}
-          >
-            <Typography sx={{ fontSize: 28, color: 'white', fontWeight: 900, lineHeight: 1 }}>Q</Typography>
-          </Box>
-          <Typography variant="h5" fontWeight={800}>Join QuizHub</Typography>
+            component="img"
+            src="/src/assets/logo.png"
+            alt="Meenzo"
+            sx={{ height: 60, maxWidth: 180, objectFit: 'contain' }}
+          />
+          <Typography variant="h5" fontWeight={800}>Join Meenzo</Typography>
           <Typography variant="body2" color="text.secondary">Create your account and start quizzing!</Typography>
         </Stack>
 

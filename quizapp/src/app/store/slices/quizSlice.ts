@@ -55,7 +55,7 @@ const quizSlice = createSlice({
     completeQuiz: (state) => {
       if (!state.activeQuiz) return;
       const score = state.answers.filter(
-        (ans, i) => ans === state.activeQuiz!.questions[i].correctAnswer
+        (ans, i) => ans === state.activeQuiz!.questions[i]?.correctAnswer
       ).length;
       const total = state.activeQuiz.questions.length;
       state.result = {
@@ -64,8 +64,8 @@ const quizSlice = createSlice({
         category: state.activeQuiz.category,
         score,
         total,
-        percentage: Math.round((score / total) * 100),
-        rank: Math.floor(Math.random() * 50) + 1,
+        percentage: total > 0 ? Math.round((score / total) * 100) : 0,
+        rank: undefined,
         duration: state.activeQuiz.duration - state.timeLeft,
         date: new Date().toISOString().split('T')[0],
         answers: state.answers,
