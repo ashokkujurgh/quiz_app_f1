@@ -79,6 +79,7 @@ export interface Quiz {
   rating: number;
   createdBy: User;
   thumbnail?: string;
+  questionCount?: number;
 }
 
 export interface QuizResult {

@@ -1,6 +1,5 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import type { Quiz, QuizResult } from '../../types';
-import { mockQuizzes } from '../../data/mockData';
 
 interface QuizState {
   quizzes: Quiz[];
@@ -14,7 +13,7 @@ interface QuizState {
 }
 
 const initialState: QuizState = {
-  quizzes: mockQuizzes,
+  quizzes: [],
   activeQuiz: null,
   currentQuestion: 0,
   answers: [],
