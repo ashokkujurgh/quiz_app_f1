@@ -316,6 +316,13 @@ export const addComment: RequestHandler = async (req: AuthRequest, res: Response
       res.status(400).json({ success: false, message: 'Author info is required.' }); return;
     }
 
+    // Content policy check
+    const policy = await checkContentPolicy(content.trim());
+    if (!policy.allowed) {
+      res.status(422).json({ success: false, message: `Comment blocked: ${policy.reason ?? 'policy violation'}` });
+      return;
+    }
+
     const post = await Post.findById(req.params.id);
     if (!post || !post.isActive) { res.status(404).json({ success: false, message: 'Post not found.' }); return; }
 

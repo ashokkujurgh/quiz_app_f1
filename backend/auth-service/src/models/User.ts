@@ -76,6 +76,7 @@ const userSchema = new Schema<IUser>(
     isActive: { type: Boolean, default: true },
     isOnline: { type: Boolean, default: false },
     lastSeen: { type: Date, default: Date.now },
+    blockedUsers: [{ type: Schema.Types.ObjectId, ref: 'User', default: [] }],
 
     stats: { type: statsSchema, default: () => ({}) },
   },

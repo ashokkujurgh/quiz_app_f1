@@ -40,6 +40,7 @@ export interface IUser extends Document {
   refreshTokens: IRefreshToken[];
   isOnline: boolean;
   lastSeen: Date;
+  blockedUsers: Types.ObjectId[];
   stats: IUserStats;
   createdAt: Date;
   updatedAt: Date;

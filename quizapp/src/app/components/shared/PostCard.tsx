@@ -1,26 +1,39 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router';
 import {
   Card, CardContent, CardActions, Box, Typography, IconButton,
-  Button, Stack, Divider, Tooltip, Avatar, TextField, CircularProgress,
+  Button, Stack, Divider, Tooltip, Avatar, TextField, CircularProgress, Badge,
+  Menu, MenuItem, ListItemIcon, ListItemText, Snackbar, Alert, Dialog,
+  DialogTitle, DialogContent, DialogActions,
 } from '@mui/material';
 import {
   ThumbUpOutlined, ThumbUp, ChatBubbleOutline, MoreHoriz, EmojiEvents,
-  SendOutlined,
+  SendOutlined, Verified, Groups, Block,
 } from '@mui/icons-material';
 import type { Post } from '../../types';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { toggleLike, syncLike, incrementComments } from '../../store/slices/postsSlice';
+import { useOnlineUsers } from '../../context/OnlineUsersContext';
+import { useBlockedUsers } from '../../hooks/useBlockedUsers';
 import { UserAvatar } from './UserAvatar';
 import { TopicChip } from './TopicChip';
 import { formatDistanceToNow } from 'date-fns';
 
 interface ApiComment {
   _id: string;
-  author: { name: string; username: string; avatar?: string };
+  author: { userId?: string; name: string; username: string; avatar?: string };
   content: string;
   createdAt: string;
   likes: number;
 }
+
+const onlineDotSx = (online: boolean) => ({
+  '& .MuiBadge-badge': {
+    backgroundColor: online ? '#44b700' : 'transparent',
+    boxShadow: online ? '0 0 0 2px white' : 'none',
+    width: 10, height: 10, borderRadius: '50%', minWidth: 'unset',
+  },
+});
 
 interface Props {
   post: Post;
@@ -29,8 +42,10 @@ interface Props {
 const API = import.meta.env.VITE_API_URL ?? '';
 
 export function PostCard({ post }: Props) {
+  const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const { user, accessToken } = useAppSelector((s) => s.auth);
+  const { isOnline } = useOnlineUsers();
 
   const timeAgo = formatDistanceToNow(new Date(post.timestamp), { addSuffix: true });
 
@@ -61,6 +76,7 @@ export function PostCard({ post }: Props) {
   const [commentsLoading, setCommentsLoading] = useState(false);
   const [commentText, setCommentText]   = useState('');
   const [submitting, setSubmitting]     = useState(false);
+  const [commentError, setCommentError] = useState('');
 
   useEffect(() => {
     if (!showComments || commentsLoaded) return;
@@ -78,6 +94,7 @@ export function PostCard({ post }: Props) {
   const handleAddComment = async () => {
     if (!commentText.trim() || submitting) return;
     setSubmitting(true);
+    setCommentError('');
     try {
       const res = await fetch(`${API}/api/posts/${post.id}/comments`, {
         method: 'POST',
@@ -98,39 +115,120 @@ export function PostCard({ post }: Props) {
         setComments((prev) => [...prev, data.comment as ApiComment]);
         dispatch(incrementComments(post.id));
         setCommentText('');
+      } else {
+        setCommentError(data.message ?? 'Failed to post comment.');
       }
     } catch {
-      // silent — user can retry
+      setCommentError('Network error. Please try again.');
     } finally {
       setSubmitting(false);
     }
   };
 
+  // ── 3-dot menu ────────────────────────────────────────────────────────────────
+  const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
+  const [blockDialogOpen, setBlockDialogOpen] = useState(false);
+  const [snackMsg, setSnackMsg] = useState('');
+  const { blockedIds, block } = useBlockedUsers();
+  const blocked = blockedIds.includes(post.author.id);
+
+  const handleBlock = () => {
+    setBlockDialogOpen(false);
+    setMenuAnchor(null);
+    block(post.author.id, accessToken ?? '');
+    setSnackMsg(`You blocked ${post.author.name}. Their posts won't appear.`);
+  };
+
+  const isOfficial = post.author.role === 'admin';
+
+  if (blocked) return (
+    <Snackbar
+      open={Boolean(snackMsg)}
+      autoHideDuration={4000}
+      onClose={() => setSnackMsg('')}
+      anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+    >
+      <Alert severity="info" onClose={() => setSnackMsg('')} sx={{ width: '100%' }}>
+        {snackMsg}
+      </Alert>
+    </Snackbar>
+  );
+
   return (
-    <Card sx={{ mb: 2 }}>
+    <Card sx={{
+      mb: 2,
+      ...(isOfficial && {
+        border: '1.5px solid',
+        borderColor: 'primary.main',
+        borderOpacity: 0.4,
+        background: (theme) => theme.palette.mode === 'dark'
+          ? 'linear-gradient(135deg, rgba(85,99,222,0.08) 0%, rgba(168,85,247,0.05) 100%)'
+          : 'linear-gradient(135deg, rgba(85,99,222,0.04) 0%, rgba(168,85,247,0.03) 100%)',
+      }),
+    }}>
+      {/* Label banner */}
+      <Box sx={{
+        px: 2, py: 0.6,
+        display: 'flex', alignItems: 'center', gap: 0.75,
+        bgcolor: isOfficial ? 'primary.main' : 'action.hover',
+        borderBottom: '1px solid', borderColor: 'divider',
+      }}>
+        {isOfficial
+          ? <Verified sx={{ fontSize: 13, color: 'white' }} />
+          : <Groups sx={{ fontSize: 13, color: 'text.secondary' }} />}
+        <Typography variant="caption" fontWeight={700} sx={{
+          color: isOfficial ? 'white' : 'text.secondary',
+          letterSpacing: 0.5, textTransform: 'uppercase', fontSize: 10,
+        }}>
+          {isOfficial ? 'Official' : 'Community'}
+        </Typography>
+      </Box>
+
       <CardContent sx={{ pb: 1 }}>
         {/* Header */}
         <Stack direction="row" spacing={1.5} alignItems="flex-start" mb={1.5}>
-          <UserAvatar user={post.author} size={44} showOnline />
+          <UserAvatar user={{ ...post.author, isOnline: isOnline(post.author.id) }} size={44} showOnline />
           <Box flex={1}>
             <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap">
               <Typography variant="subtitle2" fontWeight={700}>
                 {post.author.name}
               </Typography>
+              {isOfficial && (
+                <Verified sx={{ fontSize: 15, color: 'primary.main' }} />
+              )}
               <Typography variant="caption" color="text.secondary">@{post.author.username}</Typography>
               <TopicChip topic={post.topic} />
             </Stack>
             <Typography variant="caption" color="text.secondary">{timeAgo}</Typography>
           </Box>
-          <IconButton size="small">
+          <IconButton size="small" onClick={(e) => setMenuAnchor(e.currentTarget)}>
             <MoreHoriz fontSize="small" />
           </IconButton>
         </Stack>
 
-        {/* Content */}
-        <Typography variant="body2" sx={{ mb: post.image ? 1.5 : 0, lineHeight: 1.7 }}>
-          {post.content}
-        </Typography>
+        {/* Content — 3-line clamp, click to open detail */}
+        <Box onClick={() => navigate(`/posts/${post.id}`)} sx={{ cursor: 'pointer' }}>
+          <Typography
+            variant="body2"
+            sx={{
+              lineHeight: 1.7,
+              display: '-webkit-box',
+              WebkitLineClamp: 3,
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden',
+              mb: 0.5,
+            }}
+          >
+            {post.content}
+          </Typography>
+          <Typography
+            variant="caption"
+            color="primary.main"
+            sx={{ fontWeight: 600, '&:hover': { textDecoration: 'underline' }, mb: post.image ? 1 : 0, display: 'block' }}
+          >
+            Read more
+          </Typography>
+        </Box>
 
         {/* Image */}
         {post.image && (
@@ -209,6 +307,34 @@ export function PostCard({ post }: Props) {
         </Tooltip>
       </CardActions>
 
+      {/* 3-dot menu */}
+      <Menu
+        anchorEl={menuAnchor}
+        open={Boolean(menuAnchor)}
+        onClose={() => setMenuAnchor(null)}
+        transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+        anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+      >
+        <MenuItem onClick={() => { setMenuAnchor(null); setBlockDialogOpen(true); }} sx={{ color: 'error.main' }}>
+          <ListItemIcon><Block fontSize="small" sx={{ color: 'error.main' }} /></ListItemIcon>
+          <ListItemText>Block {post.author.name}</ListItemText>
+        </MenuItem>
+      </Menu>
+
+      {/* Block confirm dialog */}
+      <Dialog open={blockDialogOpen} onClose={() => setBlockDialogOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>Block {post.author.name}?</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary">
+            You won't see posts or comments from <strong>{post.author.name}</strong> anymore.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setBlockDialogOpen(false)}>Cancel</Button>
+          <Button variant="contained" color="error" onClick={handleBlock}>Block</Button>
+        </DialogActions>
+      </Dialog>
+
       {/* Comments section */}
       {showComments && (
         <Box sx={{ px: 2, pb: 2 }}>
@@ -227,12 +353,15 @@ export function PostCard({ post }: Props) {
             <Stack spacing={1.5} mb={2}>
               {comments.map((c) => (
                 <Stack key={c._id} direction="row" spacing={1} alignItems="flex-start">
-                  <Avatar
-                    src={c.author.avatar}
-                    sx={{ width: 32, height: 32, fontSize: 13 }}
-                  >
-                    {c.author.name?.[0]}
-                  </Avatar>
+                  <Badge overlap="circular" anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                    variant="dot" sx={onlineDotSx(isOnline(c.author.userId ?? ''))}>
+                    <Avatar
+                      src={c.author.avatar}
+                      sx={{ width: 32, height: 32, fontSize: 13 }}
+                    >
+                      {c.author.name?.[0]}
+                    </Avatar>
+                  </Badge>
                   <Box sx={{ bgcolor: 'action.hover', borderRadius: 2, px: 1.5, py: 1, flex: 1 }}>
                     <Stack direction="row" spacing={1} alignItems="center">
                       <Typography variant="caption" fontWeight={700}>{c.author.name}</Typography>
@@ -245,6 +374,17 @@ export function PostCard({ post }: Props) {
                 </Stack>
               ))}
             </Stack>
+          )}
+
+          {/* AI filter error */}
+          {commentError && (
+            <Alert
+              severity="error"
+              onClose={() => setCommentError('')}
+              sx={{ mb: 1.5, py: 0.5, fontSize: '0.8rem', borderRadius: 2 }}
+            >
+              {commentError}
+            </Alert>
           )}
 
           {/* Add comment input */}

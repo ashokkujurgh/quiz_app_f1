@@ -70,4 +70,31 @@ router.post('/upload/image', protect, (req: AuthRequest, res: Response): void =>
 
 router.patch('/profile', protect, updateProfileRules, updateProfile);
 
+// ── Block / Unblock ───────────────────────────────────────
+import User from '../models/User';
+import mongoose from 'mongoose';
+
+router.post('/block/:userId', protect, async (req: AuthRequest, res: Response): Promise<void> => {
+  const me = req.user!;
+  const targetId = req.params.userId;
+  if (!mongoose.isValidObjectId(targetId)) { res.status(400).json({ success: false, message: 'Invalid user id' }); return; }
+  if (String(me._id) === targetId) { res.status(400).json({ success: false, message: 'Cannot block yourself' }); return; }
+  await User.findByIdAndUpdate(me._id, { $addToSet: { blockedUsers: new mongoose.Types.ObjectId(targetId) } });
+  res.json({ success: true });
+});
+
+router.delete('/block/:userId', protect, async (req: AuthRequest, res: Response): Promise<void> => {
+  const me = req.user!;
+  const targetId = req.params.userId;
+  if (!mongoose.isValidObjectId(targetId)) { res.status(400).json({ success: false, message: 'Invalid user id' }); return; }
+  await User.findByIdAndUpdate(me._id, { $pull: { blockedUsers: new mongoose.Types.ObjectId(targetId) } });
+  res.json({ success: true });
+});
+
+router.get('/blocked', protect, async (req: AuthRequest, res: Response): Promise<void> => {
+  const me = await User.findById(req.user!._id).select('blockedUsers').lean();
+  const ids = (me?.blockedUsers ?? []).map(String);
+  res.json({ success: true, blockedUsers: ids });
+});
+
 export default router;
