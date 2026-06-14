@@ -1,5 +1,6 @@
 import cron from 'node-cron';
 import Quiz, { IQuiz } from '../models/Quiz';
+import { startGameSession } from '../socket/gameController';
 
 // quizId → cron task handle
 const _tasks = new Map<string, cron.ScheduledTask>();
@@ -29,15 +30,18 @@ async function activateQuiz(quizId: string): Promise<void> {
   await quiz.save();
   console.log(`🎯 Quiz "${quiz.title}" (${quizId}) started at ${quiz.startedAt.toISOString()}`);
 
-  // Schedule auto-end after durationMinutes
+  // Start the live game session (socket-driven questions)
+  startGameSession(quizId).catch(console.error);
+
+  // Schedule auto-end after durationMinutes (fallback if game session exits early)
   const endMs = quiz.durationMinutes * 60 * 1000;
   setTimeout(async () => {
     const q = await Quiz.findById(quizId);
-    if (!q || q.status !== 'active') return;
+    if (!q || q.status !== 'active') return; // already completed by game session
     q.status  = 'completed';
     q.endedAt = new Date();
     await q.save();
-    console.log(`✅ Quiz "${q.title}" (${quizId}) completed.`);
+    console.log(`✅ Quiz "${q.title}" (${quizId}) completed (timeout).`);
 
     // Reschedule recurring quizzes unless endDate has been reached
     if (quiz.scheduleType !== 'once') {
@@ -102,4 +106,34 @@ export async function rehydrateSchedules(): Promise<void> {
     scheduleQuiz(quiz);
   }
   console.log(`🔄 Rehydrated ${quizzes.length} scheduled quiz(zes).`);
+}
+
+// ── Stale-game cleanup — runs every 10 minutes ─────────────────────────────────
+async function cleanupStaleGames(): Promise<void> {
+  const now = new Date();
+
+  // Find quizzes that are still 'active' but startedAt + durationMinutes has passed
+  const stale = await Quiz.find({ status: 'active', startedAt: { $ne: null } }).lean();
+
+  const expired = stale.filter((q) => {
+    if (!q.startedAt) return false;
+    const endTime = new Date(q.startedAt.getTime() + q.durationMinutes * 60 * 1000);
+    return now > endTime;
+  });
+
+  if (expired.length === 0) return;
+
+  for (const q of expired) {
+    await Quiz.findByIdAndUpdate(q._id, { status: 'completed', endedAt: now });
+    console.log(`🧹 Cleanup: quiz "${q.title}" (${q._id}) force-completed (overran by ${Math.round((now.getTime() - (new Date(q.startedAt!).getTime() + q.durationMinutes * 60 * 1000)) / 1000)}s).`);
+  }
+
+  console.log(`🧹 Cleanup sweep done — ${expired.length} stale game(s) completed.`);
+}
+
+export function startCleanupJob(): void {
+  cron.schedule('*/10 * * * *', () => {
+    cleanupStaleGames().catch((err) => console.error('[CleanupJob] error:', err));
+  }, { timezone: 'UTC' });
+  console.log('🕐 Stale-game cleanup job scheduled (every 10 min).');
 }

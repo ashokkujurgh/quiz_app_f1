@@ -4,7 +4,7 @@ import User from '../models/User';
 
 const DEFAULT_ADMIN = {
   name:     'Super Admin',
-  email:    'admin@quizhub.com',
+  email:    'admin@meenzo.app',
   password: 'Admin@123',
   role:     'admin' as const,
   authProvider: 'email' as const,

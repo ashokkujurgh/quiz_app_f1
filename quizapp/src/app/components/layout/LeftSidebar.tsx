@@ -126,7 +126,7 @@ export function LeftSidebar({ open, onClose, variant = 'permanent' }: Props) {
       {/* Footer */}
       <Box sx={{ px: 2, pb: 2 }}>
         <Typography variant="caption" color="text.secondary">
-          © 2024 QuizHub
+          © 2026 Meenzo
         </Typography>
       </Box>
     </Box>

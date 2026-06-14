@@ -43,7 +43,7 @@ if (process.env.NODE_ENV !== 'test') app.use(morgan('dev'));
 app.get('/health', (_req, res) => {
   res.json({
     success: true,
-    service: 'quizhub-topic-service',
+    service: 'meenzo-topic-service',
     status: 'healthy',
     timestamp: new Date().toISOString(),
   });

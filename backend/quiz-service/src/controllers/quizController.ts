@@ -2,9 +2,12 @@ import { Response, RequestHandler } from 'express';
 import axios from 'axios';
 import { Types } from 'mongoose';
 import Quiz from '../models/Quiz';
+import LeaderboardEntry from '../models/LeaderboardEntry';
+import GameHistory from '../models/GameHistory';
 import { AuthRequest } from '../middleware/auth';
 import { scheduleQuiz, cancelQuiz } from '../jobs/scheduler';
 import { deleteImageByUrl } from '../config/spaces';
+import { startGameSession } from '../socket/gameController';
 
 const QUESTION_URL = process.env.QUESTION_SERVICE_URL ?? 'http://localhost:4003';
 
@@ -15,17 +18,27 @@ async function fetchRandomQuestions(
   subTopicId: string | null,
   count: number,
 ): Promise<string[]> {
-  const params: Record<string, string | number> = { topic: topicId, limit: 200 };
+  const params: Record<string, string | number> = { topic: topicId, limit: 500 };
   if (subTopicId) params.subTopic = subTopicId;
 
   const { data } = await axios.get(`${QUESTION_URL}/api/questions`, { params });
-  const questions: { _id: string }[] = data.questions ?? [];
-  if (questions.length < count) {
+  const raw: { _id: string; text: string }[] = data.questions ?? [];
+
+  // Deduplicate by normalized question text — keep first occurrence only
+  const seenTexts = new Set<string>();
+  const unique = raw.filter((q) => {
+    const key = q.text.trim().toLowerCase();
+    if (seenTexts.has(key)) return false;
+    seenTexts.add(key);
+    return true;
+  });
+
+  if (unique.length < count) {
     throw new Error(
-      `Not enough questions available for this topic (need ${count}, found ${questions.length}). Please reduce the question count or generate more questions first.`,
+      `Not enough unique questions available for this topic (need ${count}, found ${unique.length}). Please reduce the question count or add more questions first.`,
     );
   }
-  return questions.sort(() => Math.random() - 0.5).slice(0, count).map((q) => q._id);
+  return unique.sort(() => Math.random() - 0.5).slice(0, count).map((q) => q._id);
 }
 
 // ── CREATE ────────────────────────────────────────────────────────────────────
@@ -98,12 +111,13 @@ export const createQuiz: RequestHandler = async (req: AuthRequest, res: Response
 
 export const getQuizzes: RequestHandler = async (req, res): Promise<void> => {
   try {
-    const { status, participation } = req.query as { status?: string; participation?: string };
+    const { status, participation, subTopic } = req.query as { status?: string; participation?: string; subTopic?: string };
     const filter: Record<string, unknown> = {};
     if (status)        filter.status        = status;
     if (participation) filter.participation = participation;
+    if (subTopic)      filter.subTopic      = subTopic;
 
-    const quizzes = await Quiz.find(filter).sort({ scheduledAt: 1 }).lean();
+    const quizzes = await Quiz.find(filter).sort({ scheduledAt: -1 }).lean();
     res.json({ success: true, quizzes });
   } catch (err) {
     console.error(err);
@@ -280,6 +294,9 @@ export const startQuiz: RequestHandler = async (req, res): Promise<void> => {
     quiz.startedAt = new Date();
     await quiz.save();
     res.json({ success: true, quiz });
+
+    // Kick off the live game session (non-blocking)
+    startGameSession(quiz.id as string).catch(console.error);
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: 'Failed to start quiz.' });
@@ -326,6 +343,74 @@ export const removeImage: RequestHandler = async (req, res): Promise<void> => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: 'Failed to remove image.' });
+  }
+};
+
+// ── LEADERBOARD ───────────────────────────────────────────────────────────────
+
+export const getLeaderboard: RequestHandler = async (req, res): Promise<void> => {
+  try {
+    const entries = await LeaderboardEntry.find({ quizId: req.params.id }).sort({ rank: 1 }).lean();
+    res.json({ success: true, leaderboard: entries });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Failed to fetch leaderboard.' });
+  }
+};
+
+// ── MY INVITED QUIZZES ───────────────────────────────────────────────────────
+
+export const getInvitedQuizzes: RequestHandler = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = new Types.ObjectId(req.user!.id);
+    const quizzes = await Quiz.find({
+      allowedUsers: userId,
+      status: { $nin: ['cancelled'] },
+    }).sort({ scheduledAt: -1 }).lean();
+    res.json({ success: true, quizzes });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Failed to fetch invited quizzes.' });
+  }
+};
+
+// ── MY CREATED QUIZZES ────────────────────────────────────────────────────────
+
+export const getMyQuizzes: RequestHandler = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = new Types.ObjectId(req.user!.id);
+    const quizzes = await Quiz.find({ createdBy: userId }).sort({ scheduledAt: -1 }).lean();
+    res.json({ success: true, quizzes });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Failed to fetch your quizzes.' });
+  }
+};
+
+// ── MY GAME HISTORY ──────────────────────────────────────────────────────────
+
+export const getMyHistory: RequestHandler = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user!.id;
+    const entries = await GameHistory.find({ userId }).sort({ completedAt: -1 }).lean();
+    res.json({ success: true, history: entries });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Failed to fetch history.' });
+  }
+};
+
+// ── GAME HISTORY BY QUIZ ──────────────────────────────────────────────────────
+
+export const getGameHistory: RequestHandler = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user!.id;
+    const entry  = await GameHistory.findOne({ quizId: req.params.id, userId }).lean();
+    if (!entry) { res.status(404).json({ success: false, message: 'No history found for this quiz.' }); return; }
+    res.json({ success: true, history: entry });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Failed to fetch history.' });
   }
 };
 

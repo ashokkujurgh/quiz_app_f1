@@ -2,7 +2,7 @@ import amqplib, { type ChannelModel, type Channel } from 'amqplib';
 import { AuthEvent, AuthEventType } from '../types';
 
 // ── Exchange / Queue names ────────────────────────────────
-export const EXCHANGE = 'quizhub.auth';
+export const EXCHANGE = 'meenzo.auth';
 export const QUEUES = {
   AUTH_EVENTS:          'auth.events',
   NOTIFICATION_SERVICE: 'notification.auth',

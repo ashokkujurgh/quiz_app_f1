@@ -89,7 +89,7 @@ export interface QuizResult {
   score: number;
   total: number;
   percentage: number;
-  rank?: number;
+  rank?: number | null;
   duration: number;
   date: string;
   answers: number[];

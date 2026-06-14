@@ -111,6 +111,12 @@ export const createQuestion: RequestHandler = async (req: Request, res: Response
       res.status(400).json({ success: false, message: 'Invalid subTopic id.' }); return;
     }
 
+    const existing = await Question.findOne({ text: { $regex: `^${text.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' } }).lean();
+    if (existing) {
+      res.status(409).json({ success: false, message: 'A question with this text already exists.' });
+      return;
+    }
+
     const question = await Question.create({
       text: text.trim(),
       description: description?.trim() ?? '',

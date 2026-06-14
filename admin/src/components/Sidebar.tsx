@@ -79,7 +79,7 @@ export default function Sidebar() {
           </svg>
         </div>
         <div>
-          <div className="font-bold text-sm text-gray-900 dark:text-white leading-none">QuizHub</div>
+          <div className="font-bold text-sm text-gray-900 dark:text-white leading-none">Meenzo</div>
           <div className="text-xs text-gray-400 mt-0.5">Admin Panel</div>
         </div>
       </div>

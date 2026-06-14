@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import http from 'http';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -7,13 +8,16 @@ import rateLimit from 'express-rate-limit';
 
 import connectDB from './config/db';
 import quizRoutes from './routes/quiz';
-import { rehydrateSchedules } from './jobs/scheduler';
+import { rehydrateSchedules, startCleanupJob } from './jobs/scheduler';
+import { initGameSocket } from './socket/gameController';
 
-const app  = express();
-const PORT = parseInt(process.env.PORT ?? '4005', 10);
+const app    = express();
+const server = http.createServer(app);
+const PORT   = parseInt(process.env.PORT ?? '4005', 10);
 
 connectDB()
   .then(() => rehydrateSchedules())
+  .then(() => startCleanupJob())
   .catch(console.error);
 
 app.use(helmet());
@@ -33,7 +37,7 @@ app.use(express.urlencoded({ extended: true }));
 if (process.env.NODE_ENV !== 'test') app.use(morgan('dev'));
 
 app.get('/health', (_req, res) => {
-  res.json({ success: true, service: 'quizhub-quiz-service', status: 'healthy', timestamp: new Date().toISOString() });
+  res.json({ success: true, service: 'meenzo-quiz-service', status: 'healthy', timestamp: new Date().toISOString() });
 });
 
 app.use('/api/quizzes', limiter, quizRoutes);
@@ -47,14 +51,17 @@ app.use((err: Error & { status?: number }, _req: express.Request, res: express.R
   res.status(err.status ?? 500).json({ success: false, message: err.message ?? 'Internal server error.' });
 });
 
+initGameSocket(server);
+
 const shutdown = () => { console.log('\n🛑 Shutting down quiz service...'); process.exit(0); };
 process.on('SIGTERM', shutdown);
 process.on('SIGINT',  shutdown);
 
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`\n🚀 Quiz Service   →  http://localhost:${PORT}`);
   console.log(`📋 Health check   →  http://localhost:${PORT}/health`);
-  console.log(`🎯 Quiz API       →  http://localhost:${PORT}/api/quizzes\n`);
+  console.log(`🎯 Quiz API       →  http://localhost:${PORT}/api/quizzes`);
+  console.log(`🎮 Game Socket    →  ws://localhost:${PORT}/quiz.io/\n`);
 });
 
 export default app;

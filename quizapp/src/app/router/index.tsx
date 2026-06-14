@@ -6,6 +6,7 @@ import { SignupPage } from '../components/pages/SignupPage';
 import { HomePage } from '../components/pages/HomePage';
 import { QuizzesPage } from '../components/pages/QuizzesPage';
 import { QuizPlayPage } from '../components/pages/QuizPlayPage';
+import { CreateQuizPage } from '../components/pages/CreateQuizPage';
 import { QuizResultPage } from '../components/pages/QuizResultPage';
 import { FriendsPage } from '../components/pages/FriendsPage';
 import { MessagesPage } from '../components/pages/MessagesPage';
@@ -34,8 +35,9 @@ export const router = createBrowserRouter([
   { path: '/login',        element: <RedirectIfAuth><LoginPage /></RedirectIfAuth> },
   { path: '/signup',       element: <RedirectIfAuth><SignupPage /></RedirectIfAuth> },
   { path: '/posts/:id',    element: <PostDetailPage /> },
-  { path: '/quiz/play',    element: <RequireAuth><QuizPlayPage /></RequireAuth> },
-  { path: '/quiz/result',  element: <RequireAuth><QuizResultPage /></RequireAuth> },
+  { path: '/quiz/play/:quizId', element: <RequireAuth><QuizPlayPage /></RequireAuth> },
+  { path: '/quiz/result',       element: <RequireAuth><QuizResultPage /></RequireAuth> },
+  { path: '/quiz/create',       element: <RequireAuth><CreateQuizPage /></RequireAuth> },
   {
     path: '/',
     element: <AppLayout />,

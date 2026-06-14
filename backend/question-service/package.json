@@ -1,7 +1,7 @@
 {
-  "name": "quizhub-question-service",
+  "name": "meenzo-question-service",
   "version": "1.0.0",
-  "description": "QuizHub Question Microservice",
+  "description": "Meenzo Question Microservice",
   "main": "dist/server.js",
   "type": "commonjs",
   "scripts": {
