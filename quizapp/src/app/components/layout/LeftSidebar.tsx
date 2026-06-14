@@ -56,18 +56,13 @@ export function LeftSidebar({ open, onClose, variant = 'permanent' }: Props) {
       >
         <Stack direction="row" spacing={1.5} alignItems="center">
           {user ? (
-            <UserAvatar user={{ ...user, isOnline: isOnline(user.id) }} size={44} showOnline />
+            <UserAvatar user={{ ...user, isOnline: true }} size={44} showOnline />
           ) : (
             <Avatar sx={{ width: 44, height: 44 }} />
           )}
           <Box minWidth={0}>
             <Typography variant="subtitle2" fontWeight={700} noWrap>{user?.name ?? ''}</Typography>
-            <Stack direction="row" spacing={0.5} alignItems="center">
-              <Box sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: isOnline(user?.id ?? '') ? '#44b700' : 'text.disabled' }} />
-              <Typography variant="caption" color="text.secondary" noWrap>
-                {isOnline(user?.id ?? '') ? 'Online' : 'Offline'}
-              </Typography>
-            </Stack>
+            <Typography variant="caption" color="text.secondary" noWrap>{user?.email ?? ''}</Typography>
           </Box>
         </Stack>
       </Box>

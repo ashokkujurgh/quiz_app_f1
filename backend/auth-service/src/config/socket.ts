@@ -66,13 +66,13 @@ export const initSocket = (httpServer: HttpServer): SocketServer => {
     socketUserMap.set(socket.id, { userId, role });
     console.log(`[socket] ${role} connected: ${userId} (${socket.id})`);
 
-    // Mark ANY connected user as online (admin or regular)
+    // Mark user online first, then broadcast + send snapshot so user appears in snapshot
     User.findByIdAndUpdate(userId, { isOnline: true, lastSeen: new Date() })
-      .then(() => broadcastUserStatus(userId, true))
+      .then(() => {
+        broadcastUserStatus(userId, true);
+        sendSnapshot(socket);
+      })
       .catch(console.error);
-
-    // Send snapshot to ALL connecting users so they see who's online immediately
-    sendSnapshot(socket);
 
     if (role === 'admin') {
       socket.join('admins');
