@@ -57,24 +57,24 @@ export function LeftSidebar({ open, onClose, variant = 'permanent' }: Props) {
 
   const drawer = (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', pt: '64px' }}>
-      {/* User summary */}
-      <Box
-        sx={{ px: 2, py: 2, cursor: 'pointer' }}
-        onClick={() => handleNav('/profile', true)}
-      >
-        <Stack direction="row" spacing={1.5} alignItems="center">
-          {user ? (
-            <UserAvatar user={{ ...user, isOnline: true }} size={44} showOnline />
-          ) : (
-            <Avatar sx={{ width: 44, height: 44 }} />
-          )}
-          <Box minWidth={0}>
-            <Typography variant="subtitle2" fontWeight={700} noWrap>{user?.name ?? ''}</Typography>
-            <Typography variant="caption" color="text.secondary" noWrap>{user?.email ?? ''}</Typography>
+      {/* User summary — only shown when logged in */}
+      {user && (
+        <>
+          <Box
+            sx={{ px: 2, py: 2, cursor: 'pointer' }}
+            onClick={() => handleNav('/profile', true)}
+          >
+            <Stack direction="row" spacing={1.5} alignItems="center">
+              <UserAvatar user={{ ...user, isOnline: true }} size={44} showOnline />
+              <Box minWidth={0}>
+                <Typography variant="subtitle2" fontWeight={700} noWrap>{user.name}</Typography>
+                <Typography variant="caption" color="text.secondary" noWrap>{user.email}</Typography>
+              </Box>
+            </Stack>
           </Box>
-        </Stack>
-      </Box>
-      <Divider sx={{ mx: 2 }} />
+          <Divider sx={{ mx: 2 }} />
+        </>
+      )}
 
       {/* Nav */}
       <List sx={{ px: 1, flex: 1, pt: 1 }}>

@@ -215,22 +215,32 @@ export function Navbar({ onMenuToggle }: Props) {
             </IconButton>
           </Tooltip>
 
-          <Tooltip title="Messages">
-            <IconButton size="small" onClick={() => navigate('/messages')}>
-              <Badge badgeContent={unreadMessages} color="primary">
-                <Message />
-              </Badge>
-            </IconButton>
-          </Tooltip>
+          {user && (
+            <Tooltip title="Messages">
+              <IconButton size="small" onClick={() => navigate('/messages')}>
+                <Badge badgeContent={unreadMessages} color="primary">
+                  <Message />
+                </Badge>
+              </IconButton>
+            </Tooltip>
+          )}
 
-          <Tooltip title="Profile">
-            <IconButton onClick={(e) => setProfileAnchor(e.currentTarget)} sx={{ p: 0.5 }}>
-              {user ? <UserAvatar user={user} size={34} /> : <Avatar sx={{ width: 34, height: 34 }} />}
-            </IconButton>
-          </Tooltip>
+          {user ? (
+            <Tooltip title="Profile">
+              <IconButton onClick={(e) => setProfileAnchor(e.currentTarget)} sx={{ p: 0.5 }}>
+                <UserAvatar user={user} size={34} />
+              </IconButton>
+            </Tooltip>
+          ) : (
+            <Tooltip title="Sign in">
+              <IconButton onClick={() => navigate('/login')} sx={{ p: 0.5 }}>
+                <Avatar sx={{ width: 34, height: 34, bgcolor: 'action.selected' }} />
+              </IconButton>
+            </Tooltip>
+          )}
         </Stack>
 
-        {/* Profile Menu */}
+        {/* Profile Menu — only shown when logged in */}
         <Menu
           anchorEl={profileAnchor}
           open={Boolean(profileAnchor)}
