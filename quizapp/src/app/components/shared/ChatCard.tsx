@@ -3,7 +3,7 @@ import type { Chat } from '../../types';
 import { UserAvatar } from './UserAvatar';
 import { formatDistanceToNow } from 'date-fns';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
-import { setActiveChat } from '../../store/slices/messagesSlice';
+import { setActiveConv } from '../../store/slices/messagesSlice';
 
 interface Props {
   chat: Chat;
@@ -17,7 +17,7 @@ export function ChatCard({ chat }: Props) {
   return (
     <ListItemButton
       selected={isActive}
-      onClick={() => dispatch(setActiveChat(chat.id))}
+      onClick={() => dispatch(setActiveConv(chat.id))}
       sx={{ borderRadius: 2, px: 1.5, py: 1, mb: 0.5 }}
     >
       <Stack direction="row" spacing={1.5} alignItems="center" width="100%">

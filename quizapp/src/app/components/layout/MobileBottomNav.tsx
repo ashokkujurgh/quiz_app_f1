@@ -6,15 +6,22 @@ import { useAppSelector } from '../../store/hooks';
 export function MobileBottomNav() {
   const navigate = useNavigate();
   const location = useLocation();
-  const unreadMessages = useAppSelector((s) => s.messages.chats.reduce((a, c) => a + c.unreadCount, 0));
+  const unreadMessages    = useAppSelector((s) =>
+    Object.values(s.messages.unreadByConv).reduce((a, c) => a + c, 0)
+  );
+  const friendRequestCount = useAppSelector((s) => s.friends.incoming.length);
 
   const items = [
     { label: 'Home', icon: <Home />, path: '/home' },
     { label: 'Quiz', icon: <Quiz />, path: '/quizzes' },
-    { label: 'Friends', icon: <People />, path: '/friends' },
+    {
+      label: 'Friends',
+      icon: <Badge badgeContent={friendRequestCount || undefined} color="error"><People /></Badge>,
+      path: '/friends',
+    },
     {
       label: 'Messages',
-      icon: <Badge badgeContent={unreadMessages} color="primary"><Message /></Badge>,
+      icon: <Badge badgeContent={unreadMessages || undefined} color="primary"><Message /></Badge>,
       path: '/messages',
     },
     { label: 'Profile', icon: <Person />, path: '/profile' },

@@ -6,15 +6,13 @@ import {
   Tooltip, alpha, useTheme,
 } from '@mui/material';
 import {
-  Search, Notifications, Message, LightMode, DarkMode,
+  Search, Message, LightMode, DarkMode,
   Settings, Logout, Person, EmojiEvents, Menu as MenuIcon,
 } from '@mui/icons-material';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { toggleTheme } from '../../store/slices/themeSlice';
 import { logout } from '../../store/slices/authSlice';
-import { markAllRead } from '../../store/slices/notificationsSlice';
 import { UserAvatar } from '../shared/UserAvatar';
-import { formatDistanceToNow } from 'date-fns';
 
 const DRAWER_WIDTH = 260;
 
@@ -28,18 +26,11 @@ export function Navbar({ onMenuToggle }: Props) {
   const dispatch = useAppDispatch();
   const { user } = useAppSelector((s) => s.auth);
   const themeMode = useAppSelector((s) => s.theme.mode);
-  const notifications = useAppSelector((s) => s.notifications.notifications);
-  const chats = useAppSelector((s) => s.messages.chats);
-
-  const unreadNotifications = notifications.filter((n) => !n.read).length;
-  const unreadMessages = chats.reduce((acc, c) => acc + c.unreadCount, 0);
+  const unreadMessages = useAppSelector((s) =>
+    Object.values(s.messages.unreadByConv).reduce((a, c) => a + c, 0)
+  );
 
   const [profileAnchor, setProfileAnchor] = useState<null | HTMLElement>(null);
-  const [notifAnchor, setNotifAnchor] = useState<null | HTMLElement>(null);
-
-  const notifTypeIcon: Record<string, string> = {
-    like: '❤️', comment: '💬', friend_request: '👥', message: '✉️', quiz_challenge: '🎯',
-  };
 
   return (
     <AppBar
@@ -106,15 +97,6 @@ export function Navbar({ onMenuToggle }: Props) {
             </IconButton>
           </Tooltip>
 
-          {/* Notifications */}
-          <Tooltip title="Notifications">
-            <IconButton size="small" onClick={(e) => setNotifAnchor(e.currentTarget)}>
-              <Badge badgeContent={unreadNotifications} color="error">
-                <Notifications />
-              </Badge>
-            </IconButton>
-          </Tooltip>
-
           {/* Messages */}
           <Tooltip title="Messages">
             <IconButton size="small" onClick={() => navigate('/messages')}>
@@ -135,56 +117,6 @@ export function Navbar({ onMenuToggle }: Props) {
             </IconButton>
           </Tooltip>
         </Stack>
-
-        {/* Notification Menu */}
-        <Menu
-          anchorEl={notifAnchor}
-          open={Boolean(notifAnchor)}
-          onClose={() => setNotifAnchor(null)}
-          PaperProps={{ sx: { width: 360, maxHeight: 480, borderRadius: 3 } }}
-          transformOrigin={{ horizontal: 'right', vertical: 'top' }}
-          anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
-        >
-          <Box sx={{ px: 2, py: 1.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Typography variant="h6" fontWeight={700}>Notifications</Typography>
-            {unreadNotifications > 0 && (
-              <Typography
-                variant="caption"
-                color="primary"
-                sx={{ cursor: 'pointer', fontWeight: 600 }}
-                onClick={() => dispatch(markAllRead())}
-              >
-                Mark all read
-              </Typography>
-            )}
-          </Box>
-          <Divider />
-          {notifications.slice(0, 6).map((n) => (
-            <MenuItem
-              key={n.id}
-              sx={{
-                py: 1.5,
-                bgcolor: n.read ? 'transparent' : 'primary.main',
-                background: n.read ? undefined : alpha(theme.palette.primary.main, 0.06),
-              }}
-            >
-              <Stack direction="row" spacing={1.5} alignItems="flex-start" width="100%">
-                <Box sx={{ fontSize: 20 }}>{notifTypeIcon[n.type]}</Box>
-                <Box flex={1}>
-                  <Typography variant="body2">
-                    <strong>{n.actor.name}</strong> {n.content}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {formatDistanceToNow(new Date(n.timestamp), { addSuffix: true })}
-                  </Typography>
-                </Box>
-                {!n.read && (
-                  <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'primary.main', mt: 0.5, flexShrink: 0 }} />
-                )}
-              </Stack>
-            </MenuItem>
-          ))}
-        </Menu>
 
         {/* Profile Menu */}
         <Menu
