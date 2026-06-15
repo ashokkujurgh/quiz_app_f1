@@ -49,6 +49,9 @@ export function PostCard({ post }: Props) {
 
   const timeAgo = formatDistanceToNow(new Date(post.timestamp), { addSuffix: true });
 
+  // Normalise images: prefer images[] array, fall back to legacy image field
+  const postImages: string[] = post.images?.length ? post.images : post.image ? [post.image] : [];
+
   // ── Like ──────────────────────────────────────────────────────────────────────
   const handleLike = async () => {
     dispatch(toggleLike(post.id));
@@ -224,20 +227,45 @@ export function PostCard({ post }: Props) {
           <Typography
             variant="caption"
             color="primary.main"
-            sx={{ fontWeight: 600, '&:hover': { textDecoration: 'underline' }, mb: post.image ? 1 : 0, display: 'block' }}
+            sx={{ fontWeight: 600, '&:hover': { textDecoration: 'underline' }, mb: postImages.length ? 1 : 0, display: 'block' }}
           >
             Read more
           </Typography>
         </Box>
 
-        {/* Image */}
-        {post.image && (
-          <Box
-            component="img"
-            src={post.image}
-            alt="post"
-            sx={{ width: '100%', borderRadius: 2, maxHeight: 320, objectFit: 'cover', display: 'block' }}
-          />
+        {/* Images */}
+        {postImages.length === 1 && (
+          <Box component="img" src={postImages[0]} alt="post"
+            sx={{ width: '100%', borderRadius: 2, maxHeight: 320, objectFit: 'cover', display: 'block' }} />
+        )}
+        {postImages.length === 2 && (
+          <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0.5, borderRadius: 2, overflow: 'hidden' }}>
+            {postImages.map((src, i) => (
+              <Box key={i} component="img" src={src} alt={`post-${i}`}
+                sx={{ width: '100%', height: 180, objectFit: 'cover', display: 'block' }} />
+            ))}
+          </Box>
+        )}
+        {postImages.length >= 3 && (
+          <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0.5, borderRadius: 2, overflow: 'hidden' }}>
+            <Box component="img" src={postImages[0]} alt="post-0"
+              sx={{ width: '100%', height: 240, objectFit: 'cover', display: 'block', gridRow: '1 / 3' }} />
+            {postImages.slice(1, 3).map((src, i) => (
+              <Box key={i} component="img" src={src} alt={`post-${i + 1}`}
+                sx={{ width: '100%', height: 118, objectFit: 'cover', display: 'block' }} />
+            ))}
+            {postImages.length > 3 && (
+              <Box sx={{ position: 'relative' }}>
+                <Box component="img" src={postImages[3]} alt="post-3"
+                  sx={{ width: '100%', height: 118, objectFit: 'cover', display: 'block' }} />
+                {postImages.length > 4 && (
+                  <Box sx={{ position: 'absolute', inset: 0, bgcolor: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Typography variant="h6" color="white" fontWeight={700}>+{postImages.length - 4}</Typography>
+                  </Box>
+                )}
+              </Box>
+            )}
+          </Box>
         )}
 
         {/* Quiz Result Card */}

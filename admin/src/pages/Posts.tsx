@@ -39,6 +39,7 @@ interface Post {
   author: AuthorSnapshot;
   content: string;
   image: string | null;
+  images: string[];
   topic: string;
   subTopic: string | null;
   timezone: string;
@@ -129,8 +130,8 @@ function CreatePostModal({
   topics: Topic[];
 }) {
   const [content, setContent]               = useState('');
-  const [image, setImage]                   = useState('');
-  const [imageFile, setImageFile]           = useState<File | null>(null);
+  const [imagePreviews, setImagePreviews]   = useState<string[]>([]);
+  const [imageFiles, setImageFiles]         = useState<File[]>([]);
   const [uploading, setUploading]           = useState(false);
   const [nsfwChecking, setNsfwChecking]     = useState(false);
   const nsfwModel = useRef<Awaited<ReturnType<typeof nsfwjs.load>> | null>(null);
@@ -192,20 +193,20 @@ function CreatePostModal({
 
     setSaving(true); setError('');
     try {
-      let imageUrl = image.trim() || null;
-      if (imageFile) {
+      let imageUrls: string[] = [];
+      if (imageFiles.length) {
         setUploading(true);
         const fd = new FormData();
-        fd.append('image', imageFile);
-        const { data: uploadData } = await api.post('/api/auth/upload/image', fd, {
+        imageFiles.forEach((f) => fd.append('images', f));
+        const { data: uploadData } = await api.post('/api/auth/upload/images', fd, {
           headers: { 'Content-Type': 'multipart/form-data' },
         });
-        imageUrl = uploadData.url ?? null;
+        imageUrls = uploadData.urls ?? [];
         setUploading(false);
       }
       const { data } = await api.post('/api/posts', {
         content:        content.trim(),
-        image:          imageUrl,
+        ...(imageUrls.length ? { images: imageUrls } : {}),
         topic:          selectedTopicName,
         subTopic:       subTopicName,
         timezone,
@@ -361,30 +362,32 @@ function CreatePostModal({
             </p>
           </div>
 
-          {/* Image Upload */}
+          {/* Image Upload — up to 5 images */}
           <div>
             <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Image <span className="text-gray-400 font-normal">(optional)</span>
+              Images <span className="text-gray-400 font-normal">(optional, up to 5)</span>
             </label>
-            {image ? (
-              <div className="relative mt-1">
-                <img
-                  src={image}
-                  alt="preview"
-                  className="w-full h-32 object-cover rounded-xl border border-gray-200 dark:border-gray-700"
-                />
-                <button
-                  type="button"
-                  onClick={() => { setImage(''); setImageFile(null); }}
-                  className="absolute top-2 right-2 p-1 bg-black/50 hover:bg-black/70 text-white rounded-lg transition-colors"
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
+
+            {imagePreviews.length > 0 && (
+              <div className="grid grid-cols-3 gap-2 mb-2">
+                {imagePreviews.map((src, idx) => (
+                  <div key={idx} className="relative">
+                    <img src={src} alt={`preview-${idx}`} className="w-full h-20 object-cover rounded-lg border border-gray-200 dark:border-gray-700" />
+                    <button type="button" onClick={() => {
+                      setImagePreviews((p) => p.filter((_, i) => i !== idx));
+                      setImageFiles((p) => p.filter((_, i) => i !== idx));
+                    }} className="absolute top-1 right-1 p-0.5 bg-black/60 hover:bg-black/80 text-white rounded-md transition-colors">
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                ))}
               </div>
-            ) : (
-              <label className={`mt-1 flex flex-col items-center justify-center w-full h-24 border-2 border-dashed rounded-xl transition-colors ${
+            )}
+
+            {imagePreviews.length < 5 && (
+              <label className={`mt-1 flex flex-col items-center justify-center w-full h-20 border-2 border-dashed rounded-xl transition-colors ${
                 nsfwChecking
                   ? 'border-yellow-300 dark:border-yellow-600 cursor-wait'
                   : 'border-gray-300 dark:border-gray-700 cursor-pointer hover:border-indigo-400'
@@ -402,19 +405,24 @@ function CreatePostModal({
                     <svg className="w-6 h-6 text-gray-400 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
-                    <span className="text-xs text-gray-400">Click to upload (JPEG, PNG, WebP — max 5MB)</span>
+                    <span className="text-xs text-gray-400">
+                      {imagePreviews.length > 0 ? `Add more (${imagePreviews.length}/5)` : 'Click to upload images (max 5)'}
+                    </span>
                   </>
                 )}
                 <input
                   type="file"
+                  multiple
                   accept="image/jpeg,image/png,image/gif,image/webp"
                   className="hidden"
                   onChange={async (e) => {
-                    const f = e.target.files?.[0];
-                    if (!f) return;
+                    const picked = Array.from(e.target.files ?? []);
+                    if (!picked.length) return;
                     e.target.value = '';
 
-                    const objectUrl = URL.createObjectURL(f);
+                    const remaining = 5 - imagePreviews.length;
+                    const toProcess = picked.slice(0, remaining);
+
                     setNsfwChecking(true);
                     setError('');
 
@@ -422,27 +430,30 @@ function CreatePostModal({
                       if (!nsfwModel.current) {
                         nsfwModel.current = await nsfwjs.load();
                       }
-                      const img = new Image();
-                      img.src = objectUrl;
-                      await new Promise((res, rej) => {
-                        img.onload = res;
-                        img.onerror = rej;
-                      });
-                      const predictions = await nsfwModel.current.classify(img);
                       const blocked = ['Porn', 'Hentai', 'Sexy'];
-                      const flagged = predictions.find(
-                        (p) => blocked.includes(p.className) && p.probability > 0.4,
-                      );
-                      if (flagged) {
-                        URL.revokeObjectURL(objectUrl);
-                        setError(`Inappropriate image detected (${flagged.className} ${Math.round(flagged.probability * 100)}%). Please choose a different image.`);
-                        return;
+                      const validFiles: File[] = [];
+                      const validPreviews: string[] = [];
+
+                      for (const f of toProcess) {
+                        const objectUrl = URL.createObjectURL(f);
+                        const img = new Image();
+                        img.src = objectUrl;
+                        await new Promise((res, rej) => { img.onload = res; img.onerror = rej; });
+                        const predictions = await nsfwModel.current!.classify(img);
+                        const flagged = predictions.find((p) => blocked.includes(p.className) && p.probability > 0.4);
+                        if (flagged) {
+                          URL.revokeObjectURL(objectUrl);
+                          setError(`One image was rejected (${flagged.className} ${Math.round(flagged.probability * 100)}%). Others were kept.`);
+                          continue;
+                        }
+                        validFiles.push(f);
+                        validPreviews.push(objectUrl);
                       }
-                      setImageFile(f);
-                      setImage(objectUrl);
-                    } catch (err) {
-                      URL.revokeObjectURL(objectUrl);
-                      setError('Image safety check failed. Please try a different image.');
+
+                      setImageFiles((p) => [...p, ...validFiles].slice(0, 5));
+                      setImagePreviews((p) => [...p, ...validPreviews].slice(0, 5));
+                    } catch {
+                      setError('Image safety check failed. Please try different images.');
                     } finally {
                       setNsfwChecking(false);
                     }
@@ -661,14 +672,28 @@ function PostCard({
       <div className="px-5 pb-3">
         <p className="text-sm text-gray-800 dark:text-gray-200 leading-relaxed">{post.content}</p>
 
-        {/* Image */}
-        {post.image && (
-          <img
-            src={post.image}
-            alt="post"
-            className="mt-3 w-full rounded-xl object-cover max-h-64"
-          />
-        )}
+        {/* Images */}
+        {(() => {
+          const imgs = post.images?.length ? post.images : post.image ? [post.image] : [];
+          if (!imgs.length) return null;
+          if (imgs.length === 1) return (
+            <img src={imgs[0]} alt="post" className="mt-3 w-full rounded-xl object-cover max-h-64" />
+          );
+          return (
+            <div className="mt-3 grid grid-cols-2 gap-1 rounded-xl overflow-hidden">
+              {imgs.slice(0, 4).map((src, i) => (
+                <div key={i} className="relative">
+                  <img src={src} alt={`post-${i}`} className="w-full h-32 object-cover" />
+                  {i === 3 && imgs.length > 4 && (
+                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                      <span className="text-white text-lg font-bold">+{imgs.length - 4}</span>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          );
+        })()}
 
         {/* Quiz result badge */}
         {post.quizResult && (

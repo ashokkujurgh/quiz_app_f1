@@ -10,6 +10,7 @@ import {
 } from '@mui/icons-material';
 import { useAppSelector } from '../../store/hooks';
 import { EmptyState } from '../shared/EmptyState';
+import { apiFetch } from '../../utils/apiFetch';
 
 const API = import.meta.env.VITE_API_URL ?? '';
 
@@ -46,9 +47,7 @@ export function HistoryPage() {
 
   useEffect(() => {
     if (!accessToken) return;
-    fetch(`${API}/api/quizzes/my/history`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    })
+    apiFetch(`${API}/api/quizzes/my/history`)
       .then((r) => r.json())
       .then((d) => {
         if (!d.success) throw new Error(d.message ?? 'Failed');

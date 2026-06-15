@@ -7,17 +7,20 @@ import {
   uploadImage, removeImage, getLeaderboard,
   getMyHistory, getGameHistory,
   getInvitedQuizzes, getMyQuizzes,
+  getGlobalLeaderboard, getCompletedQuizzes,
 } from '../controllers/quizController';
 import { quizImageUploader } from '../config/spaces';
 
 const router = express.Router();
 
 // Public / user-specific (static routes MUST come before /:id)
-router.get('/active',       getActiveQuizzes);
-router.get('/my/history',   protect, getMyHistory);
-router.get('/my/quizzes',   protect, getMyQuizzes);
-router.get('/my/invited',   protect, getInvitedQuizzes);
-router.get('/',             getQuizzes);
+router.get('/active',              getActiveQuizzes);
+router.get('/my/history',          protect, getMyHistory);
+router.get('/my/quizzes',          protect, getMyQuizzes);
+router.get('/my/invited',          protect, getInvitedQuizzes);
+router.get('/leaderboard/global',  getGlobalLeaderboard);
+router.get('/completed/list',      getCompletedQuizzes);
+router.get('/',                    getQuizzes);
 router.get('/:id',          getQuiz);
 
 // Create quiz — any authenticated user

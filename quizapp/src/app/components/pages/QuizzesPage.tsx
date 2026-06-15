@@ -5,7 +5,8 @@ import {
   CircularProgress, Alert, Button, Chip, Stack, Card, CardContent,
   CardMedia, Skeleton, Snackbar, Tabs, Tab,
 } from '@mui/material';
-import { Search, Timer, Quiz as QuizIcon, Add, EmojiEvents } from '@mui/icons-material';
+import { Search, Timer, Quiz as QuizIcon, Add, EmojiEvents, Mail, History, PlayArrow } from '@mui/icons-material';
+
 import { io } from 'socket.io-client';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import { startQuiz } from '../../store/slices/quizSlice';
@@ -49,7 +50,7 @@ function mapQuiz(q: ApiQuiz): Omit<Quiz, 'questions'> & { _apiId: string; status
     duration: (q.durationMinutes ?? 10) * 60,
     difficulty: (q.difficulty as Quiz['difficulty']) ?? 'Medium',
     plays: 0, rating: 4.5, createdBy: {} as any,
-    thumbnail: q.image ?? undefined,
+    thumbnail: q.image && q.image.trim() !== '' ? q.image : undefined,
     questionCount: q.questionCount,
     status: q.status,
     questions: [],
@@ -66,22 +67,24 @@ function mapQuestion(q: ApiQuestion): QuizQuestion {
   };
 }
 
-const STATUS_FILTER_TABS = ['all', 'active', 'scheduled'] as const;
-type StatusFilter = typeof STATUS_FILTER_TABS[number];
 
 // ── Quiz Card ─────────────────────────────────────────────────────────────────
-function QuizCard({ quiz, loading, onPlay }: {
+function QuizCard({ quiz, loading, onPlay, onHistory, onTest }: {
   quiz: ReturnType<typeof mapQuiz>;
   loading: boolean;
   onPlay: () => void;
+  onHistory?: () => void;
+  onTest?: () => void;
 }) {
+  const [imgError, setImgError] = useState(false);
   const mins = Math.floor(quiz.duration / 60);
   const diffColor = quiz.difficulty === 'Easy' ? 'success' : quiz.difficulty === 'Hard' ? 'error' : 'warning';
+  const isPast = quiz.status === 'completed';
 
   return (
     <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column', '&:hover': { boxShadow: 4 }, transition: 'box-shadow 0.2s' }}>
-      {quiz.thumbnail ? (
-        <CardMedia component="img" height="140" image={quiz.thumbnail} alt={quiz.title} sx={{ objectFit: 'cover' }} />
+      {quiz.thumbnail && !imgError ? (
+        <CardMedia component="img" height="140" image={quiz.thumbnail} alt={quiz.title} sx={{ objectFit: 'cover' }} onError={() => setImgError(true)} />
       ) : (
         <Box sx={{ height: 100, background: 'linear-gradient(135deg, #5563DE 0%, #a855f7 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <QuizIcon sx={{ fontSize: 40, color: 'white', opacity: 0.8 }} />
@@ -102,6 +105,7 @@ function QuizCard({ quiz, loading, onPlay }: {
           {quiz.status === 'scheduled' && (
             <Chip size="small" color="info" label="Scheduled" sx={{ fontWeight: 700, fontSize: '0.7rem' }} />
           )}
+          {isPast && <Chip size="small" label="Ended" sx={{ fontWeight: 700, fontSize: '0.7rem', bgcolor: 'action.selected' }} />}
           {(quiz as any).participation === 'invite_only' && (
             <Chip size="small" color="secondary" label="Invite Only" sx={{ fontWeight: 700, fontSize: '0.7rem' }} />
           )}
@@ -125,15 +129,34 @@ function QuizCard({ quiz, loading, onPlay }: {
           </Stack>
         </Stack>
 
-        <Button
-          variant="contained" fullWidth onClick={onPlay}
-          disabled={loading || quiz.status === 'completed' || quiz.status === 'cancelled' || quiz.status === 'draft'}
-          startIcon={loading ? <CircularProgress size={16} color="inherit" /> : undefined}
-          color={quiz.status === 'active' ? 'success' : 'primary'}
-          sx={{ borderRadius: 2, fontWeight: 700, '&.Mui-disabled': { bgcolor: 'action.disabledBackground', color: 'white' } }}
-        >
-          {loading ? 'Loading…' : quiz.status === 'active' ? '🎮 Join Live' : quiz.status === 'completed' ? 'Ended' : quiz.status === 'draft' ? 'Not Ready' : quiz.status === 'cancelled' ? 'Cancelled' : 'Play Now'}
-        </Button>
+        {isPast ? (
+          <Stack spacing={1}>
+            <Button
+              variant="outlined" fullWidth startIcon={<History />}
+              onClick={onHistory}
+              sx={{ borderRadius: 2, fontWeight: 700 }}
+            >
+              Game History
+            </Button>
+            <Button
+              variant="contained" fullWidth startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <PlayArrow />}
+              onClick={onTest} disabled={loading}
+              sx={{ borderRadius: 2, fontWeight: 700, color: 'white !important' }}
+            >
+              {loading ? 'Loading…' : 'Play as Test'}
+            </Button>
+          </Stack>
+        ) : (
+          <Button
+            variant="contained" fullWidth onClick={onPlay}
+            disabled={loading || quiz.status === 'cancelled' || quiz.status === 'draft'}
+            startIcon={loading ? <CircularProgress size={16} color="inherit" /> : undefined}
+            color={quiz.status === 'active' ? 'success' : 'primary'}
+            sx={{ borderRadius: 2, fontWeight: 700, color: 'white !important' }}
+          >
+            {loading ? 'Loading…' : quiz.status === 'active' ? '🎮 Join Live' : quiz.status === 'draft' ? 'Not Ready' : quiz.status === 'cancelled' ? 'Cancelled' : 'Play Now'}
+          </Button>
+        )}
       </CardContent>
     </Card>
   );
@@ -141,12 +164,14 @@ function QuizCard({ quiz, loading, onPlay }: {
 
 // ── Shared quiz grid ──────────────────────────────────────────────────────────
 function QuizGrid({
-  quizzes, loading, error, search, onSearchChange, onPlay, playingId, emptyMsg,
+  quizzes, loading, error, search, onSearchChange, onPlay, onHistory, onTest, playingId, emptyMsg,
 }: {
   quizzes: ReturnType<typeof mapQuiz>[];
   loading: boolean; error: string; search: string;
   onSearchChange: (v: string) => void;
   onPlay: (q: ReturnType<typeof mapQuiz>) => void;
+  onHistory?: (q: ReturnType<typeof mapQuiz>) => void;
+  onTest?: (q: ReturnType<typeof mapQuiz>) => void;
   playingId: string | null;
   emptyMsg?: string;
 }) {
@@ -172,7 +197,12 @@ function QuizGrid({
         <Grid container spacing={2}>
           {filtered.map((q) => (
             <Grid key={q.id} size={{ xs: 12, sm: 6, md: 4 }}>
-              <QuizCard quiz={q} loading={playingId === q.id} onPlay={() => onPlay(q)} />
+              <QuizCard
+                quiz={q} loading={playingId === q.id}
+                onPlay={() => onPlay(q)}
+                onHistory={onHistory ? () => onHistory(q) : undefined}
+                onTest={onTest ? () => onTest(q) : undefined}
+              />
             </Grid>
           ))}
         </Grid>
@@ -188,60 +218,64 @@ export function QuizzesPage() {
   const dispatch  = useAppDispatch();
   const { accessToken } = useAppSelector((s) => s.auth);
 
-  const [mainTab, setMainTab]           = useState(0);
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
-  const [search, setSearch]             = useState('');
+  const [mainTab, setMainTab]       = useState(0);
+  const [search, setSearch]         = useState('');
+  const [pastSearch, setPastSearch] = useState('');
   const [inviteSearch, setInviteSearch] = useState('');
-  const [playingId, setPlayingId]       = useState<string | null>(null);
-  const [liveAlert, setLiveAlert]       = useState<{ quizId: string; title: string } | null>(null);
+  const [playingId, setPlayingId]   = useState<string | null>(null);
+  const [liveAlert, setLiveAlert] = useState<{ quizId: string; title: string } | null>(null);
   const [createdSnack, setCreatedSnack] = useState(!!(location.state as any)?.created);
 
-  // All games
-  const [allQuizzes, setAllQuizzes]     = useState<ReturnType<typeof mapQuiz>[]>([]);
-  const [allLoading, setAllLoading]     = useState(true);
-  const [allError, setAllError]         = useState('');
+  // Active & Upcoming (active + scheduled)
+  const [activeQuizzes, setActiveQuizzes] = useState<ReturnType<typeof mapQuiz>[]>([]);
+  const [activeLoading, setActiveLoading] = useState(true);
+  const [activeError, setActiveError]     = useState('');
 
-  // Invited games
+  // Past (completed)
+  const [pastQuizzes, setPastQuizzes]   = useState<ReturnType<typeof mapQuiz>[]>([]);
+  const [pastLoading, setPastLoading]   = useState(false);
+  const [pastError, setPastError]       = useState('');
+
+  // Invited
   const [invitedQuizzes, setInvitedQuizzes] = useState<ReturnType<typeof mapQuiz>[]>([]);
   const [invitedLoading, setInvitedLoading] = useState(false);
   const [invitedError, setInvitedError]     = useState('');
 
-  const allQuizzesRef = useRef(allQuizzes);
-  useEffect(() => { allQuizzesRef.current = allQuizzes; }, [allQuizzes]);
+  const activeQuizzesRef = useRef(activeQuizzes);
+  useEffect(() => { activeQuizzesRef.current = activeQuizzes; }, [activeQuizzes]);
 
-  // quiz.io socket for live notifications
+  // Socket for live notifications
   useEffect(() => {
     if (!accessToken) return;
     const socket = io(SOCKET_URL, { path: '/quiz.io/', auth: { token: accessToken }, transports: ['websocket', 'polling'] });
     socket.on('quiz_activated', ({ quizId, title }: { quizId: string; title: string }) => {
-      const match = allQuizzesRef.current.find((q) => q.id === quizId);
+      const match = activeQuizzesRef.current.find((q) => q.id === quizId);
       if (match) setLiveAlert({ quizId, title });
-      setAllQuizzes((prev) => prev.map((q) => q.id === quizId ? { ...q, status: 'active' } : q));
+      setActiveQuizzes((prev) => prev.map((q) => q.id === quizId ? { ...q, status: 'active' } : q));
     });
     return () => { socket.disconnect(); };
   }, [accessToken]);
 
-  // Fetch all public quizzes
+  // Fetch active + scheduled quizzes
   useEffect(() => {
-    setAllLoading(true); setAllError('');
-    const params = new URLSearchParams();
-    if (statusFilter !== 'all') params.set('status', statusFilter);
-    fetch(`${API}/api/quizzes?${params}`, {
-      credentials: 'include',
-      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
-    })
-      .then((r) => r.json())
-      .then((d) => {
-        if (!d.success) throw new Error(d.message ?? 'Failed');
-        setAllQuizzes((d.quizzes as ApiQuiz[]).map(mapQuiz));
+    setActiveLoading(true); setActiveError('');
+    const fetchActive    = fetch(`${API}/api/quizzes?status=active`,    { headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {} }).then((r) => r.json());
+    const fetchScheduled = fetch(`${API}/api/quizzes?status=scheduled`, { headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {} }).then((r) => r.json());
+    Promise.all([fetchActive, fetchScheduled])
+      .then(([a, s]) => {
+        const combined = [
+          ...((a.quizzes ?? []) as ApiQuiz[]),
+          ...((s.quizzes ?? []) as ApiQuiz[]),
+        ].map(mapQuiz);
+        setActiveQuizzes(combined);
       })
-      .catch((e) => setAllError(e.message))
-      .finally(() => setAllLoading(false));
-  }, [statusFilter, accessToken]);
+      .catch((e) => setActiveError(e.message))
+      .finally(() => setActiveLoading(false));
+  }, [accessToken]);
 
   // Fetch invited quizzes on tab switch
   useEffect(() => {
-    if (mainTab !== 1 || !accessToken) return;
+    if (mainTab !== 2 || !accessToken) return;
     setInvitedLoading(true); setInvitedError('');
     fetch(`${API}/api/quizzes/my/invited`, {
       headers: { Authorization: `Bearer ${accessToken}` },
@@ -253,6 +287,22 @@ export function QuizzesPage() {
       })
       .catch((e) => setInvitedError(e.message))
       .finally(() => setInvitedLoading(false));
+  }, [mainTab, accessToken]);
+
+  // Fetch past (completed) quizzes on tab switch
+  useEffect(() => {
+    if (mainTab !== 1) return;
+    setPastLoading(true); setPastError('');
+    fetch(`${API}/api/quizzes?status=completed`, {
+      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+    })
+      .then((r) => r.json())
+      .then((d) => {
+        if (!d.success) throw new Error(d.message ?? 'Failed');
+        setPastQuizzes((d.quizzes as ApiQuiz[]).map(mapQuiz));
+      })
+      .catch((e) => setPastError(e.message))
+      .finally(() => setPastLoading(false));
   }, [mainTab, accessToken]);
 
   const handlePlay = async (q: ReturnType<typeof mapQuiz>) => {
@@ -267,7 +317,35 @@ export function QuizzesPage() {
       dispatch(startQuiz({ ...q, questions }));
       navigate(`/quiz/play/${q.id}`);
     } catch (e) {
-      setAllError((e as Error).message);
+      setActiveError((e as Error).message);
+    } finally {
+      setPlayingId(null);
+    }
+  };
+
+  const handleHistory = (q: ReturnType<typeof mapQuiz>) => {
+    navigate('/history', { state: { highlightQuizId: q.id } });
+  };
+
+  const handleTest = async (q: ReturnType<typeof mapQuiz>) => {
+    if (!accessToken) { navigate('/login'); return; }
+    setPlayingId(q.id);
+    try {
+      const res  = await fetch(`${API}/api/quizzes/${q.id}/questions`, { credentials: 'include', headers: { Authorization: `Bearer ${accessToken}` } });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message ?? 'Failed to load questions');
+      const questions = (data.questions as ApiQuestion[]);
+      if (questions.length === 0) throw new Error('This quiz has no questions yet.');
+      navigate('/practice', {
+        state: {
+          subTopicId:   null,
+          subTopicName: q.title,
+          count:        questions.length,
+          questions,        // pass questions directly — skip API fetch in PracticeQuizPage
+        },
+      });
+    } catch (e) {
+      setPastError((e as Error).message);
     } finally {
       setPlayingId(null);
     }
@@ -317,36 +395,34 @@ export function QuizzesPage() {
 
       {/* Main tabs */}
       <Tabs value={mainTab} onChange={(_, v) => setMainTab(v)} sx={{ mb: 2.5, borderBottom: 1, borderColor: 'divider' }}>
-        <Tab icon={<QuizIcon fontSize="small" />} iconPosition="start" label="All Games" />
-        <Tab
-          icon={<EmojiEvents fontSize="small" />} iconPosition="start" label="My Invites"
-          sx={{ '& .MuiBadge-badge': { top: 4 } }}
-        />
+        <Tab icon={<QuizIcon fontSize="small" />} iconPosition="start" label="Active & Upcoming" />
+        <Tab icon={<EmojiEvents fontSize="small" />} iconPosition="start" label="Past Quizzes" />
+        <Tab icon={<Mail fontSize="small" />} iconPosition="start" label="My Invites" />
       </Tabs>
 
-      {/* ── All Games tab ── */}
+      {/* ── Active & Upcoming tab ── */}
       {mainTab === 0 && (
-        <>
-          <Stack direction="row" spacing={1} mb={2}>
-            {STATUS_FILTER_TABS.map((t) => (
-              <Chip key={t} label={t.charAt(0).toUpperCase() + t.slice(1)}
-                clickable variant={statusFilter === t ? 'filled' : 'outlined'}
-                color={statusFilter === t ? 'primary' : 'default'}
-                onClick={() => setStatusFilter(t)}
-                sx={{ fontWeight: statusFilter === t ? 700 : 500 }}
-              />
-            ))}
-          </Stack>
-          <QuizGrid
-            quizzes={allQuizzes} loading={allLoading} error={allError}
-            search={search} onSearchChange={setSearch}
-            onPlay={handlePlay} playingId={playingId}
-          />
-        </>
+        <QuizGrid
+          quizzes={activeQuizzes} loading={activeLoading} error={activeError}
+          search={search} onSearchChange={setSearch}
+          onPlay={handlePlay} playingId={playingId}
+          emptyMsg="No active or upcoming quizzes right now."
+        />
+      )}
+
+      {/* ── Past Quizzes tab ── */}
+      {mainTab === 1 && (
+        <QuizGrid
+          quizzes={pastQuizzes} loading={pastLoading} error={pastError}
+          search={pastSearch} onSearchChange={setPastSearch}
+          onPlay={handlePlay} onHistory={handleHistory} onTest={handleTest}
+          playingId={playingId}
+          emptyMsg="No completed quizzes yet."
+        />
       )}
 
       {/* ── My Invites tab ── */}
-      {mainTab === 1 && (
+      {mainTab === 2 && (
         !accessToken ? (
           <Alert severity="info" sx={{ mt: 1 }}>
             <Button variant="text" onClick={() => navigate('/login')} sx={{ p: 0, minWidth: 0, fontWeight: 700 }}>Log in</Button>
@@ -357,7 +433,7 @@ export function QuizzesPage() {
             quizzes={invitedQuizzes} loading={invitedLoading} error={invitedError}
             search={inviteSearch} onSearchChange={setInviteSearch}
             onPlay={handlePlay} playingId={playingId}
-            emptyMsg="When someone invites you to their quiz, it will appear here."
+            emptyMsg="When someone invites you to a quiz, it will appear here."
           />
         )
       )}

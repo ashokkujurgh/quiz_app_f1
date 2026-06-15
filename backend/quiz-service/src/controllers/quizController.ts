@@ -358,6 +358,59 @@ export const getLeaderboard: RequestHandler = async (req, res): Promise<void> =>
   }
 };
 
+// ── GLOBAL LEADERBOARD (aggregated across all games) ──────────────────────────
+export const getGlobalLeaderboard: RequestHandler = async (_req, res): Promise<void> => {
+  try {
+    const agg = await GameHistory.aggregate([
+      {
+        $group: {
+          _id:          '$userId',
+          userName:     { $last: '$userName' },
+          userAvatar:   { $last: '$userAvatar' },
+          totalGames:   { $sum: 1 },
+          totalScore:   { $sum: '$score' },
+          totalQuestions: { $sum: '$total' },
+          avgPercentage:  { $avg: '$percentage' },
+          perfectScores:  { $sum: { $cond: [{ $eq: ['$percentage', 100] }, 1, 0] } },
+        },
+      },
+      { $sort: { avgPercentage: -1, totalScore: -1 } },
+      { $limit: 100 },
+    ]);
+
+    const ranked = agg.map((e, i) => ({
+      rank:           i + 1,
+      userId:         e._id,
+      userName:       e.userName,
+      userAvatar:     e.userAvatar,
+      totalGames:     e.totalGames,
+      totalScore:     e.totalScore,
+      totalQuestions: e.totalQuestions,
+      avgPercentage:  Math.round(e.avgPercentage),
+      perfectScores:  e.perfectScores,
+    }));
+
+    res.json({ success: true, leaderboard: ranked });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Failed to fetch global leaderboard.' });
+  }
+};
+
+// ── COMPLETED QUIZZES (for browsing per-game leaderboards) ───────────────────
+export const getCompletedQuizzes: RequestHandler = async (_req, res): Promise<void> => {
+  try {
+    const quizzes = await Quiz.find({ status: 'completed' })
+      .select('title description durationMinutes endedAt questionCount')
+      .sort({ endedAt: -1 })
+      .lean();
+    res.json({ success: true, quizzes });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Failed to fetch completed quizzes.' });
+  }
+};
+
 // ── MY INVITED QUIZZES ───────────────────────────────────────────────────────
 
 export const getInvitedQuizzes: RequestHandler = async (req: AuthRequest, res: Response): Promise<void> => {

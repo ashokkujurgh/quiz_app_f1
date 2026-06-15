@@ -1,7 +1,13 @@
 import { Response, RequestHandler } from 'express';
 import mongoose from 'mongoose';
+import OpenAI from 'openai';
 import Post, { IQuizResult } from '../models/Post';
 import { AuthRequest } from '../middleware/auth';
+
+// ── OpenAI client ─────────────────────────────────────────────────────────────
+const openai = process.env.OPENAI_API_KEY
+  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  : null;
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -92,12 +98,80 @@ async function checkContentPolicy(content: string, imageUrl?: string | null): Pr
   }
 }
 
+// ── OpenAI second-layer validation ────────────────────────────────────────────
+async function openAIValidate(
+  content: string,
+  topic: string,
+  subTopic: string | null,
+  imageUrls: string[],
+): Promise<{ allowed: boolean; reason?: string }> {
+  if (!openai) return { allowed: true }; // skip if key not configured
+
+  try {
+    const topicLabel = subTopic ? `${topic} > ${subTopic}` : topic;
+
+    // Build message content — text + optional image URLs
+    const userParts: OpenAI.Chat.ChatCompletionContentPart[] = [
+      {
+        type: 'text',
+        text: `You are a strict content moderator for an educational quiz social platform called Meenzo.
+
+Evaluate the following post against two criteria:
+
+1. TOPIC RELEVANCE — Does the post content genuinely relate to the selected topic: "${topicLabel}"?
+   - Minor tangential mentions are NOT enough; the core subject must match.
+   - A post about unrelated subjects posted under a wrong topic must be rejected.
+
+2. CONTENT SAFETY — Does the post (text or images) contain any of the following?
+   - Sexual, nudity, or adult content
+   - Hate speech, harassment, or bullying
+   - Violence or gore
+   - Spam or misleading information
+   - Abusive or profane language
+
+Post content:
+"""
+${content}
+"""
+
+Respond ONLY with valid JSON (no markdown, no explanation outside JSON):
+{
+  "allowed": true | false,
+  "reason": "brief reason if rejected, else null"
+}`,
+      },
+    ];
+
+    // Attach images for vision check if present
+    for (const url of imageUrls.slice(0, 3)) {
+      userParts.push({ type: 'image_url', image_url: { url, detail: 'low' } });
+    }
+
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [{ role: 'user', content: userParts }],
+      max_tokens: 120,
+      temperature: 0,
+    });
+
+    const raw = response.choices[0]?.message?.content?.trim() ?? '';
+    // Strip markdown code fences if model wraps anyway
+    const jsonStr = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+    const parsed = JSON.parse(jsonStr) as { allowed: boolean; reason?: string | null };
+    return { allowed: !!parsed.allowed, reason: parsed.reason ?? undefined };
+  } catch (err) {
+    console.error('[OpenAI validate] error (fail open):', err);
+    return { allowed: true }; // fail open — don't block posts if OpenAI is down
+  }
+}
+
 // ── POST /api/posts ───────────────────────────────────────────────────────────
 export const createPost: RequestHandler = async (req: AuthRequest, res: Response) => {
   try {
-    const { content, image, topic, subTopic, timezone, quizResult, authorName, authorUsername, authorAvatar } = req.body as {
+    const { content, image, images, topic, subTopic, timezone, quizResult, authorName, authorUsername, authorAvatar } = req.body as {
       content?: string;
-      image?: string;
+      image?: string;           // legacy single image
+      images?: string[];        // up to 5 images
       topic?: string;
       subTopic?: string;
       timezone?: string;
@@ -117,15 +191,24 @@ export const createPost: RequestHandler = async (req: AuthRequest, res: Response
       res.status(400).json({ success: false, message: 'Author name and username are required.' }); return;
     }
 
+    // Normalise image list — accept both legacy `image` and new `images[]`
+    const imageList: string[] = images?.length
+      ? images.slice(0, 5)
+      : image ? [image] : [];
+
+    if (imageList.length > 5) {
+      res.status(400).json({ success: false, message: 'Maximum 5 images allowed per post.' }); return;
+    }
+
     const userType: 'user' | 'admin' = (req.user as { role?: string })?.role === 'admin' ? 'admin' : 'user';
 
-    // Always check image for nudity regardless of role; check text only for regular users
-    if (image) {
-      const imagePolicy = await checkContentPolicy('', image);
+    // Check each image for content policy
+    for (const imgUrl of imageList) {
+      const imagePolicy = await checkContentPolicy('', imgUrl);
       if (!imagePolicy.allowed) {
         res.status(422).json({
           success: false,
-          message: `⚠️ The image was rejected: ${imagePolicy.reason ?? 'explicit content detected'}. Please use an appropriate image.`,
+          message: `⚠️ One of your images was rejected: ${imagePolicy.reason ?? 'explicit content detected'}. Please use appropriate images.`,
         });
         return;
       }
@@ -142,6 +225,18 @@ export const createPost: RequestHandler = async (req: AuthRequest, res: Response
       }
     }
 
+    // ── OpenAI second-layer: topic relevance + safety (all users including admin) ──
+    const aiCheck = await openAIValidate(content.trim(), topic, subTopic ?? null, imageList);
+    if (!aiCheck.allowed) {
+      res.status(422).json({
+        success: false,
+        message: aiCheck.reason?.toLowerCase().includes('topic')
+          ? `⚠️ Your post doesn't seem to belong to the "${subTopic ?? topic}" topic. Please post in the correct category or update your content to match.`
+          : `⚠️ Your post was flagged by our content review: ${aiCheck.reason ?? 'policy violation detected'}. Please revise and try again.`,
+      });
+      return;
+    }
+
     const post = await Post.create({
       author: {
         userId:   toObjId(req.user!.id),
@@ -151,7 +246,8 @@ export const createPost: RequestHandler = async (req: AuthRequest, res: Response
       },
       userType,
       content:    content.trim(),
-      image:      image ?? null,
+      image:      imageList[0] ?? null,   // legacy compat
+      images:     imageList,
       topic,
       subTopic:   subTopic ?? null,
       timezone:   timezone ?? 'UTC',

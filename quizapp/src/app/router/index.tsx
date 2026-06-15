@@ -17,6 +17,8 @@ import { NotificationsPage } from '../components/pages/NotificationsPage';
 import { SettingsPage } from '../components/pages/SettingsPage';
 import { AdminDashboard } from '../components/pages/AdminDashboard';
 import { PostDetailPage } from '../components/pages/PostDetailPage';
+import { PracticeQuizPage } from '../components/pages/PracticeQuizPage';
+import { NavOnlyLayout } from '../components/layout/NavOnlyLayout';
 
 function RequireAuth({ children }: { children: JSX.Element }) {
   const accessToken = useAppSelector((s) => s.auth.accessToken);
@@ -36,6 +38,13 @@ export const router = createBrowserRouter([
   { path: '/signup',       element: <RedirectIfAuth><SignupPage /></RedirectIfAuth> },
   { path: '/posts/:id',    element: <PostDetailPage /> },
   { path: '/quiz/play/:quizId', element: <RequireAuth><QuizPlayPage /></RequireAuth> },
+  {
+    path: '/',
+    element: <NavOnlyLayout />,
+    children: [
+      { path: 'practice', element: <RequireAuth><PracticeQuizPage /></RequireAuth> },
+    ],
+  },
   { path: '/quiz/result',       element: <RequireAuth><QuizResultPage /></RequireAuth> },
   { path: '/quiz/create',       element: <RequireAuth><CreateQuizPage /></RequireAuth> },
   {

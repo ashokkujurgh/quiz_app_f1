@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import {
-  Box, Card, CardContent, Typography, Stack, Button, CircularProgress,
+  Box, Card, CardContent, Typography, Stack, Button,
   Divider, Avatar, Chip,
 } from '@mui/material';
 import {
@@ -9,6 +9,7 @@ import {
 } from '@mui/icons-material';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import { resetQuiz } from '../../store/slices/quizSlice';
+import { apiFetch } from '../../utils/apiFetch';
 import type { LeaderboardRow } from '../../hooks/useQuizSocket';
 
 const API = import.meta.env.VITE_API_URL ?? '';
@@ -55,9 +56,7 @@ export function QuizResultPage() {
   useEffect(() => {
     const quizId = state.quizId;
     if (!quizId || !accessToken) return;
-    fetch(`${API}/api/quizzes/${quizId}/my-history`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    })
+    apiFetch(`${API}/api/quizzes/${quizId}/my-history`)
       .then((r) => r.json())
       .then((d) => {
         if (d.success && d.history?.answers) setHistoryAnswers(d.history.answers);
@@ -67,71 +66,36 @@ export function QuizResultPage() {
 
   if (!result && !myEntry) { navigate('/quizzes'); return null; }
 
-  const grade =
-    pct >= 90 ? { label: 'Excellent!',      emoji: '🏆', color: '#f59e0b' } :
-    pct >= 75 ? { label: 'Great Job!',       emoji: '🎉', color: '#22c55e' } :
-    pct >= 60 ? { label: 'Good Effort!',     emoji: '👍', color: '#3b82f6' } :
-                { label: 'Keep Practicing!', emoji: '📚', color: '#ef4444' };
-
-  const timeTaken = myEntry?.timeTaken ?? result?.duration ?? 0;
-  const mins      = Math.floor(timeTaken / 60);
-  const secs      = timeTaken % 60;
-
-  // Build answer review items — prefer backend history, fall back to live userAnswers
-  const reviewItems: HistoryAnswer[] | null = historyAnswers ?? (() => {
+  // Build answer review — prefer backend history but patch -1 entries with local answers
+  const reviewItems: HistoryAnswer[] | null = (() => {
+    const local = state.userAnswers ?? {};
+    if (historyAnswers) {
+      // Merge: if backend says userAnswer=-1 but we have a local answer, use local
+      return historyAnswers.map((item) => {
+        const localAns = local[item.questionIndex];
+        if (item.userAnswer === -1 && localAns !== undefined && localAns !== -1) {
+          return {
+            ...item,
+            userAnswer: localAns,
+            isCorrect:  localAns === item.correctOption,
+          };
+        }
+        return item;
+      });
+    }
     if (!state.userAnswers || !activeQuiz) return null;
     return activeQuiz.questions.map((q, i) => ({
       questionIndex: i,
       questionText:  q.question,
       options:       q.options,
       correctOption: q.correctAnswer,
-      userAnswer:    state.userAnswers![i] ?? -1,
-      isCorrect:     (state.userAnswers![i] ?? -1) === q.correctAnswer,
+      userAnswer:    local[i] ?? -1,
+      isCorrect:     (local[i] ?? -1) === q.correctAnswer,
     }));
   })();
 
   return (
     <Box sx={{ maxWidth: 680, mx: 'auto' }}>
-      {/* Hero */}
-      <Card sx={{ mb: 3, textAlign: 'center' }}>
-        <CardContent sx={{ py: 4 }}>
-          <Typography fontSize={56} mb={1}>{grade.emoji}</Typography>
-          <Typography variant="h4" fontWeight={800} sx={{ color: grade.color, mb: 0.5 }}>
-            {grade.label}
-          </Typography>
-          <Typography variant="h6" color="text.secondary" mb={3}>{title}</Typography>
-
-          <Box sx={{ position: 'relative', display: 'inline-flex', mb: 3 }}>
-            <CircularProgress variant="determinate" value={pct} size={120} thickness={6} sx={{ color: grade.color }} />
-            <Box sx={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-              <Typography variant="h4" fontWeight={800}>{pct}%</Typography>
-              <Typography variant="caption" color="text.secondary">Score</Typography>
-            </Box>
-          </Box>
-
-          <Stack direction="row" justifyContent="center" spacing={4} flexWrap="wrap">
-            <Box textAlign="center">
-              <Typography variant="h5" fontWeight={800} color="success.main">{score}</Typography>
-              <Typography variant="caption" color="text.secondary">Correct</Typography>
-            </Box>
-            <Box textAlign="center">
-              <Typography variant="h5" fontWeight={800} color="error.main">{total - score}</Typography>
-              <Typography variant="caption" color="text.secondary">Wrong</Typography>
-            </Box>
-            {rank && (
-              <Box textAlign="center">
-                <Typography variant="h5" fontWeight={800} color="warning.main">#{rank}</Typography>
-                <Typography variant="caption" color="text.secondary">Rank</Typography>
-              </Box>
-            )}
-            <Box textAlign="center">
-              <Typography variant="h5" fontWeight={800}>{mins}:{secs.toString().padStart(2, '0')}</Typography>
-              <Typography variant="caption" color="text.secondary">Duration</Typography>
-            </Box>
-          </Stack>
-        </CardContent>
-      </Card>
-
       {/* Leaderboard */}
       {leaderboard.length > 0 && (
         <Card sx={{ mb: 3 }}>
