@@ -345,10 +345,6 @@ export function PostCard({ post }: Props) {
         transformOrigin={{ horizontal: 'right', vertical: 'top' }}
         anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
       >
-        <MenuItem onClick={() => { setMenuAnchor(null); setBlockDialogOpen(true); }} sx={{ color: 'error.main' }}>
-          <ListItemIcon><Block fontSize="small" sx={{ color: 'error.main' }} /></ListItemIcon>
-          <ListItemText>Block {post.author.name}</ListItemText>
-        </MenuItem>
       </Menu>
 
       {/* Block confirm dialog */}
