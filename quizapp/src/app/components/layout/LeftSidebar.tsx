@@ -8,10 +8,11 @@ import {
   Home, Quiz, People, Message, EmojiEvents, History,
   Person, Settings, AdminPanelSettings, Lock,
 } from '@mui/icons-material';
-import { useState } from 'react';
-import { useAppSelector } from '../../store/hooks';
+import { useState, useEffect } from 'react';
+import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import { useOnlineUsers } from '../../context/OnlineUsersContext';
 import { UserAvatar } from '../shared/UserAvatar';
+import { fetchIncoming } from '../../store/slices/friendsSlice';
 
 const DRAWER_WIDTH = 260;
 
@@ -36,9 +37,17 @@ export function LeftSidebar({ open, onClose, variant = 'permanent' }: Props) {
   const navigate = useNavigate();
   const location = useLocation();
   const theme = useTheme();
+  const dispatch = useAppDispatch();
   const { user, accessToken } = useAppSelector((s) => s.auth);
+
+  useEffect(() => {
+    if (accessToken) dispatch(fetchIncoming());
+  }, [accessToken, dispatch]);
   const { isOnline } = useOnlineUsers();
-  const unreadMessages = useAppSelector((s) => s.messages.chats.reduce((a, c) => a + c.unreadCount, 0));
+  const unreadMessages = useAppSelector((s) =>
+    Object.values(s.messages.unreadByConv).reduce((a, c) => a + c, 0)
+  );
+  const friendRequestCount = useAppSelector((s) => s.friends.incoming.length);
   const [loginPrompt, setLoginPrompt] = useState(false);
 
   const handleNav = (path: string, requiresAuth: boolean) => {
@@ -72,7 +81,7 @@ export function LeftSidebar({ open, onClose, variant = 'permanent' }: Props) {
       <List sx={{ px: 1, flex: 1, pt: 1 }}>
         {navItems.map(({ label, icon: Icon, path, auth }) => {
           const isActive = location.pathname === path;
-          const badge = label === 'Messages' ? unreadMessages : 0;
+          const badge = label === 'Messages' ? unreadMessages : label === 'Friends' ? friendRequestCount : 0;
           const locked = auth && !accessToken;
           return (
             <ListItemButton

@@ -172,5 +172,33 @@ services:
       - post-service
     restart: unless-stopped
 
+  # ── Friend service ───────────────────────────────────────
+  friend-service:
+    build:
+      context: ./backend/friend-service
+      dockerfile: Dockerfile
+    container_name: quizhub-friend
+    ports:
+      - "7209:4006"
+    env_file:
+      - ./backend/friend-service/.env
+    depends_on:
+      - auth-service
+    restart: unless-stopped
+
+  # ── Message service ──────────────────────────────────────
+  message-service:
+    build:
+      context: ./backend/message-service
+      dockerfile: Dockerfile
+    container_name: quizhub-message
+    ports:
+      - "7210:4007"
+    env_file:
+      - ./backend/message-service/.env
+    depends_on:
+      - auth-service
+    restart: unless-stopped
+
 volumes:
   rabbitmq_data:
