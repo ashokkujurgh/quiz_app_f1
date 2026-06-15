@@ -1,6 +1,6 @@
 """
 Fetch web context from Wikipedia + RSS news feeds.
-- India-biased subtopics: 80% Indian content, 20% world
+- India-biased subtopics: 50% Indian content, 50% world
 - Trending-biased subtopics: 80% current news/trending, 20% foundational context
 """
 import logging
@@ -9,11 +9,12 @@ import feedparser
 
 logger = logging.getLogger(__name__)
 
-# 80% Indian content for these
-INDIA_BIASED_SUBTOPICS = {"history", "geography", "economics", "economy", "polity", "political science"}
+# 80% Indian content for these (currently empty — moved to 50/50)
+INDIA_BIASED_SUBTOPICS: set[str] = set()
 
 # 50% India, 50% world for these
 INDIA_50_SUBTOPICS = {
+    "history", "geography", "economics", "economy", "polity", "political science",
     "engineering", "civil engineering", "mechanical engineering", "electrical engineering",
     "computer science", "information technology",
     "general science", "science", "science and technology", "physics", "chemistry", "biology",
