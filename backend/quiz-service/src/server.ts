@@ -12,6 +12,7 @@ import { rehydrateSchedules, startCleanupJob } from './jobs/scheduler';
 import { initGameSocket } from './socket/gameController';
 
 const app    = express();
+app.set('trust proxy', 1);
 const server = http.createServer(app);
 const PORT   = parseInt(process.env.PORT ?? '4005', 10);
 
@@ -30,7 +31,7 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
-const limiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100, standardHeaders: true, legacyHeaders: false });
+const limiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 1000, standardHeaders: true, legacyHeaders: false });
 
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true }));

@@ -15,6 +15,7 @@ import authRoutes from './routes/auth';
 import adminRoutes from './routes/admin';
 
 const app = express();
+app.set('trust proxy', 1);
 const httpServer = http.createServer(app);
 const PORT = parseInt(process.env.PORT ?? '4001', 10);
 
@@ -43,7 +44,7 @@ app.use(
 // Strict limit only for login/register
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100,
+  max: 1000,
   message: { success: false, message: 'Too many requests. Please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,

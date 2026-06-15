@@ -35,6 +35,8 @@ interface GameState {
   gameStartedAt:        number;
   allQuestions:         ApiQuestion[];
   players:              Map<string, PlayerInfo>; // userId → info
+  // in-memory answer cache: userId → { questionIndex → { questionId, answer } }
+  answerCache:          Map<string, Map<number, { questionId: string; answer: number }>>;
 }
 
 let io: IOServer;
@@ -110,6 +112,17 @@ export function initGameSocket(httpServer: HttpServer): IOServer {
 
       console.log(`[GameSocket] ${user.id} joined quiz:${quizId}`);
 
+      // If no live session but quiz is active in DB, restart the game session
+      if (!state) {
+        try {
+          const dbQuiz = await Quiz.findById(quizId).select('status').lean();
+          if (dbQuiz?.status === 'active' && !activeGames.has(quizId)) {
+            console.log(`[GameSocket] Restarting orphaned game session for ${quizId}`);
+            startGameSession(quizId).catch(console.error);
+          }
+        } catch { /* ignore */ }
+      }
+
       // Replay current game state if game already running
       if (state) {
         if (state.mode === 'total_timer') {
@@ -163,6 +176,12 @@ export function initGameSocket(httpServer: HttpServer): IOServer {
     socket.on('submit_answer', async ({
       quizId, questionId, questionIndex, answer,
     }: { quizId: string; questionId: string; questionIndex: number; answer: number }) => {
+      // Cache in-memory first (survives DB hiccups)
+      const gs = gameStateMap.get(quizId);
+      if (gs) {
+        if (!gs.answerCache.has(user.id)) gs.answerCache.set(user.id, new Map());
+        gs.answerCache.get(user.id)!.set(questionIndex, { questionId, answer });
+      }
       try {
         await GameAnswer.findOneAndUpdate(
           { quizId: new Types.ObjectId(quizId), userId: user.id, questionIndex },
@@ -204,22 +223,47 @@ async function buildLeaderboard(
   questions: ApiQuestion[],
   gameStartedAt: number,
   playersMap: Map<string, PlayerInfo>,
+  answerCache: Map<string, Map<number, { questionId: string; answer: number }>> = new Map(),
 ): Promise<{ rank: number; userId: string; userName: string; userAvatar?: string; score: number; total: number; percentage: number; timeTaken: number }[]> {
   // Mark all submitted answers as correct/incorrect
-  for (const q of questions) {
-    await GameAnswer.updateMany(
-      { quizId: new Types.ObjectId(quizId), questionId: q._id },
-      [{ $set: { isCorrect: { $eq: ['$answer', q.correctOption] } } }],
-    );
+  try {
+    for (const q of questions) {
+      await GameAnswer.updateMany(
+        { quizId: new Types.ObjectId(quizId), questionId: q._id },
+        [{ $set: { isCorrect: { $eq: ['$answer', q.correctOption] } } }],
+      );
+    }
+  } catch (err) {
+    console.error('[buildLeaderboard] updateMany error (non-fatal):', err);
   }
 
-  const answers = await GameAnswer.find({ quizId: new Types.ObjectId(quizId) }).lean();
+  // Read DB answers and merge with in-memory cache (cache wins for missing entries)
+  let dbAnswers: { userId: string; questionIndex: number; questionId: string; answer: number; isCorrect: boolean; answeredAt: Date }[] = [];
+  try {
+    dbAnswers = await GameAnswer.find({ quizId: new Types.ObjectId(quizId) }).lean() as typeof dbAnswers;
+  } catch (err) {
+    console.error('[buildLeaderboard] find error (will use cache only):', err);
+  }
 
-  // Build per-user answer map: userId → { questionIndex → answer doc }
-  const userAnswerMap = new Map<string, Map<number, typeof answers[0]>>();
-  for (const a of answers) {
+  // Build per-user answer map: userId → { questionIndex → answer }
+  const userAnswerMap = new Map<string, Map<number, { questionId: string; answer: number; isCorrect: boolean; answeredAt: Date }>>();
+  for (const a of dbAnswers) {
     if (!userAnswerMap.has(a.userId)) userAnswerMap.set(a.userId, new Map());
     userAnswerMap.get(a.userId)!.set(a.questionIndex, a);
+  }
+  // Merge in-memory cache for any entries missing from DB
+  for (const [uid, qMap] of answerCache) {
+    if (!userAnswerMap.has(uid)) userAnswerMap.set(uid, new Map());
+    for (const [qi, cached] of qMap) {
+      if (!userAnswerMap.get(uid)!.has(qi)) {
+        const q = questions[qi];
+        userAnswerMap.get(uid)!.set(qi, {
+          ...cached,
+          isCorrect:   q ? cached.answer === q.correctOption : false,
+          answeredAt:  new Date(),
+        });
+      }
+    }
   }
 
   const byUser = new Map<string, { score: number; name: string; avatar?: string; lastAnsweredAt: Date }>();
@@ -227,11 +271,14 @@ async function buildLeaderboard(
   for (const [uid, p] of playersMap) {
     byUser.set(uid, { score: 0, name: p.userName, avatar: p.userAvatar, lastAnsweredAt: new Date(0) });
   }
-  for (const a of answers) {
-    const entry = byUser.get(a.userId) ?? { score: 0, name: a.userId, lastAnsweredAt: new Date(0) };
-    if (a.isCorrect) entry.score += 1;
-    if (a.answeredAt > entry.lastAnsweredAt) entry.lastAnsweredAt = a.answeredAt;
-    byUser.set(a.userId, entry);
+  // Tally scores from merged answer map
+  for (const [uid, qMap] of userAnswerMap) {
+    const entry = byUser.get(uid) ?? { score: 0, name: uid, lastAnsweredAt: new Date(0) };
+    for (const a of qMap.values()) {
+      if (a.isCorrect) entry.score += 1;
+      if (a.answeredAt > entry.lastAnsweredAt) entry.lastAnsweredAt = a.answeredAt;
+    }
+    byUser.set(uid, entry);
   }
 
   const total            = questions.length;
@@ -334,6 +381,7 @@ export async function startGameSession(quizId: string): Promise<void> {
         gameStartedAt,
         allQuestions:         questions,
         players:              new Map(preGamePlayers),
+        answerCache:          new Map(),
       });
 
       io.to(room).emit('game_started', {
@@ -353,7 +401,7 @@ export async function startGameSession(quizId: string): Promise<void> {
 
       const finalState   = gameStateMap.get(quizId);
       const playersMap   = finalState?.players ?? preGamePlayers;
-      const leaderboard  = await buildLeaderboard(quizId, quiz.title, questions, gameStartedAt, playersMap);
+      const leaderboard  = await buildLeaderboard(quizId, quiz.title, questions, gameStartedAt, playersMap, finalState?.answerCache);
 
       await LeaderboardEntry.deleteMany({ quizId: new Types.ObjectId(quizId) });
       await LeaderboardEntry.insertMany(
@@ -380,6 +428,7 @@ export async function startGameSession(quizId: string): Promise<void> {
         gameStartedAt,
         allQuestions:         questions,
         players:              new Map(preGamePlayers),
+        answerCache:          new Map(),
       });
 
       io.to(room).emit('game_started', {
@@ -433,7 +482,7 @@ export async function startGameSession(quizId: string): Promise<void> {
 
       const finalState  = gameStateMap.get(quizId);
       const playersMap  = finalState?.players ?? preGamePlayers;
-      const leaderboard = await buildLeaderboard(quizId, quiz.title, questions, gameStartedAt, playersMap);
+      const leaderboard = await buildLeaderboard(quizId, quiz.title, questions, gameStartedAt, playersMap, finalState?.answerCache);
 
       await LeaderboardEntry.deleteMany({ quizId: new Types.ObjectId(quizId) });
       await LeaderboardEntry.insertMany(

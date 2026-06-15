@@ -68,6 +68,16 @@ router.post('/upload/image', protect, (req: AuthRequest, res: Response): void =>
   });
 });
 
+// Multiple image upload — up to 5 images, returns array of CDN URLs
+router.post('/upload/images', protect, (req: AuthRequest, res: Response): void => {
+  imageUpload.array('images', 5)(req, res, (err) => {
+    if (err) { res.status(400).json({ success: false, message: (err as Error).message }); return; }
+    const files = (req.files ?? []) as MulterS3File[];
+    if (!files.length) { res.status(400).json({ success: false, message: 'No files uploaded.' }); return; }
+    res.json({ success: true, urls: files.map((f) => f.location) });
+  });
+});
+
 router.patch('/profile', protect, updateProfileRules, updateProfile);
 
 // ── Block / Unblock ───────────────────────────────────────

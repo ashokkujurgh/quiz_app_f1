@@ -104,40 +104,47 @@ export function HomePage() {
   // ── Create post dialog ────────────────────────────────────────────────────────
   const [open, setOpen]               = useState(false);
   const [content, setContent]         = useState('');
-  const [imageFile, setImageFile]     = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState('');
+  const [imageFiles, setImageFiles]   = useState<File[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [submitting, setSubmitting]   = useState(false);
   const [error, setError]             = useState('');
   const [selectedSubTopicId, setSelectedSubTopicId] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
 
   const openDialog = () => {
-    setContent(''); setImageFile(null); setImagePreview(''); setError(''); setOpen(true);
+    setContent(''); setImageFiles([]); setImagePreviews([]); setError(''); setOpen(true);
   };
 
   const handleImagePick = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setImageFile(file);
-    setImagePreview(URL.createObjectURL(file));
+    const picked = Array.from(e.target.files ?? []);
+    if (!picked.length) return;
+    const combined = [...imageFiles, ...picked].slice(0, 5);
+    setImageFiles(combined);
+    setImagePreviews(combined.map((f) => URL.createObjectURL(f)));
+    e.target.value = '';
+  };
+
+  const removeImage = (idx: number) => {
+    setImageFiles((prev) => prev.filter((_, i) => i !== idx));
+    setImagePreviews((prev) => prev.filter((_, i) => i !== idx));
   };
 
   const handleSubmit = async () => {
     if (!content.trim()) { setError('Please write something.'); return; }
     setSubmitting(true); setError('');
     try {
-      let imageUrl = '';
-      if (imageFile) {
+      let imageUrls: string[] = [];
+      if (imageFiles.length) {
         const form = new FormData();
-        form.append('image', imageFile);
-        const r = await fetch(`${API}/api/auth/upload/image`, {
+        imageFiles.forEach((f) => form.append('images', f));
+        const r = await fetch(`${API}/api/auth/upload/images`, {
           method: 'POST', credentials: 'include',
           headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
           body: form,
         });
         const d = await r.json();
         if (!r.ok) throw new Error(d.message ?? 'Image upload failed');
-        imageUrl = d.url as string;
+        imageUrls = d.urls as string[];
       }
 
       const selectedSub = allSubTopics.find((s) => s._id === selectedSubTopicId);
@@ -155,7 +162,7 @@ export function HomePage() {
           content: content.trim(),
           topic: parentTopic,
           ...(selectedSub ? { subTopic: selectedSub.name } : {}),
-          ...(imageUrl ? { image: imageUrl } : {}),
+          ...(imageUrls.length ? { images: imageUrls } : {}),
           authorName: user?.name,
           authorUsername: user?.username ?? user?.email?.split('@')[0] ?? 'user',
           authorAvatar: user?.avatar,
@@ -181,6 +188,7 @@ export function HomePage() {
         },
         content: p['content'] as string,
         image: p['image'] as string | undefined,
+        images: p['images'] as string[] | undefined,
         topic: p['topic'] as QuizTopic,
         timestamp: (p['createdAt'] ?? new Date().toISOString()) as string,
         likes: 0, comments: 0, shares: 0, liked: false, saved: false,
@@ -354,21 +362,26 @@ export function HomePage() {
             value={content} onChange={(e) => setContent(e.target.value)}
             sx={{ mb: 2 }} />
 
-          {imagePreview && (
-            <Box sx={{ position: 'relative', mb: 2 }}>
-              <Box component="img" src={imagePreview}
-                sx={{ width: '100%', borderRadius: 2, maxHeight: 240, objectFit: 'cover' }} />
-              <IconButton size="small" onClick={() => { setImageFile(null); setImagePreview(''); }}
-                sx={{ position: 'absolute', top: 4, right: 4, bgcolor: 'rgba(0,0,0,0.5)', color: 'white' }}>
-                <Close fontSize="small" />
-              </IconButton>
+          {imagePreviews.length > 0 && (
+            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: 1, mb: 2 }}>
+              {imagePreviews.map((src, idx) => (
+                <Box key={idx} sx={{ position: 'relative' }}>
+                  <Box component="img" src={src}
+                    sx={{ width: '100%', height: 100, borderRadius: 2, objectFit: 'cover', display: 'block' }} />
+                  <IconButton size="small" onClick={() => removeImage(idx)}
+                    sx={{ position: 'absolute', top: 2, right: 2, bgcolor: 'rgba(0,0,0,0.55)', color: 'white', p: 0.25 }}>
+                    <Close fontSize="small" />
+                  </IconButton>
+                </Box>
+              ))}
             </Box>
           )}
 
-          <input ref={fileRef} type="file" accept="image/*" hidden onChange={handleImagePick} />
+          <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={handleImagePick} />
           <Button startIcon={<Image />} variant="outlined" size="small"
-            onClick={() => fileRef.current?.click()}>
-            Add Photo
+            onClick={() => fileRef.current?.click()}
+            disabled={imagePreviews.length >= 5}>
+            {imagePreviews.length > 0 ? `Add More (${imagePreviews.length}/5)` : 'Add Photos'}
           </Button>
         </DialogContent>
 

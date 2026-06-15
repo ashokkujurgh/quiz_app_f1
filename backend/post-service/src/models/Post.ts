@@ -39,7 +39,8 @@ export interface IPost extends Document {
   author: IAuthorSnapshot;
   userType: 'user' | 'admin';
   content: string;
-  image: string | null;
+  image: string | null;   // legacy single image (kept for backwards compat)
+  images: string[];       // up to 5 images
   topic: QuizTopic;
   subTopic: string | null;
   timezone: string;
@@ -98,6 +99,7 @@ const postSchema = new Schema<IPost>(
     userType:   { type: String, enum: ['user', 'admin'], default: 'user' },
     content:    { type: String, required: true, trim: true, maxlength: 2000 },
     image:      { type: String, default: null },
+    images:     { type: [String], default: [] },
     topic:      { type: String, required: true },
     subTopic:   { type: String, default: null },
     timezone:   { type: String, default: 'UTC' },

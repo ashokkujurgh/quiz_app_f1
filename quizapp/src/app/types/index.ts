@@ -22,6 +22,7 @@ export interface Post {
   author: User;
   content: string;
   image?: string;
+  images?: string[];
   topic: QuizTopic;
   timestamp: string;
   likes: number;
