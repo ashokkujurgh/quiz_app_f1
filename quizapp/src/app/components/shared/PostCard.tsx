@@ -10,7 +10,7 @@ import {
   ThumbUpOutlined, ThumbUp, ChatBubbleOutline, MoreHoriz, EmojiEvents,
   SendOutlined, Verified, Groups, Block,
 } from '@mui/icons-material';
-import type { Post } from '../../types';
+import type { Post, QuizTopic } from '../../types';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { toggleLike, syncLike, incrementComments } from '../../store/slices/postsSlice';
 import { useOnlineUsers } from '../../context/OnlineUsersContext';
@@ -142,7 +142,7 @@ export function PostCard({ post }: Props) {
     setSnackMsg(`You blocked ${post.author.name}. Their posts won't appear.`);
   };
 
-  const isOfficial = post.author.role === 'admin';
+  const isOfficial = post.userType === 'admin' || post.author.role === 'admin';
 
   if (blocked) return (
     <Snackbar
@@ -200,7 +200,7 @@ export function PostCard({ post }: Props) {
                 <Verified sx={{ fontSize: 15, color: 'primary.main' }} />
               )}
               <Typography variant="caption" color="text.secondary">@{post.author.username}</Typography>
-              <TopicChip topic={post.topic} />
+              <TopicChip topic={(post.subTopic ?? post.topic) as QuizTopic} />
             </Stack>
             <Typography variant="caption" color="text.secondary">{timeAgo}</Typography>
           </Box>
@@ -211,6 +211,11 @@ export function PostCard({ post }: Props) {
 
         {/* Content — 3-line clamp, click to open detail */}
         <Box onClick={() => navigate(`/posts/${post.id}`)} sx={{ cursor: 'pointer' }}>
+          {post.title && (
+            <Typography variant="subtitle2" fontWeight={700} mb={0.5}>
+              {post.title}
+            </Typography>
+          )}
           <Typography
             variant="body2"
             sx={{

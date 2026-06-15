@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useLayoutEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router';
+import { Helmet } from 'react-helmet-async';
 import {
   Box, Card, CardContent, Typography, Stack, Avatar, IconButton,
   Divider, CircularProgress, Badge, TextField, Button, Alert,
@@ -16,6 +17,20 @@ import { Navbar } from '../layout/Navbar';
 import { UserAvatar } from '../shared/UserAvatar';
 import { TopicChip } from '../shared/TopicChip';
 import type { Post, QuizTopic } from '../../types';
+
+interface SeoMeta {
+  metaTitle: string;
+  metaDescription: string;
+  keywords: string[];
+  ogTitle: string;
+  ogDescription: string;
+  ogImage: string | null;
+  canonical: string | null;
+}
+
+interface PostWithSeo extends Post {
+  seo?: SeoMeta | null;
+}
 
 const API = import.meta.env.VITE_API_URL ?? '';
 
@@ -35,10 +50,11 @@ const onlineDotSx = (online: boolean) => ({
   },
 });
 
-function mapPost(p: Record<string, unknown>): Post {
+function mapPost(p: Record<string, unknown>): PostWithSeo {
   const author = (p['author'] as Record<string, unknown>) ?? {};
   return {
     id: String(p['_id'] ?? p['id'] ?? ''),
+    title: (p['title'] as string | null) ?? null,
     author: {
       id: String(author['userId'] ?? author['_id'] ?? ''),
       name: (author['name'] ?? '') as string,
@@ -53,12 +69,15 @@ function mapPost(p: Record<string, unknown>): Post {
     content: p['content'] as string,
     image: p['image'] as string | undefined,
     topic: (p['topic'] ?? 'General') as QuizTopic,
+    subTopic: (p['subTopic'] as string | null) ?? null,
+    userType: (p['userType'] as 'user' | 'admin') ?? 'user',
     timestamp: (p['createdAt'] ?? new Date().toISOString()) as string,
     likes: (p['likes'] as number) ?? 0,
     comments: (p['commentsCount'] as number) ?? 0,
     shares: 0,
     liked: (p['liked'] as boolean) ?? false,
     saved: false,
+    seo: (p['seo'] as SeoMeta | null) ?? null,
   };
 }
 
@@ -119,17 +138,17 @@ export function PostDetailPage() {
   const { user, accessToken } = useAppSelector((s) => s.auth);
   const { isOnline } = useOnlineUsers();
 
-  const [post, setPost] = useState<Post | null>(null);
+  const [post, setPost] = useState<PostWithSeo | null>(null);
   const [loading, setLoading] = useState(true);
   const [comments, setComments] = useState<ApiComment[]>([]);
   const [commentsLoading, setCommentsLoading] = useState(true);
   const [commentText, setCommentText] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [commentError, setCommentError] = useState('');
-  const [related, setRelated] = useState<Post[]>([]);
+  const [related, setRelated] = useState<PostWithSeo[]>([]);
 
   // Fetch main post
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!id) return;
     setLoading(true);
     fetch(`${API}/api/posts/${id}`, {
@@ -143,7 +162,7 @@ export function PostDetailPage() {
   }, [id, accessToken]);
 
   // Fetch comments
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!id) return;
     setCommentsLoading(true);
     fetch(`${API}/api/posts/${id}/comments`, {
@@ -157,7 +176,7 @@ export function PostDetailPage() {
   }, [id, accessToken]);
 
   // Fetch related posts (same topic, different id)
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!post) return;
     const params = new URLSearchParams({ limit: '6', subTopic: post.topic });
     fetch(`${API}/api/posts?${params}`, {
@@ -369,8 +388,47 @@ export function PostDetailPage() {
 
   const [mobileOpen, setMobileOpen] = useState(false);
 
+  const seo        = post?.seo;
+  const pageTitle  = seo?.metaTitle  || post?.title  || `${post?.topic ?? 'Post'} — Meenzo`;
+  const pageDesc   = seo?.metaDescription || post?.content?.slice(0, 155) || 'Read this post on Meenzo.';
+  const ogTitle    = seo?.ogTitle    || pageTitle;
+  const ogDesc     = seo?.ogDescription || pageDesc;
+  const ogImage    = seo?.ogImage    || post?.image  || null;
+  const keywords   = seo?.keywords?.join(', ') || `${post?.topic}, ${post?.author?.name}, meenzo`;
+  const canonical  = seo?.canonical  || (typeof window !== 'undefined' ? window.location.href : '');
+
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: 'background.default' }}>
+      <Helmet>
+        <title>{pageTitle}</title>
+        <meta name="description"        content={pageDesc} />
+        <meta name="keywords"           content={keywords} />
+        <meta name="robots"             content="index, follow" />
+        {canonical && <link rel="canonical" href={canonical} />}
+
+        {/* Open Graph */}
+        <meta property="og:type"        content="article" />
+        <meta property="og:title"       content={ogTitle} />
+        <meta property="og:description" content={ogDesc} />
+        {ogImage && <meta property="og:image" content={ogImage} />}
+        {canonical && <meta property="og:url" content={canonical} />}
+        <meta property="og:site_name"   content="Meenzo" />
+
+        {/* Twitter Card */}
+        <meta name="twitter:card"        content={ogImage ? 'summary_large_image' : 'summary'} />
+        <meta name="twitter:title"       content={ogTitle} />
+        <meta name="twitter:description" content={ogDesc} />
+        {ogImage && <meta name="twitter:image" content={ogImage} />}
+
+        {/* Article meta */}
+        {post?.author?.name && <meta name="author" content={post.author.name} />}
+        {post?.timestamp && <meta property="article:published_time" content={post.timestamp} />}
+        {post?.topic && <meta property="article:section" content={post.topic} />}
+        {seo?.keywords?.map((kw) => (
+          <meta key={kw} property="article:tag" content={kw} />
+        ))}
+      </Helmet>
+
       <Navbar onMenuToggle={() => setMobileOpen(!mobileOpen)} />
 
       <Box sx={{

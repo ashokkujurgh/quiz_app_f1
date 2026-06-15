@@ -34,9 +34,20 @@ interface Comment {
   createdAt: string;
 }
 
+interface SeoMeta {
+  metaTitle: string;
+  metaDescription: string | null;
+  keywords: string[];
+  ogTitle: string | null;
+  ogDescription: string | null;
+  ogImage: string | null;
+  canonical: string | null;
+}
+
 interface Post {
   _id: string;
   author: AuthorSnapshot;
+  title: string | null;
   content: string;
   image: string | null;
   images: string[];
@@ -49,6 +60,7 @@ interface Post {
   quizResult: QuizResult | null;
   isActive: boolean;
   createdAt: string;
+  seo: SeoMeta | null;
 }
 
 interface Pagination {
@@ -129,6 +141,7 @@ function CreatePostModal({
   onCreated: (post: Post) => void;
   topics: Topic[];
 }) {
+  const [title, setTitle]                   = useState('');
   const [content, setContent]               = useState('');
   const [imagePreviews, setImagePreviews]   = useState<string[]>([]);
   const [imageFiles, setImageFiles]         = useState<File[]>([]);
@@ -145,6 +158,16 @@ function CreatePostModal({
   const [error, setError]                   = useState('');
   const [profile, setProfile]               = useState<AdminProfile | null>(getAdminProfile());
   const [profileLoading, setProfileLoading] = useState(!getAdminProfile());
+
+  // SEO fields
+  const [seoOpen, setSeoOpen]               = useState(false);
+  const [seoMetaTitle, setSeoMetaTitle]     = useState('');
+  const [seoMetaDesc, setSeoMetaDesc]       = useState('');
+  const [seoKeywords, setSeoKeywords]       = useState('');
+  const [seoOgTitle, setSeoOgTitle]         = useState('');
+  const [seoOgDesc, setSeoOgDesc]           = useState('');
+  const [seoOgImage, setSeoOgImage]         = useState('');
+  const [seoCanonical, setSeoCanonical]     = useState('');
 
   // Auto-fetch profile from API if not in localStorage
   useEffect(() => {
@@ -204,7 +227,18 @@ function CreatePostModal({
         imageUrls = uploadData.urls ?? [];
         setUploading(false);
       }
+      const seoPayload = seoMetaTitle.trim() ? {
+        metaTitle:       seoMetaTitle.trim(),
+        metaDescription: seoMetaDesc.trim() || null,
+        keywords:        seoKeywords.trim() ? seoKeywords.split(',').map((k) => k.trim()).filter(Boolean) : [],
+        ogTitle:         seoOgTitle.trim() || null,
+        ogDescription:   seoOgDesc.trim() || null,
+        ogImage:         seoOgImage.trim() || null,
+        canonical:       seoCanonical.trim() || null,
+      } : null;
+
       const { data } = await api.post('/api/posts', {
+        ...(title.trim() ? { title: title.trim() } : {}),
         content:        content.trim(),
         ...(imageUrls.length ? { images: imageUrls } : {}),
         topic:          selectedTopicName,
@@ -213,6 +247,7 @@ function CreatePostModal({
         authorName:     profile.name,
         authorUsername: profile.username,
         authorAvatar:   profile.avatar ?? null,
+        ...(seoPayload ? { seo: seoPayload } : {}),
       });
       onCreated(data.post);
       onClose();
@@ -261,6 +296,24 @@ function CreatePostModal({
               </span>
             </div>
           ) : null}
+
+          {/* Title */}
+          <div>
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Title <span className="text-gray-400">(optional)</span>
+            </label>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              maxLength={300}
+              placeholder="Enter a title for this post…"
+              className="w-full text-sm rounded-xl px-3 py-2 border
+                bg-white border-gray-200 text-gray-900 placeholder-gray-400
+                dark:bg-gray-800 dark:border-gray-700 dark:text-white dark:placeholder-gray-500
+                focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
 
           {/* Content */}
           <div>
@@ -460,6 +513,84 @@ function CreatePostModal({
                   }}
                 />
               </label>
+            )}
+          </div>
+          {/* SEO — collapsible */}
+          <div className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setSeoOpen((o) => !o)}
+              className="w-full flex items-center justify-between px-3 py-2 text-xs font-medium
+                text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-800/60 hover:bg-gray-100
+                dark:hover:bg-gray-800 transition-colors"
+            >
+              <span>SEO Metadata <span className="text-gray-400 font-normal">(optional)</span></span>
+              <svg className={`w-4 h-4 transition-transform ${seoOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            {seoOpen && (
+              <div className="px-3 py-3 space-y-3 bg-white dark:bg-gray-900">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Meta Title <span className="text-gray-400 font-normal">(max 60 chars)</span>
+                  </label>
+                  <input type="text" value={seoMetaTitle} onChange={(e) => setSeoMetaTitle(e.target.value)} maxLength={60}
+                    placeholder="SEO page title…"
+                    className="w-full text-sm rounded-lg px-3 py-1.5 border bg-white border-gray-200 text-gray-900 placeholder-gray-400
+                      dark:bg-gray-800 dark:border-gray-700 dark:text-white dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                  <p className="text-xs text-gray-400 mt-0.5 text-right">{seoMetaTitle.length}/60</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Meta Description <span className="text-gray-400 font-normal">(max 155 chars)</span>
+                  </label>
+                  <textarea rows={2} value={seoMetaDesc} onChange={(e) => setSeoMetaDesc(e.target.value)} maxLength={155}
+                    placeholder="Compelling description for search engines…"
+                    className="w-full text-sm rounded-lg px-3 py-1.5 border bg-white border-gray-200 text-gray-900 placeholder-gray-400
+                      dark:bg-gray-800 dark:border-gray-700 dark:text-white dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none" />
+                  <p className="text-xs text-gray-400 mt-0.5 text-right">{seoMetaDesc.length}/155</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Keywords <span className="text-gray-400 font-normal">(comma-separated)</span>
+                  </label>
+                  <input type="text" value={seoKeywords} onChange={(e) => setSeoKeywords(e.target.value)}
+                    placeholder="keyword1, keyword2, keyword3…"
+                    className="w-full text-sm rounded-lg px-3 py-1.5 border bg-white border-gray-200 text-gray-900 placeholder-gray-400
+                      dark:bg-gray-800 dark:border-gray-700 dark:text-white dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">OG Title</label>
+                    <input type="text" value={seoOgTitle} onChange={(e) => setSeoOgTitle(e.target.value)} maxLength={90}
+                      placeholder="Open Graph title…"
+                      className="w-full text-sm rounded-lg px-3 py-1.5 border bg-white border-gray-200 text-gray-900 placeholder-gray-400
+                        dark:bg-gray-800 dark:border-gray-700 dark:text-white dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">OG Image URL</label>
+                    <input type="url" value={seoOgImage} onChange={(e) => setSeoOgImage(e.target.value)}
+                      placeholder="https://…"
+                      className="w-full text-sm rounded-lg px-3 py-1.5 border bg-white border-gray-200 text-gray-900 placeholder-gray-400
+                        dark:bg-gray-800 dark:border-gray-700 dark:text-white dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">OG Description</label>
+                  <textarea rows={2} value={seoOgDesc} onChange={(e) => setSeoOgDesc(e.target.value)} maxLength={200}
+                    placeholder="Social sharing description…"
+                    className="w-full text-sm rounded-lg px-3 py-1.5 border bg-white border-gray-200 text-gray-900 placeholder-gray-400
+                      dark:bg-gray-800 dark:border-gray-700 dark:text-white dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Canonical URL</label>
+                  <input type="url" value={seoCanonical} onChange={(e) => setSeoCanonical(e.target.value)}
+                    placeholder="https://…"
+                    className="w-full text-sm rounded-lg px-3 py-1.5 border bg-white border-gray-200 text-gray-900 placeholder-gray-400
+                      dark:bg-gray-800 dark:border-gray-700 dark:text-white dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                </div>
+              </div>
             )}
           </div>
         </form>
@@ -670,6 +801,9 @@ function PostCard({
 
       {/* Content */}
       <div className="px-5 pb-3">
+        {post.title && (
+          <p className="text-sm font-semibold text-gray-900 dark:text-white mb-1">{post.title}</p>
+        )}
         <p className="text-sm text-gray-800 dark:text-gray-200 leading-relaxed">{post.content}</p>
 
         {/* Images */}
@@ -737,6 +871,14 @@ function PostCard({
           {post.likes} likes
         </span>
         <span className="text-xs text-gray-400">{post.shares} shares</span>
+        {post.seo?.metaTitle && (
+          <span className="flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400 font-medium" title={`SEO: ${post.seo.metaTitle}`}>
+            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            SEO
+          </span>
+        )}
         <button
           onClick={() => onViewComments(post._id)}
           className="flex items-center gap-1 text-xs text-indigo-500 hover:text-indigo-600 dark:text-indigo-400 font-medium transition-colors"

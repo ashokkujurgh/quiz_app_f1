@@ -135,6 +135,21 @@ services:
       - question-service
     restart: unless-stopped
 
+  post-creator:
+    build:
+      context: ./agentic/post-creator
+      dockerfile: Dockerfile
+    container_name: meenzo-post-creator
+    env_file:
+      - ./agentic/post-creator/.env
+    ports:
+      - "5050:5050"
+    depends_on:
+      - auth-service
+      - topic-service
+      - post-service
+    restart: unless-stopped
+
   # ── Admin panel ──────────────────────────────────────────
   admin:
     build:

@@ -20,10 +20,13 @@ export interface User {
 export interface Post {
   id: string;
   author: User;
+  title?: string | null;
   content: string;
   image?: string;
   images?: string[];
   topic: QuizTopic;
+  subTopic?: string | null;
+  userType?: 'user' | 'admin';
   timestamp: string;
   likes: number;
   comments: number;

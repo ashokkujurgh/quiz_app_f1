@@ -1,7 +1,7 @@
 import { Response, RequestHandler } from 'express';
 import mongoose from 'mongoose';
 import OpenAI from 'openai';
-import Post, { IQuizResult } from '../models/Post';
+import Post, { IQuizResult, ISeoMeta } from '../models/Post';
 import { AuthRequest } from '../middleware/auth';
 
 // ── OpenAI client ─────────────────────────────────────────────────────────────
@@ -174,10 +174,11 @@ Respond ONLY with valid JSON (no markdown, no explanation outside JSON):
 // ── POST /api/posts ───────────────────────────────────────────────────────────
 export const createPost: RequestHandler = async (req: AuthRequest, res: Response) => {
   try {
-    const { content, image, images, topic, subTopic, timezone, quizResult, authorName, authorUsername, authorAvatar } = req.body as {
+    const { title, content, image, images, topic, subTopic, timezone, quizResult, authorName, authorUsername, authorAvatar, seo } = req.body as {
+      title?: string;
       content?: string;
-      image?: string;           // legacy single image
-      images?: string[];        // up to 5 images
+      image?: string;
+      images?: string[];
       topic?: string;
       subTopic?: string;
       timezone?: string;
@@ -185,6 +186,7 @@ export const createPost: RequestHandler = async (req: AuthRequest, res: Response
       authorName?: string;
       authorUsername?: string;
       authorAvatar?: string;
+      seo?: { metaTitle?: string; metaDescription?: string; keywords?: string[]; ogTitle?: string; ogDescription?: string; ogImage?: string | null; canonical?: string | null };
     };
 
     if (!content?.trim()) {
@@ -251,13 +253,15 @@ export const createPost: RequestHandler = async (req: AuthRequest, res: Response
         avatar:   authorAvatar ?? null,
       },
       userType,
+      title:      title?.trim() ?? null,
       content:    content.trim(),
-      image:      imageList[0] ?? null,   // legacy compat
+      image:      imageList[0] ?? null,
       images:     imageList,
       topic,
       subTopic:   subTopic ?? null,
       timezone:   timezone ?? 'UTC',
       quizResult: quizResult ?? null,
+      seo:        (seo as ISeoMeta | null | undefined) ?? null,
     });
 
     res.status(201).json({ success: true, post });
@@ -281,10 +285,13 @@ export const updatePost: RequestHandler = async (req: AuthRequest, res: Response
       res.status(403).json({ success: false, message: 'Not authorised.' }); return;
     }
 
-    const { content, image, topic, subTopic, timezone, isActive } = req.body as {
-      content?: string; image?: string; topic?: string; subTopic?: string | null; timezone?: string; isActive?: boolean;
+    const { title, content, image, topic, subTopic, timezone, isActive, seo } = req.body as {
+      title?: string | null; content?: string; image?: string; topic?: string; subTopic?: string | null; timezone?: string; isActive?: boolean;
+      seo?: { metaTitle?: string; metaDescription?: string; keywords?: string[]; ogTitle?: string; ogDescription?: string; ogImage?: string | null; canonical?: string | null } | null;
     };
 
+    if (title     !== undefined) post.title    = title?.trim() ?? null;
+    if (seo       !== undefined) post.seo      = (seo as typeof post.seo) ?? null;
     if (content   !== undefined) post.content  = content.trim();
     if (image     !== undefined) post.image    = image;
     if (topic?.trim()) post.topic = topic.trim();

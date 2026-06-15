@@ -51,6 +51,7 @@ export function ProfilePage() {
           const a = (p['author'] as Record<string, unknown>) ?? {};
           return {
             id: (p['_id'] ?? p['id']) as string,
+            title: (p['title'] as string | null) ?? null,
             author: {
               id: String(a['userId'] ?? a['_id'] ?? ''),
               name: (a['name'] ?? '') as string,
@@ -66,6 +67,8 @@ export function ProfilePage() {
             image: p['image'] as string | undefined,
             images: p['images'] as string[] | undefined,
             topic: (p['topic'] ?? 'General') as QuizTopic,
+            subTopic: (p['subTopic'] as string | null) ?? null,
+            userType: (p['userType'] as 'user' | 'admin') ?? 'user',
             timestamp: (p['createdAt'] ?? new Date().toISOString()) as string,
             likes: (p['likes'] as number) ?? 0,
             comments: (p['commentsCount'] as number) ?? 0,
