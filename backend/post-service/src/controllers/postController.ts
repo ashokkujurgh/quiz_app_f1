@@ -29,10 +29,16 @@ function withUserFlags(post: Record<string, unknown>, userId?: string) {
 // ── GET /api/posts ────────────────────────────────────────────────────────────
 export const getPosts: RequestHandler = async (req: AuthRequest, res: Response) => {
   try {
-    const { topic, subTopic, page = '1', limit = '20' } = req.query as Record<string, string>;
+    const { topic, subTopic, page = '1', limit = '20', q } = req.query as Record<string, string>;
 
     const filter: Record<string, unknown> = { isActive: true };
-    if (subTopic && subTopic !== 'All') {
+    if (q?.trim()) {
+      filter.$or = [
+        { content:  { $regex: q.trim(), $options: 'i' } },
+        { topic:    { $regex: q.trim(), $options: 'i' } },
+        { subTopic: { $regex: q.trim(), $options: 'i' } },
+      ];
+    } else if (subTopic && subTopic !== 'All') {
       filter.subTopic = subTopic;
     } else if (topic && topic !== 'All') {
       filter.topic = { $regex: new RegExp(`^${topic}$`, 'i') };

@@ -1,12 +1,11 @@
 import { useState } from 'react';
+import logoUrl from '../../../assets/logo.png';
 import { useNavigate, Link } from 'react-router';
 import {
   Box, Card, CardContent, Typography, TextField, Button, Stack,
   Divider, FormControlLabel, Checkbox, IconButton, InputAdornment, Alert,
 } from '@mui/material';
-import { Visibility, VisibilityOff, Google } from '@mui/icons-material';
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../../config/firebase';
+import { Visibility, VisibilityOff } from '@mui/icons-material';
 import { useAppDispatch } from '../../store/hooks';
 import { loginSuccess } from '../../store/slices/authSlice';
 
@@ -27,32 +26,18 @@ export function LoginPage() {
     if (!email || !password) { setError('Please fill in all fields.'); return; }
     setError(''); setLoading(true);
     try {
-      // Step 1 — Sign in with Firebase
-      const credential = await signInWithEmailAndPassword(auth, email, password);
-      const idToken    = await credential.user.getIdToken();
-
-      // Step 2 — Exchange Firebase ID token with backend
-      const res = await fetch(`${API}/api/auth/firebase`, {
+      const res = await fetch(`${API}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ idToken }),
+        body: JSON.stringify({ email, password }),
       });
       const data = await res.json();
-      if (!res.ok) { setError(data.message ?? 'Login failed.'); return; }
+      if (!res.ok) { setError(data.message ?? 'Invalid email or password.'); return; }
       dispatch(loginSuccess({ user: data.user, accessToken: data.accessToken }));
       navigate('/home');
-    } catch (err: any) {
-      const code = err?.code ?? '';
-      if (code === 'auth/user-not-found' || code === 'auth/wrong-password' || code === 'auth/invalid-credential') {
-        setError('Invalid email or password.');
-      } else if (code === 'auth/too-many-requests') {
-        setError('Too many attempts. Please try again later.');
-      } else if (code === 'auth/network-request-failed') {
-        setError('Network error. Please check your connection.');
-      } else {
-        setError(err?.message ?? 'Login failed. Please try again.');
-      }
+    } catch {
+      setError('Network error. Please check your connection.');
     } finally {
       setLoading(false);
     }
@@ -75,7 +60,7 @@ export function LoginPage() {
         <Stack alignItems="center" spacing={1} mb={4}>
           <Box
             component="img"
-            src="/src/assets/logo.png"
+            src={logoUrl}
             alt="Meenzo"
             sx={{ height: 60, maxWidth: 180, objectFit: 'contain' }}
           />
@@ -136,21 +121,7 @@ export function LoginPage() {
                   {loading ? 'Signing in…' : 'Sign In'}
                 </Button>
 
-                <Divider>
-                  <Typography variant="caption" color="text.secondary">or continue with</Typography>
-                </Divider>
-
-                <Button
-                  variant="outlined"
-                  size="large"
-                  fullWidth
-                  startIcon={<Google />}
-                  sx={{ py: 1.5 }}
-                  disabled
-                >
-                  Continue with Google
-                </Button>
-
+               
                 <Typography variant="body2" textAlign="center">
                   Don't have an account?{' '}
                   <Typography

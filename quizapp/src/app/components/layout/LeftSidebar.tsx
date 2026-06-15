@@ -6,7 +6,7 @@ import {
 } from '@mui/material';
 import {
   Home, Quiz, People, Message, EmojiEvents, History,
-  Person, Settings, AdminPanelSettings, Lock,
+  Person, AdminPanelSettings, Lock,
 } from '@mui/icons-material';
 import { useState, useEffect } from 'react';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
@@ -24,7 +24,6 @@ const navItems = [
   { label: 'Leaderboard', icon: EmojiEvents,path: '/leaderboard', auth: true },
   { label: 'History',     icon: History,    path: '/history',     auth: true },
   { label: 'Profile',     icon: Person,     path: '/profile',     auth: true },
-  { label: 'Settings',    icon: Settings,   path: '/settings',    auth: true },
 ];
 
 interface Props {

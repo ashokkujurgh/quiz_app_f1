@@ -111,13 +111,20 @@ export const createQuiz: RequestHandler = async (req: AuthRequest, res: Response
 
 export const getQuizzes: RequestHandler = async (req, res): Promise<void> => {
   try {
-    const { status, participation, subTopic } = req.query as { status?: string; participation?: string; subTopic?: string };
+    const { status, participation, subTopic, q } = req.query as { status?: string; participation?: string; subTopic?: string; q?: string };
     const filter: Record<string, unknown> = {};
     if (status)        filter.status        = status;
     if (participation) filter.participation = participation;
     if (subTopic)      filter.subTopic      = subTopic;
+    if (q?.trim()) {
+      filter.$or = [
+        { title:       { $regex: q.trim(), $options: 'i' } },
+        { description: { $regex: q.trim(), $options: 'i' } },
+        { subTopic:    { $regex: q.trim(), $options: 'i' } },
+      ];
+    }
 
-    const quizzes = await Quiz.find(filter).sort({ scheduledAt: -1 }).lean();
+    const quizzes = await Quiz.find(filter).sort({ scheduledAt: -1 }).limit(q ? 10 : 1000).lean();
     res.json({ success: true, quizzes });
   } catch (err) {
     console.error(err);

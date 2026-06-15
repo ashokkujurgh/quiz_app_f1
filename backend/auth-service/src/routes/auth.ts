@@ -107,7 +107,7 @@ router.get('/blocked', protect, async (req: AuthRequest, res: Response): Promise
   res.json({ success: true, blockedUsers: ids });
 });
 
-// User search — any authenticated user, for participant selection
+// Specific route BEFORE the :userId param route
 router.get('/users/search', protect, async (req: AuthRequest, res: Response): Promise<void> => {
   const q = ((req.query.q as string) ?? '').trim();
   if (!q || q.length < 2) { res.json({ success: true, users: [] }); return; }
@@ -122,6 +122,16 @@ router.get('/users/search', protect, async (req: AuthRequest, res: Response): Pr
   };
   const users = await User.find(filter).select('_id name email username avatar').limit(20).lean();
   res.json({ success: true, users });
+});
+
+router.get('/users/:userId', protect, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const user = await User.findById(req.params.userId).select('_id name email username avatar coverImage role').lean();
+    if (!user) { res.status(404).json({ success: false, message: 'User not found' }); return; }
+    res.json({ success: true, user });
+  } catch {
+    res.status(400).json({ success: false, message: 'Invalid user ID' });
+  }
 });
 
 export default router;

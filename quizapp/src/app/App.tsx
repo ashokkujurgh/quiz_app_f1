@@ -9,6 +9,7 @@ import { useAppSelector, useAppDispatch } from './store/hooks';
 import { OnlineUsersProvider } from './context/OnlineUsersContext';
 import { configureApiFetch } from './utils/apiFetch';
 import { tokenRefreshed, logout } from './store/slices/authSlice';
+import { ErrorBoundary } from './components/shared/ErrorBoundary';
 
 function ThemedApp() {
   const dispatch  = useAppDispatch();
@@ -26,18 +27,22 @@ function ThemedApp() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <OnlineUsersProvider>
-        {/* MARKER-MAKE-KIT-INVOKED */}
-        <RouterProvider router={router} />
-      </OnlineUsersProvider>
+      <ErrorBoundary>
+        <OnlineUsersProvider>
+          {/* MARKER-MAKE-KIT-INVOKED */}
+          <RouterProvider router={router} />
+        </OnlineUsersProvider>
+      </ErrorBoundary>
     </ThemeProvider>
   );
 }
 
 export default function App() {
   return (
-    <Provider store={store}>
-      <ThemedApp />
-    </Provider>
+    <ErrorBoundary>
+      <Provider store={store}>
+        <ThemedApp />
+      </Provider>
+    </ErrorBoundary>
   );
 }

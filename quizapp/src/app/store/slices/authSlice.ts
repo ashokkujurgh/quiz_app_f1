@@ -10,8 +10,11 @@ interface AuthState {
 }
 
 const storedUser = (() => {
-  try { return JSON.parse(localStorage.getItem('auth_user') ?? 'null') as User | null; }
-  catch { return null; }
+  try {
+    const raw = JSON.parse(localStorage.getItem('auth_user') ?? 'null') as (User & { _id?: string }) | null;
+    if (!raw) return null;
+    return { ...raw, id: raw.id ?? raw._id ?? '' } as User;
+  } catch { return null; }
 })();
 
 const initialState: AuthState = {
@@ -29,12 +32,14 @@ const authSlice = createSlice({
       state.user = currentUser;
       state.isAuthenticated = true;
     },
-    loginSuccess: (state, action: PayloadAction<{ user: User; accessToken: string }>) => {
-      state.user = action.payload.user;
+    loginSuccess: (state, action: PayloadAction<{ user: User & { _id?: string }; accessToken: string }>) => {
+      const raw = action.payload.user;
+      const user: User = { ...raw, id: raw.id ?? raw._id ?? '' };
+      state.user = user;
       state.accessToken = action.payload.accessToken;
       state.isAuthenticated = true;
       localStorage.setItem('access_token', action.payload.accessToken);
-      localStorage.setItem('auth_user', JSON.stringify(action.payload.user));
+      localStorage.setItem('auth_user', JSON.stringify(user));
     },
     signup: (state, action: PayloadAction<Partial<User>>) => {
       state.user = { ...currentUser, ...action.payload };

@@ -1,12 +1,11 @@
 import { useState } from 'react';
+import logoUrl from '../../../assets/logo.png';
 import { useNavigate, Link } from 'react-router';
 import {
   Box, Card, CardContent, Typography, TextField, Button, Stack,
-  Avatar, IconButton, InputAdornment, Alert,
+  IconButton, InputAdornment, Alert,
 } from '@mui/material';
-import { Visibility, VisibilityOff, CameraAlt } from '@mui/icons-material';
-import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
-import { auth } from '../../config/firebase';
+import { Visibility, VisibilityOff } from '@mui/icons-material';
 import { useAppDispatch } from '../../store/hooks';
 import { loginSuccess } from '../../store/slices/authSlice';
 
@@ -36,33 +35,18 @@ export function SignupPage() {
     }
     setError(''); setLoading(true);
     try {
-      // Step 1 — Create user in Firebase
-      const credential = await createUserWithEmailAndPassword(auth, form.email, form.password);
-      await updateProfile(credential.user, { displayName: form.name });
-      const idToken = await credential.user.getIdToken();
-
-      // Step 2 — Exchange Firebase ID token with backend
-      const res = await fetch(`${API}/api/auth/firebase`, {
+      const res = await fetch(`${API}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ idToken, name: form.name }),
+        body: JSON.stringify({ name: form.name, email: form.email, password: form.password }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.message ?? 'Registration failed.'); return; }
       dispatch(loginSuccess({ user: data.user, accessToken: data.accessToken }));
       navigate('/home');
-    } catch (err: any) {
-      const code = err?.code ?? '';
-      if (code === 'auth/email-already-in-use') {
-        setError('Email is already registered. Please sign in.');
-      } else if (code === 'auth/weak-password') {
-        setError('Password is too weak. Use at least 6 characters.');
-      } else if (code === 'auth/network-request-failed') {
-        setError('Network error. Please check your connection.');
-      } else {
-        setError(err?.message ?? 'Registration failed. Please try again.');
-      }
+    } catch {
+      setError('Network error. Please check your connection.');
     } finally {
       setLoading(false);
     }
@@ -84,7 +68,7 @@ export function SignupPage() {
         <Stack alignItems="center" spacing={1} mb={4}>
           <Box
             component="img"
-            src="/src/assets/logo.png"
+            src={logoUrl}
             alt="Meenzo"
             sx={{ height: 60, maxWidth: 180, objectFit: 'contain' }}
           />
@@ -96,34 +80,6 @@ export function SignupPage() {
           <CardContent sx={{ p: 4 }}>
             {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
-            {/* Avatar Upload */}
-            <Stack alignItems="center" mb={3}>
-              <Box sx={{ position: 'relative' }}>
-                <Avatar
-                  sx={{
-                    width: 80, height: 80,
-                    background: 'linear-gradient(135deg, #5563DE, #E91E8C)',
-                    fontSize: 32,
-                  }}
-                >
-                  {form.name[0] || 'U'}
-                </Avatar>
-                <IconButton
-                  size="small"
-                  sx={{
-                    position: 'absolute', bottom: -4, right: -4,
-                    bgcolor: 'primary.main', color: 'white',
-                    width: 28, height: 28,
-                    '&:hover': { bgcolor: 'primary.dark' },
-                  }}
-                >
-                  <CameraAlt sx={{ fontSize: 14 }} />
-                </IconButton>
-              </Box>
-              <Typography variant="caption" color="text.secondary" mt={1}>
-                Upload profile photo
-              </Typography>
-            </Stack>
 
             <form onSubmit={handleSubmit}>
               <Stack spacing={2}>

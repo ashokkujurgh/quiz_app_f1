@@ -88,13 +88,13 @@ export async function blockUser(req: AuthRequest, res: Response): Promise<void> 
 
 // GET /api/friends — list accepted friends
 export async function listFriends(req: AuthRequest, res: Response): Promise<void> {
-  const me = req.user!.id;
+  const target = (req.query.userId as string) || req.user!.id;
   const docs = await FriendRequest.find({
-    $or: [{ sender: me, status: 'accepted' }, { receiver: me, status: 'accepted' }],
+    $or: [{ sender: target, status: 'accepted' }, { receiver: target, status: 'accepted' }],
   }).lean();
 
   const friendIds = docs.map((d) =>
-    d.sender.toString() === me ? d.receiver : d.sender
+    d.sender.toString() === target ? d.receiver : d.sender
   );
 
   const users = await User.find({ _id: { $in: friendIds } }).select('username avatar email').lean();
