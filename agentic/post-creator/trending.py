@@ -1,16 +1,13 @@
 """
 Fetch web context from Wikipedia + RSS news feeds.
-- India-biased subtopics: 50% Indian content, 50% world
-- Trending-biased subtopics: 80% current news/trending, 20% foundational context
+Also includes Google News RSS for real-time trending headlines.
 """
 import logging
 import requests
 import feedparser
+from datetime import date, timedelta
 
 logger = logging.getLogger(__name__)
-
-# 80% Indian content for these (currently empty — moved to 50/50)
-INDIA_BIASED_SUBTOPICS: set[str] = set()
 
 # 50% India, 50% world for these
 INDIA_50_SUBTOPICS = {
@@ -19,6 +16,8 @@ INDIA_50_SUBTOPICS = {
     "computer science", "information technology",
     "general science", "science", "science and technology", "physics", "chemistry", "biology",
 }
+
+INDIA_BIASED_SUBTOPICS: set[str] = set()
 
 # 80% current trending news for these
 TRENDING_BIASED_SUBTOPICS = {
@@ -31,38 +30,43 @@ TRENDING_BIASED_SUBTOPICS = {
     "innovation", "technology", "artificial intelligence", "robotics",
 }
 
-# RSS feeds for different topic areas
+# RSS feeds — topic-specific + Google News for real-time trending
 RSS_FEEDS = {
-    "engineering":   [
+    "engineering": [
+        "https://news.google.com/rss/search?q=engineering+technology&hl=en-IN&gl=IN&ceid=IN:en",
         "https://www.sciencedaily.com/rss/matter_energy/engineering.xml",
         "https://feeds.bbci.co.uk/news/science_and_environment/rss.xml",
-        "https://www.newscientist.com/feed/home/",
     ],
-    "science":       [
+    "science": [
+        "https://news.google.com/rss/search?q=science+discovery+2024&hl=en-IN&gl=IN&ceid=IN:en",
         "https://www.sciencedaily.com/rss/all.xml",
         "https://feeds.bbci.co.uk/news/science_and_environment/rss.xml",
-        "https://www.newscientist.com/feed/home/",
     ],
-    "economics":     [
+    "economics": [
+        "https://news.google.com/rss/search?q=economy+finance+india&hl=en-IN&gl=IN&ceid=IN:en",
         "https://feeds.bbci.co.uk/news/business/rss.xml",
-        "https://www.economist.com/finance-and-economics/rss.xml",
         "https://feeds.reuters.com/reuters/businessNews",
     ],
-    "geopolitics":   [
+    "geopolitics": [
+        "https://news.google.com/rss/search?q=geopolitics+world+news&hl=en-IN&gl=IN&ceid=IN:en",
         "https://feeds.bbci.co.uk/news/world/rss.xml",
         "https://feeds.reuters.com/Reuters/worldNews",
-        "https://rss.nytimes.com/services/xml/rss/nyt/World.xml",
     ],
-    "geography":     [
+    "geography": [
+        "https://news.google.com/rss/search?q=geography+environment+climate&hl=en-IN&gl=IN&ceid=IN:en",
         "https://www.sciencedaily.com/rss/earth_climate.xml",
-        "https://feeds.bbci.co.uk/news/science_and_environment/rss.xml",
     ],
-    "innovation":    [
-        "https://www.sciencedaily.com/rss/computers_math/artificial_intelligence.xml",
-        "https://www.newscientist.com/feed/home/",
+    "innovation": [
+        "https://news.google.com/rss/search?q=AI+technology+innovation+2024&hl=en-IN&gl=IN&ceid=IN:en",
         "https://feeds.bbci.co.uk/news/technology/rss.xml",
+        "https://www.newscientist.com/feed/home/",
     ],
-    "general":       [
+    "history": [
+        "https://news.google.com/rss/search?q=history+heritage+discovery&hl=en-IN&gl=IN&ceid=IN:en",
+        "https://feeds.bbci.co.uk/news/rss.xml",
+    ],
+    "general": [
+        "https://news.google.com/rss?hl=en-IN&gl=IN&ceid=IN:en",
         "https://feeds.bbci.co.uk/news/rss.xml",
         "https://feeds.reuters.com/reuters/topNews",
     ],
@@ -77,10 +81,11 @@ WIKI_SUMMARY_URL = "https://en.wikipedia.org/api/rest_v1/page/summary/"
 def _is_india_biased(subtopic_name: str) -> bool:
     return any(kw in subtopic_name.lower() for kw in INDIA_BIASED_SUBTOPICS)
 
+def _is_india_50(subtopic_name: str) -> bool:
+    return any(kw in subtopic_name.lower() for kw in INDIA_50_SUBTOPICS)
 
 def _is_trending_biased(subtopic_name: str) -> bool:
-    name = subtopic_name.lower()
-    return any(kw in name for kw in TRENDING_BIASED_SUBTOPICS)
+    return any(kw in subtopic_name.lower() for kw in TRENDING_BIASED_SUBTOPICS)
 
 
 def _wiki_summary(title: str) -> str | None:
@@ -127,11 +132,13 @@ def _rss_feed_key(subtopic_name: str) -> str:
         return "geography"
     if any(k in name for k in ["innovat", "ai", "robot", "tech", "startup", "digital"]):
         return "innovation"
+    if any(k in name for k in ["history", "ancient", "heritage", "civiliz", "medieval"]):
+        return "history"
     return "general"
 
 
-def _fetch_rss_headlines(subtopic_name: str, limit: int = 5) -> list[dict]:
-    """Fetch recent headlines from RSS feeds matching the subtopic."""
+def _fetch_rss_headlines(subtopic_name: str, limit: int = 8) -> list[dict]:
+    """Fetch recent headlines from RSS feeds (includes Google News)."""
     key   = _rss_feed_key(subtopic_name)
     feeds = RSS_FEEDS.get(key, RSS_FEEDS["general"])
     headlines: list[dict] = []
@@ -141,9 +148,10 @@ def _fetch_rss_headlines(subtopic_name: str, limit: int = 5) -> list[dict]:
             feed = feedparser.parse(feed_url)
             for entry in feed.entries[:limit]:
                 title   = entry.get("title", "")
-                summary = entry.get("summary", entry.get("description", ""))[:300]
+                summary = entry.get("summary", entry.get("description", ""))[:400]
+                published = entry.get("published", "")
                 if title:
-                    headlines.append({"title": title, "summary": summary})
+                    headlines.append({"title": title, "summary": summary, "published": published})
             if len(headlines) >= limit:
                 break
         except Exception as exc:
@@ -154,29 +162,51 @@ def _fetch_rss_headlines(subtopic_name: str, limit: int = 5) -> list[dict]:
 
 
 def _filter_headlines_by_subtopic(headlines: list[dict], subtopic_name: str) -> list[dict]:
-    """Keep headlines that are loosely related to the subtopic."""
     keywords = [w for w in subtopic_name.lower().split() if len(w) > 3]
     if not keywords:
         return headlines
     filtered = [h for h in headlines if any(k in h["title"].lower() or k in h["summary"].lower() for k in keywords)]
-    return filtered if filtered else headlines  # fall back to all if none match
+    return filtered if filtered else headlines
+
+
+def fetch_trending_news(subtopic: dict, limit: int = 6) -> list[dict]:
+    """
+    Fetch fresh trending news headlines for the given subtopic.
+    Returns list of {title, summary, published} dicts.
+    """
+    subtopic_name = subtopic["name"]
+    topic_name    = subtopic.get("topicName", "")
+
+    # Try Google News first with a targeted query
+    query = f"{subtopic_name} {topic_name}".strip()
+    google_url = f"https://news.google.com/rss/search?q={requests.utils.quote(query)}&hl=en-IN&gl=IN&ceid=IN:en"
+    headlines: list[dict] = []
+    try:
+        feed = feedparser.parse(google_url)
+        for entry in feed.entries[:limit]:
+            title   = entry.get("title", "")
+            summary = entry.get("summary", "")[:400]
+            published = entry.get("published", "")
+            if title:
+                headlines.append({"title": title, "summary": summary, "published": published})
+    except Exception as exc:
+        logger.warning("Google News fetch failed: %s", exc)
+
+    # Supplement with RSS if needed
+    if len(headlines) < 3:
+        rss = _fetch_rss_headlines(subtopic_name, limit=limit)
+        rss = _filter_headlines_by_subtopic(rss, subtopic_name)
+        seen = {h["title"] for h in headlines}
+        for h in rss:
+            if h["title"] not in seen:
+                headlines.append(h)
+
+    return headlines[:limit]
 
 
 # ── public interface ──────────────────────────────────────────────────────────
 
-def _is_india_50(subtopic_name: str) -> bool:
-    return any(kw in subtopic_name.lower() for kw in INDIA_50_SUBTOPICS)
-
-
 def fetch_web_context(subtopic: dict) -> str:
-    """
-    Build a research context string for GPT.
-    - Trending-biased:  80% current RSS news, 20% foundational
-    - India 80/20:      80% Indian Wikipedia, 20% world
-    - India 50/50:      50% Indian Wikipedia, 50% world Wikipedia
-    - Both trending + India biases can apply together.
-    Returns a string with labelled sections.
-    """
     subtopic_name   = subtopic["name"]
     topic_name      = subtopic.get("topicName", "")
     india_80        = _is_india_biased(subtopic_name)
@@ -185,25 +215,20 @@ def fetch_web_context(subtopic: dict) -> str:
 
     sections: list[str] = []
 
-    # ── Trending news (80% weight) ─────────────────────────────────────────
     if trending_biased:
-        headlines = _fetch_rss_headlines(subtopic_name, limit=6)
-        headlines = _filter_headlines_by_subtopic(headlines, subtopic_name)
+        headlines = fetch_trending_news(subtopic, limit=6)
         if headlines:
             news_block = "\n".join(
-                f"• {h['title']}" + (f": {h['summary']}" if h['summary'] else "")
+                f"• {h['title']}" + (f": {h['summary'][:200]}" if h['summary'] else "")
                 for h in headlines[:5]
             )
             sections.append(f"[CURRENT NEWS — primary angle, 80% focus]\n{news_block}")
 
-    # ── India 50/50 (engineering, science) ────────────────────────────────
     if india_50:
-        # Try to get a relevant India article; fall back to general if not found
         indian_summary = None
         indian_title   = None
         for query in [f"Indian {subtopic_name}", f"{subtopic_name} India", f"India {subtopic_name}"]:
             for title in _wiki_search(query, limit=4):
-                # Skip clearly unrelated results
                 skip_words = {"civil service", "civil war", "civil code", "services of india"}
                 if any(s in title.lower() for s in skip_words):
                     continue
@@ -217,7 +242,6 @@ def fetch_web_context(subtopic: dict) -> str:
         if indian_summary:
             sections.append(f"[INDIA CONTEXT — 50% focus]\n[{indian_title}]\n{indian_summary[:500]}")
 
-        # Global context
         for title in _wiki_search(f"{subtopic_name}", limit=3):
             if "india" not in title.lower():
                 summary = _wiki_summary(title)
@@ -225,7 +249,6 @@ def fetch_web_context(subtopic: dict) -> str:
                     sections.append(f"[GLOBAL CONTEXT — 50% focus]\n[{title}]\n{summary[:500]}")
                     break
 
-    # ── India 80/20 ───────────────────────────────────────────────────────
     elif india_80:
         indian_titles = _wiki_search(f"India {subtopic_name}", limit=2)
         for title in indian_titles[:1]:
@@ -233,14 +256,12 @@ def fetch_web_context(subtopic: dict) -> str:
             if summary:
                 sections.append(f"[INDIA CONTEXT — 80% focus]\n[{title}]\n{summary[:600]}")
                 break
-
         world_titles = _wiki_search(f"{subtopic_name} world overview", limit=1)
         for title in world_titles[:1]:
             summary = _wiki_summary(title)
             if summary:
                 sections.append(f"[GLOBAL CONTEXT — 20% focus]\n[{title}]\n{summary[:300]}")
 
-    # ── General Wikipedia (no bias) ───────────────────────────────────────
     elif not trending_biased:
         for query in [f"{subtopic_name} {topic_name}", subtopic_name]:
             titles = _wiki_search(query, limit=2)
@@ -260,7 +281,6 @@ def fetch_web_context(subtopic: dict) -> str:
 
 def fetch_wikipedia_trending(limit: int = 50) -> list[str]:
     try:
-        from datetime import date, timedelta
         yesterday = date.today() - timedelta(days=2)
         url = (
             f"https://wikimedia.org/api/rest_v1/metrics/pageviews/top/"

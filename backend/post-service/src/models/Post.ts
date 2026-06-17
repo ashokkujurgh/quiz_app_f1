@@ -146,6 +146,7 @@ const postSchema = new Schema<IPost>(
 postSchema.index({ 'author.userId': 1 });
 postSchema.index({ topic: 1, createdAt: -1 });
 postSchema.index({ createdAt: -1 });
+postSchema.index({ slug: 1 }, { unique: true, sparse: true });
 
 const Post: Model<IPost> = mongoose.model<IPost>('Post', postSchema);
 export default Post;

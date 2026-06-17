@@ -73,6 +73,7 @@ export function HomePage() {
           const author = (p['author'] as Record<string, unknown>) ?? {};
           return {
             id: (p['_id'] ?? p['id']) as string,
+            slug: (p['slug'] as string | null) ?? null,
             author: {
               id: String(author['userId'] ?? author['_id'] ?? ''),
               name: (author['name'] ?? '') as string,

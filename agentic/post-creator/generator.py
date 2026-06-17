@@ -1,18 +1,28 @@
 """
-AI content generation: title, post content, image, embeddings.
+AI content generation with four human-like post modes:
+  trending  (40%) — news-hooked, current events angle
+  basic     (40%) — clear educational explainer, real-world examples
+  fun       (10%) — witty, light-hearted, meme-energy but still informative
+  question  (10%) — thought-provoking question that sparks debate/discussion
 """
 import logging
 import json
-import base64
-import requests as _requests
+import random
 from openai import OpenAI
-from config import OPENAI_API_KEY, DALLE_API_KEY, EMBED_MODEL
+from config import OPENAI_API_KEY, EMBED_MODEL
 from trending import INDIA_BIASED_SUBTOPICS, INDIA_50_SUBTOPICS, TRENDING_BIASED_SUBTOPICS
 
 logger = logging.getLogger(__name__)
 
-_gpt_client   = OpenAI(api_key=OPENAI_API_KEY)
-_dalle_client = OpenAI(api_key=DALLE_API_KEY)
+_client = OpenAI(api_key=OPENAI_API_KEY)
+
+# ── post mode weights ─────────────────────────────────────────────────────────
+POST_MODES   = ["trending", "basic", "fun", "question"]
+MODE_WEIGHTS = [0.40,       0.40,   0.10, 0.10]
+
+
+def pick_post_mode() -> str:
+    return random.choices(POST_MODES, weights=MODE_WEIGHTS, k=1)[0]
 
 
 def _is_india_biased(subtopic_name: str) -> bool:
@@ -25,190 +35,204 @@ def _is_trending_biased(subtopic_name: str) -> bool:
     return any(kw in subtopic_name.lower() for kw in TRENDING_BIASED_SUBTOPICS)
 
 
+# ── per-mode system prompts ───────────────────────────────────────────────────
+
+_SYSTEM_TRENDING = """\
+You write posts for Meenzo, a quiz and learning app popular with Indian students and curious learners.
+Your job: write a SHORT, punchy post tied to a REAL news story or current event.
+
+Voice: You sound like a smart friend who just read the news and can't stop talking about it.
+Tone: excited but credible — like a knowledgeable college senior explaining something over chai.
+Rules:
+- Start with the news hook (what happened, when, why it matters) — ONE sentence max.
+- Then connect it to the broader topic in a way that teaches something.
+- Never say "Did you know", "In today's world", "In conclusion", or use bullet points.
+- Active voice. Short sentences. No jargon without explanation.
+- End with one sentence that makes the reader feel smarter for reading this.
+- Length: 160-220 words. Flowing paragraphs, no lists."""
+
+_SYSTEM_BASIC = """\
+You write posts for Meenzo, a quiz and learning app popular with Indian students and curious learners.
+Your job: write a CLEAR, engaging educational post that explains a concept in a way anyone can understand.
+
+Voice: Like a really good teacher who actually makes class interesting — warm, direct, zero fluff.
+Tone: confident but approachable, like explaining to a smart 16-year-old.
+Rules:
+- Open with a surprising fact, an analogy, or a concrete real-world example — never a definition.
+- Explain the concept through stories or comparisons, not textbook language.
+- Include one specific real-world example that sticks (India-relevant where possible).
+- Never say "Did you know", "In conclusion", or use bullet points.
+- Active voice. Write like a human, not a Wikipedia article.
+- End with one memorable line that makes the concept click.
+- Length: 180-240 words. Flowing paragraphs."""
+
+_SYSTEM_FUN = """\
+You write posts for Meenzo, a quiz and learning app popular with Indian students and curious learners.
+Your job: write a FUNNY, witty post about a topic that also secretly teaches something.
+
+Voice: Like a stand-up comedian who also happens to have a PhD — sharp, playful, self-aware.
+Tone: light-hearted, a little irreverent, definitely not corporate. Think Twitter/X energy meets actual knowledge.
+Rules:
+- Open with a funny observation, absurd comparison, or relatable student struggle related to the topic.
+- Sneak in 2-3 real facts or insights disguised as jokes or commentary.
+- Can use mild sarcasm, pop culture references, or India-specific humour (exams, traffic, cricket, chai).
+- Never lecture. Never be cringe. No "haha" or "lol" — let the writing be the funny part.
+- End with a punchline or a playful twist that makes people want to share it.
+- Length: 130-180 words. Punchy, flowing. No bullet points."""
+
+_SYSTEM_QUESTION = """\
+You write posts for Meenzo, a quiz and learning app popular with Indian students and curious learners.
+Your job: write a THOUGHT-PROVOKING post that asks a big question and gets people thinking and debating.
+
+Voice: Like a philosophy professor who also watches way too much news — curious, open, a little provocative.
+Tone: honest, slightly controversial in a harmless way, intellectually exciting.
+Rules:
+- Open by framing an interesting dilemma, paradox, or surprising question about the topic.
+- Give 2-3 angles or perspectives — don't answer it definitively. Let the reader decide.
+- Use India-relevant context where natural (but don't force it).
+- End with the actual question directed at the reader — make them WANT to comment or think.
+- Never say "In conclusion", never be preachy, never lecture.
+- Active voice. Short paragraphs. 150-200 words. No bullet points."""
+
+
+def _india_clause(subtopic_name: str) -> str:
+    if _is_india_50(subtopic_name):
+        return (
+            "\nINDIA MIX: Blend Indian examples and global context equally (50/50). "
+            "Name real Indian places, scientists, companies, or events where relevant."
+        )
+    elif _is_india_biased(subtopic_name):
+        return (
+            "\nINDIA FOCUS: 80% of examples and context should be India-specific "
+            "(Indian cities, people, policies, achievements). 20% global comparison."
+        )
+    return ""
+
+
+def _context_clause(web_context: str | None, trending_news: list[dict] | None, mode: str) -> str:
+    parts = []
+
+    if trending_news and mode in ("trending", "question"):
+        news_lines = "\n".join(
+            f"• {h['title']}" + (f": {h['summary'][:200]}" if h.get("summary") else "")
+            for h in trending_news[:5]
+        )
+        parts.append(f"TRENDING NEWS (use as primary hook for this post):\n{news_lines}")
+
+    if web_context:
+        parts.append(f"BACKGROUND REFERENCE (use for facts, do NOT copy verbatim):\n{web_context[:800]}")
+
+    if not parts:
+        return ""
+    return "\n\n" + "\n\n".join(parts)
+
+
+# ── main generation function ──────────────────────────────────────────────────
+
+def generate_post(
+    topic_name: str,
+    subtopic_name: str,
+    mode: str,
+    trending_news: list[dict] | None = None,
+    web_context: str | None = None,
+    trending_hint: str | None = None,
+) -> dict | None:
+    """
+    Generate a post with the given mode.
+    Returns { title, content, seo, mode } or None on failure.
+    """
+    system_map = {
+        "trending": _SYSTEM_TRENDING,
+        "basic":    _SYSTEM_BASIC,
+        "fun":      _SYSTEM_FUN,
+        "question": _SYSTEM_QUESTION,
+    }
+    system_prompt = system_map.get(mode, _SYSTEM_BASIC)
+
+    india_note   = _india_clause(subtopic_name)
+    context_note = _context_clause(web_context, trending_news, mode)
+
+    trend_note = ""
+    if trending_hint and mode == "trending":
+        trend_note = f"\nTrending angle to incorporate: {trending_hint}"
+
+    mode_title_hints = {
+        "trending": "news-hook title that makes people click (e.g. 'This just changed everything about X')",
+        "basic":    "clear, curiosity-driven title (e.g. 'Why X actually works like Y')",
+        "fun":      "witty, slightly clickbaity title with personality (e.g. 'X explained by someone who gets it')",
+        "question": "question title that makes people stop scrolling (e.g. 'Is X really Y? Here's the debate.')",
+    }
+    title_hint = mode_title_hints.get(mode, "engaging title")
+
+    user_prompt = f"""Topic: {topic_name}
+Subtopic: {subtopic_name}
+Post mode: {mode.upper()}{india_note}{trend_note}{context_note}
+
+Write a {mode} post about "{subtopic_name}" under the topic "{topic_name}".
+Title should be a {title_hint}.
+
+Return ONLY valid JSON — no markdown, no code fences:
+
+{{
+  "title": "<{title_hint}, max 100 chars>",
+  "content": "<post body — see system instructions for length and rules>",
+  "seo": {{
+    "metaTitle": "<SEO title with primary keyword, max 60 chars>",
+    "metaDescription": "<compelling meta description, max 155 chars>",
+    "keywords": ["<kw1>", "<kw2>", "<kw3>", "<kw4>", "<kw5>"],
+    "ogTitle": "<social sharing title, max 90 chars>",
+    "ogDescription": "<social sharing description, max 200 chars>",
+    "ogImage": null,
+    "canonical": null
+  }}
+}}"""
+
+    try:
+        resp = _client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user",   "content": user_prompt},
+            ],
+            temperature=0.85,
+            max_tokens=1200,
+        )
+        raw = resp.choices[0].message.content.strip()
+        # Strip markdown code fences if present
+        if raw.startswith("```"):
+            raw = raw.split("```")[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+        data = json.loads(raw)
+        assert isinstance(data.get("content"), str) and len(data["content"]) > 50
+        data["mode"] = mode
+        return data
+    except Exception as exc:
+        logger.error("[%s] Content generation failed: %s", mode, exc)
+        return None
+
+
+# kept for backward compatibility — wraps generate_post in "basic" mode
 def generate_title_and_content(
     topic_name: str,
     subtopic_name: str,
     trending_hint: str | None = None,
     web_context: str | None = None,
 ) -> dict | None:
-    """
-    Generate a post title, content, and SEO metadata.
-    Returns { title, content, seo } or None on failure.
-    """
-    india_biased    = _is_india_biased(subtopic_name)
-    india_50        = _is_india_50(subtopic_name)
-    trending_biased = _is_trending_biased(subtopic_name)
-
-    trend_clause = (
-        f"\nTrending angle: Incorporate insights about '{trending_hint}' if relevant."
-        if trending_hint else ""
+    return generate_post(
+        topic_name=topic_name,
+        subtopic_name=subtopic_name,
+        mode="basic",
+        web_context=web_context,
+        trending_hint=trending_hint,
     )
-
-    context_clause = (
-        f"\n\nResearch context (use as reference, do NOT copy verbatim):\n{web_context}"
-        if web_context else ""
-    )
-
-    if india_50:
-        india_clause = (
-            f"\nIMPORTANT: Write exactly 50% of the content focused on India "
-            f"(Indian achievements, Indian scientists/engineers, India-specific examples) "
-            f"and 50% on global/world context and developments."
-        )
-    elif india_biased:
-        india_clause = (
-            f"\nIMPORTANT: Write 80% of the content focused on India "
-            f"(Indian examples, Indian context, Indian {subtopic_name}) and 20% on global perspective."
-        )
-    else:
-        india_clause = ""
-
-    trending_clause = (
-        f"\nIMPORTANT: This is a trending/current topic. Write 80% of the content around the LATEST "
-        f"developments, recent breakthroughs, and current real-world events in {subtopic_name}. "
-        f"Use the news headlines from the research context as primary angles. 20% can be foundational context."
-        if trending_biased else ""
-    )
-
-    prompt = f"""You are an expert educational content writer for Meenzo, a modern quiz and learning platform for students and curious learners.
-
-Topic: {topic_name}
-Subtopic: {subtopic_name}{trend_clause}{india_clause}{trending_clause}{context_clause}
-
-Write a highly engaging, modern educational post. Return ONLY valid JSON — no markdown, no extra text:
-
-{{
-  "title": "<punchy, curiosity-driven title that makes readers want to learn more, max 100 chars>",
-  "content": "<rich educational post, 200-280 words. Structure: start with a surprising fact or a current news hook, then explain the concept clearly with vivid real-world examples, include 2-3 key insights or recent developments, end with a thought-provoking question or call-to-action. Use simple language, active voice, no markdown, no bullet points — flowing paragraphs only.>",
-  "seo": {{
-    "metaTitle": "<SEO title with primary keyword, max 60 chars>",
-    "metaDescription": "<compelling description with keyword, max 155 chars>",
-    "keywords": ["<keyword1>", "<keyword2>", "<keyword3>", "<keyword4>", "<keyword5>"],
-    "ogTitle": "<social sharing title, engaging and shareable, max 90 chars>",
-    "ogDescription": "<social sharing description, max 200 chars>",
-    "ogImage": null,
-    "canonical": null
-  }}
-}}
-
-Quality rules:
-- Open with a surprising fact, current statistic, or bold statement — never start with "Did you know".
-- Base content on the research context (news headlines / Wikipedia) if provided.
-- Use vivid analogies and real-world examples students can relate to.
-- Write like a knowledgeable friend, not a textbook.
-- SEO fields must be unique and click-worthy.
-"""
-
-    try:
-        resp = _gpt_client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.8,
-            max_tokens=1100,
-        )
-        raw = resp.choices[0].message.content.strip()
-        if raw.startswith("```"):
-            raw = raw.split("```")[1]
-            if raw.startswith("json"):
-                raw = raw[4:]
-        data = json.loads(raw)
-        assert isinstance(data.get("content"), str) and data["content"]
-        assert isinstance(data.get("seo"), dict)
-        return data
-    except Exception as exc:
-        logger.error("Title/content generation failed: %s", exc)
-        return None
-
-
-def _extract_visual_scene(title: str, content: str, subtopic_name: str, topic_name: str) -> str:
-    """Use GPT to extract a country-specific, unique visual scene from the post content."""
-    try:
-        resp = _gpt_client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[{"role": "user", "content": (
-                f"You are a photo director. Given this article title and content:\n\n"
-                f"Title: {title}\nContent (first 500 chars): {content[:500]}\n\n"
-                f"Step 1: Identify the PRIMARY country or region this article is about "
-                f"(e.g. India, USA, Japan, Germany, Brazil). If no specific country, use the most relevant region.\n"
-                f"Step 2: Describe ONE specific, vivid, photorealistic scene that best represents this article visually. "
-                f"The scene MUST be clearly set in that country — use its recognisable landmarks, architecture, "
-                f"landscapes, people's appearance, traditional or local clothing, and cultural context so the location "
-                f"is immediately obvious from the photo. Be very specific: name real settings, real objects, real actions. "
-                f"No generic stock-photo descriptions. Make it unique to THIS article.\n\n"
-                f"Return ONLY a 2-3 sentence scene description that naturally includes the country/location. No extra text."
-            )}],
-            temperature=0.9,
-            max_tokens=150,
-        )
-        return resp.choices[0].message.content.strip()
-    except Exception:
-        return f"{subtopic_name} in the context of {topic_name}"
-
-
-def generate_image(title: str | None, subtopic_name: str, topic_name: str, content: str = "") -> str | None:
-    """
-    Generate 1 image via gpt-image-1, upload to CDN, return URL.
-    """
-    india_biased = _is_india_biased(subtopic_name)
-    india_50     = _is_india_50(subtopic_name)
-    if india_50:
-        india_style = "blending Indian and global visual elements equally"
-    elif india_biased:
-        india_style = "with Indian visual elements, warm colours, and culturally relevant imagery"
-    else:
-        india_style = ""
-
-    scene = _extract_visual_scene(title or subtopic_name, content, subtopic_name, topic_name) if content else f"{subtopic_name} in the context of {topic_name}"
-
-    image_prompt = (
-        f"A high-quality, photorealistic editorial photograph. {scene} {india_style} "
-        f"Style: professional DSLR photography, natural lighting, sharp focus, realistic textures, "
-        f"cinematic composition, documentary feel. Real people, real environments, real objects — "
-        f"no illustrations, no cartoons, no flat design, no CGI, no text overlays. "
-        f"Shot like a National Geographic or BBC feature photo."
-    )
-
-    try:
-        resp = _dalle_client.images.generate(
-            model="gpt-image-1",
-            prompt=image_prompt,
-            size="1024x1024",
-            n=1,
-        )
-        item = resp.data[0] if resp.data else None
-        if not item:
-            logger.error("Image generation returned no data.")
-            return None
-
-        if item.b64_json:
-            img_bytes = base64.b64decode(item.b64_json)
-            from config import AUTH_API_URL
-            from auth_client import auth_headers
-            upload_resp = _requests.post(
-                f"{AUTH_API_URL}/api/auth/upload/image",
-                files={"image": ("image.png", img_bytes, "image/png")},
-                headers=auth_headers(),
-                timeout=60,
-            )
-            if upload_resp.ok:
-                url = upload_resp.json().get("url")
-                if url:
-                    logger.info("Image uploaded: %s", url[:60])
-                    return url
-            else:
-                logger.error("Image upload failed: %s", upload_resp.text[:200])
-
-        if item.url:
-            logger.info("Image URL: %s", item.url[:60])
-            return item.url
-
-    except Exception as exc:
-        logger.error("Image generation failed: %s", exc)
-
-    return None
 
 
 def embed_text(text: str) -> list[float]:
-    """Return a 1536-dim embedding for the given text."""
-    resp = _gpt_client.embeddings.create(model=EMBED_MODEL, input=text[:8000])
+    resp = _client.embeddings.create(model=EMBED_MODEL, input=text[:8000])
     return resp.data[0].embedding
+
+
+def generate_image(*args, **kwargs) -> None:
+    """Image generation is currently disabled."""
+    return None

@@ -2,17 +2,17 @@
 Post-creator agent:
 1. Fetch all subtopics
 2. Pick subtopics with topic-diversity priority
-3. Fetch web context from Wikipedia (India-biased for relevant subtopics)
-4. Generate title + content using real research context
-5. Embed title+content → check Pinecone for duplicates
-6. Generate image
-7. Save post to MongoDB via post-service
+3. Decide post mode (trending 40% / basic 40% / fun 10% / question 10%)
+4. Fetch live news (Google News RSS) + Wikipedia background context
+5. Generate human-like post content for the chosen mode
+6. Embed title+content → check Pinecone for duplicates
+7. Save post to MongoDB via post-service (no image)
 8. Upsert embedding to Pinecone
 """
 import logging
 from topic_client import fetch_all_subtopics, pick_subtopics_with_priority
-from trending import fetch_web_context, fetch_wikipedia_trending, match_trending_to_subtopic
-from generator import generate_title_and_content, generate_image, embed_text
+from trending import fetch_trending_news, fetch_web_context, fetch_wikipedia_trending, match_trending_to_subtopic
+from generator import generate_post, pick_post_mode, embed_text
 from pinecone_client import post_exists, upsert_post
 from post_client import save_post
 from config import POSTS_PER_RUN
@@ -34,28 +34,44 @@ def run_agent() -> None:
         logger.warning("No active subtopics found. Skipping.")
         return
 
-    # 2. Pick with priority (diverse topics)
+    # 2. Pick with diversity
     selected = pick_subtopics_with_priority(subtopics, POSTS_PER_RUN)
     logger.info("Selected %d subtopics: %s", len(selected), [s["name"] for s in selected])
 
-    # 3. Fetch trending titles once
+    # 3. Fetch Wikipedia trending once (for trending_hint)
     trending_titles = fetch_wikipedia_trending(limit=100)
 
     for subtopic in selected:
         topic_name    = subtopic["topicName"]
         subtopic_name = subtopic["name"]
 
-        logger.info("Processing: %s > %s", topic_name, subtopic_name)
+        # 4. Pick post mode
+        mode = pick_post_mode()
+        logger.info("Processing: %s > %s  [mode=%s]", topic_name, subtopic_name, mode)
 
-        # 4. Fetch real web context from Wikipedia
-        web_context   = fetch_web_context(subtopic)
+        # 5a. Fetch live trending news (always — used by trending + question modes)
+        trending_news = fetch_trending_news(subtopic, limit=6)
+        if trending_news:
+            logger.info("  Trending news: %d headlines fetched", len(trending_news))
+        else:
+            logger.info("  No trending news found, will rely on Wikipedia context")
+
+        # 5b. Wikipedia trending hint
         trending_hint = match_trending_to_subtopic(subtopic, trending_titles)
         if trending_hint:
-            logger.info("Trending hint: %s", trending_hint)
+            logger.info("  Wikipedia trending hint: %s", trending_hint)
 
-        # 5. Generate title + content with research context
-        generated = generate_title_and_content(
-            topic_name, subtopic_name, trending_hint, web_context or None
+        # 5c. Wikipedia + RSS background context
+        web_context = fetch_web_context(subtopic)
+
+        # 6. Generate content
+        generated = generate_post(
+            topic_name=topic_name,
+            subtopic_name=subtopic_name,
+            mode=mode,
+            trending_news=trending_news if trending_news else None,
+            web_context=web_context or None,
+            trending_hint=trending_hint,
         )
         if not generated:
             logger.warning("Content generation failed for '%s'. Skipping.", subtopic_name)
@@ -65,7 +81,7 @@ def run_agent() -> None:
         content = generated["content"]
         seo     = generated.get("seo")
 
-        # 6. Embed and check for duplicate in Pinecone
+        # 7. Embed and check duplicate
         embedding_text = f"{title}\n{content}" if title else content
         try:
             embedding = embed_text(embedding_text)
@@ -78,14 +94,11 @@ def run_agent() -> None:
             logger.info("Duplicate detected (matched=%s) for '%s'. Skipping.", matched_id, subtopic_name)
             continue
 
-        # 7. Generate image
-        image_url = generate_image(title, subtopic_name, topic_name, content)
-
-        # 8. Save to MongoDB
+        # 8. Save to MongoDB (no image)
         post = save_post(
             title=title,
             content=content,
-            image_url=image_url,
+            image_url=None,
             topic_name=topic_name,
             subtopic_name=subtopic_name,
             seo=seo,
@@ -103,14 +116,17 @@ def run_agent() -> None:
                 "title":    title,
                 "topic":    topic_name,
                 "subtopic": subtopic_name,
+                "mode":     mode,
                 "trending": trending_hint or "",
             },
         )
 
         logger.info(
-            "✅ Post created: '%s' (%s > %s)%s",
-            (title or "(no title)")[:60], topic_name, subtopic_name,
-            f" [trending: {trending_hint[:40]}]" if trending_hint else "",
+            "✅ [%s] Post created: '%s' (%s > %s)",
+            mode.upper(),
+            (title or "(no title)")[:60],
+            topic_name,
+            subtopic_name,
         )
 
     logger.info("=== Post-creator agent finished ===")
