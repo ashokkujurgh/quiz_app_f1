@@ -22,7 +22,7 @@ const DRAWER_WIDTH = 260;
 interface SearchResult {
   quizzes: { _id: string; title: string; subTopic?: string }[];
   people:  { _id: string; username: string; name?: string; avatar?: string | null }[];
-  posts:   { _id: string; content: string; topic?: string }[];
+  posts:   { _id: string; slug?: string | null; content: string; topic?: string }[];
 }
 
 interface Props { onMenuToggle: () => void; }
@@ -192,7 +192,7 @@ export function Navbar({ onMenuToggle }: Props) {
                     <Chip icon={<Article sx={{ fontSize: 14 }} />} label="Posts" size="small" sx={{ fontWeight: 700, fontSize: 11 }} />
                   </Box>
                   {results.posts.map((p) => (
-                    <MenuItem key={p._id} onClick={() => goTo(`/posts/${p._id}`)} sx={{ py: 1, gap: 1.5 }}>
+                    <MenuItem key={p._id} onClick={() => goTo(`/posts/${p.slug ?? p._id}`)} sx={{ py: 1, gap: 1.5 }}>
                       <Article fontSize="small" sx={{ color: 'text.secondary' }} />
                       <Typography fontSize={13} noWrap sx={{ maxWidth: 300 }}>
                         {p.content?.slice(0, 80)}{(p.content?.length ?? 0) > 80 ? '…' : ''}

@@ -207,7 +207,7 @@ export function PostCard({ post }: Props) {
         </Stack>
 
         {/* Content — 3-line clamp, click to open detail */}
-        <Box onClick={() => navigate(`/posts/${post.id}`)} sx={{ cursor: 'pointer' }}>
+        <Box onClick={() => navigate(`/posts/${post.slug ?? post.id}`)} sx={{ cursor: 'pointer' }}>
           {post.title && (
             <Typography variant="subtitle2" fontWeight={700} mb={0.5}>
               {post.title}

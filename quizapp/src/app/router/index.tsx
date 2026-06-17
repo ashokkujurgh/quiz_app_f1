@@ -37,7 +37,7 @@ export const router = createBrowserRouter([
   { path: '/', element: <Navigate to="/home" replace /> },
   { path: '/login',        element: <RedirectIfAuth><LoginPage /></RedirectIfAuth> },
   { path: '/signup',       element: <RedirectIfAuth><SignupPage /></RedirectIfAuth> },
-  { path: '/posts/:id',    element: <PostDetailPage /> },
+  { path: '/posts/:slug',  element: <PostDetailPage /> },
   { path: '/quiz/play/:quizId', element: <RequireAuth><QuizPlayPage /></RequireAuth> },
   {
     path: '/',

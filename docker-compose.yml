@@ -124,18 +124,18 @@ services:
     restart: unless-stopped
 
   # ── Agentic question generator (cron every 10 min) ───────
-  # agentic:  # DISABLED — quiz generator agent turned off
-  #   build:
-  #     context: ./agentic
-  #     dockerfile: Dockerfile
-  #   container_name: quizhub-agentic
-  #   env_file:
-  #     - ./agentic/.env
-  #   depends_on:
-  #     - auth-service
-  #     - topic-service
-  #     - question-service
-  #   restart: unless-stopped
+  agentic:
+    build:
+      context: ./agentic
+      dockerfile: Dockerfile
+    container_name: quizhub-agentic
+    env_file:
+      - ./agentic/.env
+    depends_on:
+      - auth-service
+      - topic-service
+      - question-service
+    restart: unless-stopped
 
   player-agent:
     build:

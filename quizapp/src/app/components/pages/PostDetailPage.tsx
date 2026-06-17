@@ -54,6 +54,7 @@ function mapPost(p: Record<string, unknown>): PostWithSeo {
   const author = (p['author'] as Record<string, unknown>) ?? {};
   return {
     id: String(p['_id'] ?? p['id'] ?? ''),
+    slug: (p['slug'] as string | null) ?? null,
     title: (p['title'] as string | null) ?? null,
     author: {
       id: String(author['userId'] ?? author['_id'] ?? ''),
@@ -86,7 +87,7 @@ function RelatedPostCard({ post }: { post: Post }) {
   const navigate = useNavigate();
   return (
     <Card
-      onClick={() => navigate(`/posts/${post.id}`)}
+      onClick={() => navigate(`/posts/${post.slug ?? post.id}`)}
       sx={{
         mb: 1.5, cursor: 'pointer',
         '&:hover': { boxShadow: 4 },
@@ -111,7 +112,7 @@ function RelatedPostCard({ post }: { post: Post }) {
           {post.content}
         </Typography>
         <Stack direction="row" spacing={1} alignItems="center" mt={1}>
-          <TopicChip topic={post.topic} />
+          <TopicChip topic={(post.subTopic ?? post.topic) as QuizTopic} />
           <Typography variant="caption" color="text.secondary">
             {post.likes} likes
           </Typography>
@@ -130,7 +131,7 @@ function AdSlot({ width = '100%', height = 250, label = 'Advertisement' }: { wid
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 export function PostDetailPage() {
-  const { id } = useParams<{ id: string }>();
+  const { slug: id } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const theme = useTheme();
@@ -274,7 +275,7 @@ export function PostDetailPage() {
               <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap">
                 <Typography variant="subtitle2" fontWeight={700}>{post.author.name}</Typography>
                 <Typography variant="caption" color="text.secondary">@{post.author.username}</Typography>
-                <TopicChip topic={post.topic} />
+                <TopicChip topic={(post.subTopic ?? post.topic) as QuizTopic} />
               </Stack>
               <Typography variant="caption" color="text.secondary">
                 {formatDistanceToNow(new Date(post.timestamp), { addSuffix: true })}

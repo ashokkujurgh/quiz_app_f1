@@ -13,7 +13,7 @@ import threading
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from flask import Flask, jsonify
-from config import CRON_HOURS_UTC, CRON_MINUTE_UTC
+from config import CRON_SCHEDULE_UTC
 from agent import run_agent
 
 logging.basicConfig(
@@ -53,19 +53,20 @@ def trigger():
 def main() -> None:
     scheduler = BackgroundScheduler(timezone="UTC")
 
-    for hour in CRON_HOURS_UTC:
+    for hour, minute in CRON_SCHEDULE_UTC:
+        ist_h = (hour * 60 + minute + 330) // 60 % 24
+        ist_m = (minute + 30) % 60
         scheduler.add_job(
             run_agent,
-            trigger=CronTrigger(hour=hour, minute=CRON_MINUTE_UTC, timezone="UTC"),
-            id=f"post_creator_{hour:02d}{CRON_MINUTE_UTC:02d}",
-            name=f"Post creator @ {hour:02d}:{CRON_MINUTE_UTC:02d} UTC",
+            trigger=CronTrigger(hour=hour, minute=minute, timezone="UTC"),
+            id=f"post_creator_{hour:02d}{minute:02d}",
+            name=f"Post creator @ {hour:02d}:{minute:02d} UTC ({ist_h:02d}:{ist_m:02d} IST)",
             replace_existing=True,
             max_instances=1,
         )
         logger.info(
-            "Scheduled post-creator @ %02d:%02d UTC  (IST %02d:%02d)",
-            hour, CRON_MINUTE_UTC,
-            (hour + 5) % 24, (CRON_MINUTE_UTC + 30) % 60,
+            "Scheduled post-creator @ %02d:%02d UTC  (%02d:%02d IST)",
+            hour, minute, ist_h, ist_m,
         )
 
     def _shutdown(signum, frame):

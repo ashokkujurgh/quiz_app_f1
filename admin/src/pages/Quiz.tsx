@@ -121,10 +121,13 @@ function QuizModal({
       try {
         const fd = new FormData();
         fd.append('image', imageFile);
-        const { data } = await api.post('/api/auth/upload/image', fd, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-        });
+        // Do NOT set Content-Type manually — axios sets it with the correct boundary
+        const { data } = await api.post('/api/auth/upload/image', fd);
         imageUrl = data.url ?? imageUrl;
+      } catch (err) {
+        console.error('[QuizForm] image upload failed:', err);
+        // Continue without image rather than blocking quiz creation
+        imageUrl = '';
       } finally {
         setUploading(false);
       }

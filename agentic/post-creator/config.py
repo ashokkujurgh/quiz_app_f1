@@ -28,9 +28,17 @@ EMBED_DIM           = 1536
 # Duplicate threshold — cosine similarity above this = already exists
 SIMILARITY_THRESHOLD = 0.90
 
-# How many posts to generate per run
+# 1 post per run — schedule controls the total
 POSTS_PER_RUN       = 1
 
-# Cron: 7 AM and 7 PM IST (UTC+5:30 = 01:30 and 13:30 UTC)
-CRON_HOURS_UTC      = [1, 13]   # 07:00 and 19:00 IST
-CRON_MINUTE_UTC     = 30
+# Schedule (IST → UTC, IST = UTC+5:30):
+#   07:00 IST = 01:30 UTC  (morning)
+#   13:00 IST = 07:30 UTC  (afternoon)
+#   17:00 IST = 11:30 UTC  (evening first)
+#   20:00 IST = 14:30 UTC  (evening second)
+CRON_SCHEDULE_UTC = [
+    (1,  30),   # 07:00 IST — morning
+    (7,  30),   # 13:00 IST — afternoon
+    (11, 30),   # 17:00 IST — 5 PM evening
+    (14, 30),   # 20:00 IST — 8 PM evening
+]

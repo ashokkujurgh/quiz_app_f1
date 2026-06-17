@@ -15,6 +15,26 @@ const isValidId = (id: string) => mongoose.Types.ObjectId.isValid(id);
 
 const toObjId = (id: string) => new mongoose.Types.ObjectId(id);
 
+function generateSlug(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .slice(0, 80);
+}
+
+async function uniqueSlug(base: string): Promise<string> {
+  let slug = base;
+  let n = 0;
+  while (await Post.exists({ slug })) {
+    n++;
+    slug = `${base}-${n}`;
+  }
+  return slug;
+}
+
 // Build a lean post with per-user flags (liked / saved)
 function withUserFlags(post: Record<string, unknown>, userId?: string) {
   const likedBy  = (post['likedBy']  as string[]) ?? [];
@@ -71,12 +91,16 @@ export const getPosts: RequestHandler = async (req: AuthRequest, res: Response) 
   }
 };
 
-// ── GET /api/posts/:id ────────────────────────────────────────────────────────
+// ── GET /api/posts/:slug ──────────────────────────────────────────────────────
+// Accepts a slug (e.g. "why-black-holes-matter") OR a MongoDB ObjectId as fallback
 export const getPost: RequestHandler = async (req: AuthRequest, res: Response) => {
   try {
-    if (!isValidId(req.params.id)) { res.status(400).json({ success: false, message: 'Invalid post id.' }); return; }
-
-    const post = await Post.findById(req.params.id).lean();
+    const param = req.params.id; // kept as :id in the route for backwards compat
+    const post = await (
+      isValidId(param)
+        ? Post.findById(param).lean()
+        : Post.findOne({ slug: param }).lean()
+    );
     if (!post || !post.isActive) { res.status(404).json({ success: false, message: 'Post not found.' }); return; }
 
     res.json({ success: true, post: withUserFlags(post as Record<string, unknown>, req.user?.id) });
@@ -245,6 +269,9 @@ export const createPost: RequestHandler = async (req: AuthRequest, res: Response
       return;
     }
 
+    const titleText = title?.trim() ?? content.trim().split(' ').slice(0, 10).join(' ');
+    const slug = await uniqueSlug(generateSlug(titleText));
+
     const post = await Post.create({
       author: {
         userId:   toObjId(req.user!.id),
@@ -254,6 +281,7 @@ export const createPost: RequestHandler = async (req: AuthRequest, res: Response
       },
       userType,
       title:      title?.trim() ?? null,
+      slug,
       content:    content.trim(),
       image:      imageList[0] ?? null,
       images:     imageList,
