@@ -49,6 +49,7 @@ export interface IPost extends Document {
   author: IAuthorSnapshot;
   userType: 'user' | 'admin';
   title: string | null;
+  slug: string | null;
   content: string;
   seo: ISeoMeta | null;
   image: string | null;   // legacy single image (kept for backwards compat)
@@ -123,6 +124,7 @@ const postSchema = new Schema<IPost>(
     author:     { type: authorSchema, required: true },
     userType:   { type: String, enum: ['user', 'admin'], default: 'user' },
     title:      { type: String, default: null, trim: true, maxlength: 300 },
+    slug:       { type: String, default: null, trim: true },
     content:    { type: String, required: true, trim: true, maxlength: 2000 },
     seo:        { type: seoSchema, default: null },
     image:      { type: String, default: null },

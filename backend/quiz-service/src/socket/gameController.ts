@@ -273,7 +273,7 @@ async function buildLeaderboard(
   }
   // Tally scores from merged answer map
   for (const [uid, qMap] of userAnswerMap) {
-    const entry = byUser.get(uid) ?? { score: 0, name: uid, lastAnsweredAt: new Date(0) };
+    const entry = byUser.get(uid) ?? { score: 0, name: playersMap.get(uid)?.userName ?? uid, avatar: playersMap.get(uid)?.userAvatar, lastAnsweredAt: new Date(0) };
     for (const a of qMap.values()) {
       if (a.isCorrect) entry.score += 1;
       if (a.answeredAt > entry.lastAnsweredAt) entry.lastAnsweredAt = a.answeredAt;

@@ -120,7 +120,32 @@ Quality rules:
         return None
 
 
-def generate_image(title: str | None, subtopic_name: str, topic_name: str) -> str | None:
+def _extract_visual_scene(title: str, content: str, subtopic_name: str, topic_name: str) -> str:
+    """Use GPT to extract a country-specific, unique visual scene from the post content."""
+    try:
+        resp = _gpt_client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": (
+                f"You are a photo director. Given this article title and content:\n\n"
+                f"Title: {title}\nContent (first 500 chars): {content[:500]}\n\n"
+                f"Step 1: Identify the PRIMARY country or region this article is about "
+                f"(e.g. India, USA, Japan, Germany, Brazil). If no specific country, use the most relevant region.\n"
+                f"Step 2: Describe ONE specific, vivid, photorealistic scene that best represents this article visually. "
+                f"The scene MUST be clearly set in that country — use its recognisable landmarks, architecture, "
+                f"landscapes, people's appearance, traditional or local clothing, and cultural context so the location "
+                f"is immediately obvious from the photo. Be very specific: name real settings, real objects, real actions. "
+                f"No generic stock-photo descriptions. Make it unique to THIS article.\n\n"
+                f"Return ONLY a 2-3 sentence scene description that naturally includes the country/location. No extra text."
+            )}],
+            temperature=0.9,
+            max_tokens=150,
+        )
+        return resp.choices[0].message.content.strip()
+    except Exception:
+        return f"{subtopic_name} in the context of {topic_name}"
+
+
+def generate_image(title: str | None, subtopic_name: str, topic_name: str, content: str = "") -> str | None:
     """
     Generate 1 image via gpt-image-1, upload to CDN, return URL.
     """
@@ -133,9 +158,10 @@ def generate_image(title: str | None, subtopic_name: str, topic_name: str) -> st
     else:
         india_style = ""
 
+    scene = _extract_visual_scene(title or subtopic_name, content, subtopic_name, topic_name) if content else f"{subtopic_name} in the context of {topic_name}"
+
     image_prompt = (
-        f"A high-quality, photorealistic editorial photograph for an educational article titled '{title or subtopic_name}'. "
-        f"Subject: {subtopic_name} in the context of {topic_name}. {india_style} "
+        f"A high-quality, photorealistic editorial photograph. {scene} {india_style} "
         f"Style: professional DSLR photography, natural lighting, sharp focus, realistic textures, "
         f"cinematic composition, documentary feel. Real people, real environments, real objects — "
         f"no illustrations, no cartoons, no flat design, no CGI, no text overlays. "

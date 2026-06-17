@@ -79,7 +79,7 @@ def run_agent() -> None:
             continue
 
         # 7. Generate image
-        image_url = generate_image(title, subtopic_name, topic_name)
+        image_url = generate_image(title, subtopic_name, topic_name, content)
 
         # 8. Save to MongoDB
         post = save_post(
