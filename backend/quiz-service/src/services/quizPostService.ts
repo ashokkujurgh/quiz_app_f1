@@ -11,10 +11,8 @@ import axios from 'axios';
 import Quiz from '../models/Quiz';
 import GameHistory from '../models/GameHistory';
 
-const POST_SERVICE_URL = process.env.POST_SERVICE_URL ?? 'http://post-service:4004';
-const AUTH_SERVICE_URL = process.env.AUTH_SERVICE_URL ?? 'http://auth-service:4001';
-const ADMIN_EMAIL      = process.env.ADMIN_EMAIL      ?? 'admin@quizhub.com';
-const ADMIN_PASSWORD   = process.env.ADMIN_PASSWORD   ?? 'Admin@123';
+const POST_SERVICE_URL = process.env.POST_SERVICE_URL        ?? 'http://post-service:4004';
+const INTERNAL_SECRET  = process.env.INTERNAL_SERVICE_SECRET ?? 'internal-quiz-secret';
 
 // ── Leaderboard entry shape (matches gameController) ─────────────────────────
 interface LeaderboardRow {
@@ -28,23 +26,6 @@ interface LeaderboardRow {
   timeTaken:   number;
 }
 
-// ── Cache admin token so we don't re-login on every quiz end ─────────────────
-let _adminToken: string | null = null;
-
-async function getAdminToken(): Promise<string | null> {
-  if (_adminToken) return _adminToken;
-  try {
-    const res = await axios.post(`${AUTH_SERVICE_URL}/api/admin/login`, {
-      email:    ADMIN_EMAIL,
-      password: ADMIN_PASSWORD,
-    }, { timeout: 8000 });
-    _adminToken = res.data?.accessToken ?? null;
-    return _adminToken;
-  } catch (err) {
-    console.error('[quizPostService] admin login failed:', (err as Error).message);
-    return null;
-  }
-}
 
 // ── Build human-readable post content ────────────────────────────────────────
 function buildPostContent(
@@ -100,14 +81,7 @@ interface QuizEndedPayload {
  * Silently swallows errors so it never blocks the game flow.
  */
 export async function createQuizEndedPost(payload: QuizEndedPayload): Promise<void> {
-  // Only create posts for public quizzes
   if (payload.participation !== 'public') return;
-
-  const token = await getAdminToken();
-  if (!token) {
-    console.warn('[quizPostService] No admin token — skipping post creation.');
-    return;
-  }
 
   const content = buildPostContent(
     payload.quizTitle,
@@ -133,7 +107,7 @@ export async function createQuizEndedPost(payload: QuizEndedPayload): Promise<vo
 
   try {
     await axios.post(
-      `${POST_SERVICE_URL}/api/posts`,
+      `${POST_SERVICE_URL}/api/posts/internal`,
       {
         content,
         topic:          payload.topic || 'General',
@@ -141,25 +115,20 @@ export async function createQuizEndedPost(payload: QuizEndedPayload): Promise<vo
         authorName:     payload.adminName,
         authorUsername: payload.adminUsername,
         authorAvatar:   payload.adminAvatar,
+        authorUserId:   payload.adminUserId,
         quizResult,
-        timezone:       'Asia/Kolkata',
       },
       {
         headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
+          'x-internal-secret': INTERNAL_SECRET,
+          'Content-Type':      'application/json',
         },
         timeout: 10000,
       },
     );
     console.log(`[quizPostService] Post created for quiz "${payload.quizTitle}"`);
-    // Mark so the recovery cron skips this quiz
     await Quiz.findByIdAndUpdate(payload.quizId, { postCreated: true });
   } catch (err) {
-    // Reset cached token on 401 so it refreshes next time
-    if (axios.isAxiosError(err) && err.response?.status === 401) {
-      _adminToken = null;
-    }
     console.error('[quizPostService] Failed to create post:', (err as Error).message);
   }
 }

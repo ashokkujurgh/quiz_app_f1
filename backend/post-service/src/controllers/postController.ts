@@ -299,6 +299,48 @@ export const createPost: RequestHandler = async (req: AuthRequest, res: Response
   }
 };
 
+// ── POST /api/posts/internal (service-to-service, no user JWT required) ──────
+export const createInternalPost: RequestHandler = async (req: AuthRequest, res: Response) => {
+  try {
+    const { title, content, image, topic, subTopic, quizResult, authorName, authorUsername, authorAvatar, authorUserId, seo } = req.body as {
+      title?: string; content?: string; image?: string; topic?: string; subTopic?: string;
+      quizResult?: IQuizResult; authorName?: string; authorUsername?: string;
+      authorAvatar?: string; authorUserId?: string;
+      seo?: { metaTitle?: string; metaDescription?: string; keywords?: string[]; ogTitle?: string; ogDescription?: string; ogImage?: string | null; canonical?: string | null };
+    };
+
+    if (!content?.trim()) { res.status(400).json({ success: false, message: 'Content required.' }); return; }
+    if (!topic?.trim())   { res.status(400).json({ success: false, message: 'Topic required.' }); return; }
+
+    const titleText = title?.trim() ?? content.trim().split(' ').slice(0, 10).join(' ');
+    const slug = await uniqueSlug(generateSlug(titleText));
+
+    const post = await Post.create({
+      author: {
+        userId:   authorUserId ? toObjId(authorUserId) : new mongoose.Types.ObjectId(),
+        name:     authorName     ?? 'Meenzo',
+        username: authorUsername ?? 'meenzo',
+        avatar:   authorAvatar   ?? null,
+      },
+      userType:   'admin',
+      title:      title?.trim() ?? null,
+      slug,
+      content:    content.trim(),
+      image:      image ?? null,
+      images:     image ? [image] : [],
+      topic,
+      subTopic:   subTopic ?? null,
+      quizResult: quizResult ?? null,
+      seo:        (seo as ISeoMeta | null | undefined) ?? null,
+    });
+
+    res.status(201).json({ success: true, post });
+  } catch (err) {
+    console.error('[createInternalPost]', err);
+    res.status(500).json({ success: false, message: 'Failed to create post.' });
+  }
+};
+
 // ── PATCH /api/posts/:id ─────────────────────────────────────────────────────
 export const updatePost: RequestHandler = async (req: AuthRequest, res: Response) => {
   try {

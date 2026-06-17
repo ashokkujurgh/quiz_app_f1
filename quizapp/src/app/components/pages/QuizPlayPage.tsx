@@ -362,10 +362,11 @@ export function QuizPlayPage() {
     setGameOver(true);
     setPlayers(e.leaderboard.map((r: LeaderboardRow) => ({ userId: r.userId, userName: r.userName, userAvatar: r.userAvatar, score: r.score, answered: r.total })));
     const myEntry = e.leaderboard.find((r) => r.userId === user?.id);
+    const quizSnapshot = activeQuiz;
     if (activeQuiz) dispatch(completeQuiz());
     const answerSnapshot = { ...perQAnswers.current, ...ttAnswersRef.current };
     setTimeout(() => {
-      navigate('/quiz/result', { state: { leaderboard: e.leaderboard, myEntry, quizId: activeQuiz?.id, quizTitle: activeQuiz?.title, userAnswers: answerSnapshot } });
+      navigate('/quiz/result', { state: { leaderboard: e.leaderboard, myEntry, quizId: quizSnapshot?.id, quizTitle: quizSnapshot?.title, userAnswers: answerSnapshot } });
     }, 2500);
   }, [user?.id, activeQuiz, dispatch, navigate]);
 
@@ -410,7 +411,7 @@ export function QuizPlayPage() {
     });
   }, [ttSubmitted, gameMode]);
 
-  useEffect(() => { if (!restoring && !activeQuiz) navigate('/quizzes'); }, [restoring, activeQuiz]);
+  useEffect(() => { if (!restoring && !activeQuiz && !gameOver) navigate('/quizzes'); }, [restoring, activeQuiz, gameOver]);
 
   if (restoring) {
     return (

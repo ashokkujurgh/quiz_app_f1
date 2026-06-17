@@ -283,6 +283,12 @@ export function PostDetailPage() {
             </Box>
           </Stack>
 
+          {post.title && (
+            <Typography variant="h6" fontWeight={700} mb={1.5} sx={{ lineHeight: 1.4 }}>
+              {post.title}
+            </Typography>
+          )}
+
           <Typography variant="body1" sx={{ lineHeight: 1.9, whiteSpace: 'pre-wrap', mb: post.image ? 2 : 0 }}>
             {post.content}
           </Typography>
