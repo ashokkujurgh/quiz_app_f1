@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import {
   Box, Card, CardContent, Typography, Stack, Button,
-  Divider, Avatar, Chip,
+  Divider, Avatar, Chip, Alert, CircularProgress,
 } from '@mui/material';
 import {
   EmojiEvents, Replay, Home, CheckCircle, Cancel, RemoveCircle,
+  Share, CheckCircleOutline,
 } from '@mui/icons-material';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import { resetQuiz } from '../../store/slices/quizSlice';
@@ -38,7 +39,7 @@ export function QuizResultPage() {
   const dispatch  = useAppDispatch();
   const location  = useLocation();
   const { result, activeQuiz } = useAppSelector((s) => s.quiz);
-  const { accessToken } = useAppSelector((s) => s.auth);
+  const { accessToken, user }  = useAppSelector((s) => s.auth);
 
   const state = (location.state ?? {}) as ResultState;
   const leaderboard = state.leaderboard ?? [];
@@ -49,6 +50,54 @@ export function QuizResultPage() {
   const pct    = myEntry?.percentage ?? result?.percentage ?? 0;
   const rank   = myEntry?.rank       ?? result?.rank       ?? null;
   const title  = state.quizTitle     ?? result?.quizTitle  ?? 'Quiz';
+
+  // Share-to-feed state
+  const [sharing, setSharing]     = useState(false);
+  const [shared, setShared]       = useState(false);
+  const [shareError, setShareError] = useState<string | null>(null);
+
+  const handleShareToFeed = async () => {
+    if (!user || sharing || shared) return;
+    setSharing(true);
+    setShareError(null);
+    try {
+      const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `#${rank}`;
+      const content = rank
+        ? `Just finished "${title}" and ranked ${medal} with ${score}/${total} (${pct}%)! 🎯 Think you can beat me? Join the next quiz! 🚀`
+        : `Just completed "${title}" — scored ${score}/${total} (${pct}%)! 🎯 Join the next quiz! 🚀`;
+
+      const body = {
+        content,
+        topic:          'General',
+        authorName:     user.name,
+        authorUsername: user.username,
+        authorAvatar:   user.avatar ?? null,
+        quizResult: {
+          quizId:     state.quizId ?? '',
+          quizTitle:  title,
+          category:   'General',
+          score,
+          total,
+          percentage: pct,
+          rank:       rank ?? undefined,
+          duration:   0,
+        },
+      };
+
+      const res = await apiFetch(`${API}/api/posts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message ?? 'Failed to share');
+      setShared(true);
+    } catch (err) {
+      setShareError((err as Error).message ?? 'Failed to share post');
+    } finally {
+      setSharing(false);
+    }
+  };
 
   // Fetch per-user answer history from backend for the answer review
   const [historyAnswers, setHistoryAnswers] = useState<HistoryAnswer[] | null>(null);
@@ -184,6 +233,18 @@ export function QuizResultPage() {
         </Card>
       )}
 
+      {/* Share feedback */}
+      {shared && (
+        <Alert severity="success" icon={<CheckCircleOutline />} sx={{ mb: 2, borderRadius: 2 }}>
+          Your result has been shared to the feed!
+        </Alert>
+      )}
+      {shareError && (
+        <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }} onClose={() => setShareError(null)}>
+          {shareError}
+        </Alert>
+      )}
+
       {/* Actions */}
       <Stack direction="row" spacing={1.5} flexWrap="wrap">
         <Button variant="outlined" startIcon={<Home />}
@@ -194,6 +255,24 @@ export function QuizResultPage() {
           onClick={() => { dispatch(resetQuiz()); navigate('/quizzes'); }} sx={{ flex: 1 }}>
           Play Again
         </Button>
+        {user && !shared && (
+          <Button
+            variant="contained"
+            color="primary"
+            startIcon={sharing ? <CircularProgress size={16} color="inherit" /> : <Share />}
+            onClick={handleShareToFeed}
+            disabled={sharing}
+            sx={{ flex: 1 }}
+          >
+            {sharing ? 'Sharing…' : 'Share to Feed'}
+          </Button>
+        )}
+        {shared && (
+          <Button variant="contained" color="success" startIcon={<CheckCircleOutline />}
+            disabled sx={{ flex: 1 }}>
+            Shared!
+          </Button>
+        )}
       </Stack>
     </Box>
   );

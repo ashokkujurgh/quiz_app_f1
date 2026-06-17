@@ -271,37 +271,52 @@ export function PostCard({ post }: Props) {
         )}
 
         {/* Quiz Result Card */}
-        {post.quizResult && (
-          <Box
-            sx={{
-              mt: 1.5, p: 2, borderRadius: 2,
-              background: 'linear-gradient(135deg, #5563DE18 0%, #E91E8C12 100%)',
-              border: '1px solid', borderColor: 'divider',
-            }}
-          >
-            <Stack direction="row" alignItems="center" spacing={1} mb={0.5}>
-              <EmojiEvents sx={{ color: 'warning.main', fontSize: 20 }} />
-              <Typography variant="caption" fontWeight={700} color="primary.main">Quiz Result</Typography>
-            </Stack>
-            <Typography variant="subtitle2" fontWeight={700}>{post.quizResult.quizTitle}</Typography>
-            <Stack direction="row" spacing={3} mt={0.5}>
-              <Box>
-                <Typography variant="h5" fontWeight={800} color="primary.main">{post.quizResult.percentage}%</Typography>
-                <Typography variant="caption" color="text.secondary">Score</Typography>
-              </Box>
-              <Box>
-                <Typography variant="h5" fontWeight={800}>{post.quizResult.score}/{post.quizResult.total}</Typography>
-                <Typography variant="caption" color="text.secondary">Correct</Typography>
-              </Box>
-              {post.quizResult.rank && (
+        {post.quizResult && (() => {
+          const isAdminSummary = post.userType === 'admin';
+          return (
+            <Box
+              sx={{
+                mt: 1.5, p: 2, borderRadius: 2,
+                background: isAdminSummary
+                  ? 'linear-gradient(135deg, #FF6B0018 0%, #FFD70022 100%)'
+                  : 'linear-gradient(135deg, #5563DE18 0%, #E91E8C12 100%)',
+                border: '1px solid', borderColor: isAdminSummary ? 'warning.light' : 'divider',
+              }}
+            >
+              <Stack direction="row" alignItems="center" spacing={1} mb={0.5}>
+                <EmojiEvents sx={{ color: 'warning.main', fontSize: 20 }} />
+                <Typography variant="caption" fontWeight={700} color={isAdminSummary ? 'warning.dark' : 'primary.main'}>
+                  {isAdminSummary ? '🏆 Quiz Summary' : 'Quiz Result'}
+                </Typography>
+              </Stack>
+              <Typography variant="subtitle2" fontWeight={700}>{post.quizResult.quizTitle}</Typography>
+              <Stack direction="row" spacing={3} mt={0.5}>
                 <Box>
-                  <Typography variant="h5" fontWeight={800} color="warning.main">#{post.quizResult.rank}</Typography>
-                  <Typography variant="caption" color="text.secondary">Rank</Typography>
+                  <Typography variant="h5" fontWeight={800} color="primary.main">{post.quizResult.percentage}%</Typography>
+                  <Typography variant="caption" color="text.secondary">{isAdminSummary ? 'Top Score' : 'Score'}</Typography>
                 </Box>
-              )}
-            </Stack>
-          </Box>
-        )}
+                <Box>
+                  <Typography variant="h5" fontWeight={800}>{post.quizResult.score}/{post.quizResult.total}</Typography>
+                  <Typography variant="caption" color="text.secondary">Correct</Typography>
+                </Box>
+                {post.quizResult.rank && !isAdminSummary && (
+                  <Box>
+                    <Typography variant="h5" fontWeight={800} color="warning.main">#{post.quizResult.rank}</Typography>
+                    <Typography variant="caption" color="text.secondary">Rank</Typography>
+                  </Box>
+                )}
+                {isAdminSummary && (
+                  <Box>
+                    <Typography variant="h5" fontWeight={800} color="success.main">
+                      #{post.quizResult.rank ?? 1}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">Winner Rank</Typography>
+                  </Box>
+                )}
+              </Stack>
+            </Box>
+          );
+        })()}
       </CardContent>
 
       {/* Stats row */}

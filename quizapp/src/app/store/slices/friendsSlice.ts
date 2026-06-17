@@ -3,6 +3,7 @@ import { apiFetch } from '../../utils/apiFetch';
 
 export interface FriendUser {
   _id: string;
+  name: string;
   username: string;
   avatar: string | null;
   email: string;

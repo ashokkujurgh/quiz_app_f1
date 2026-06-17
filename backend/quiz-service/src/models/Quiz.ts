@@ -39,6 +39,7 @@ export interface IQuiz extends Document {
   status: QuizStatus;
   startedAt: Date | null;
   endedAt: Date | null;
+  postCreated: boolean;
 
   createdBy: Types.ObjectId;
   createdAt: Date;
@@ -69,9 +70,10 @@ const quizSchema = new Schema<IQuiz>(
     participation: { type: String, enum: ['public', 'private', 'invite_only'], default: 'public' },
     allowedUsers:  [{ type: Schema.Types.ObjectId, ref: 'User' }],
 
-    status:    { type: String, enum: ['draft', 'scheduled', 'active', 'completed', 'cancelled'], default: 'draft' },
-    startedAt: { type: Date, default: null },
-    endedAt:   { type: Date, default: null },
+    status:      { type: String, enum: ['draft', 'scheduled', 'active', 'completed', 'cancelled'], default: 'draft' },
+    startedAt:   { type: Date, default: null },
+    endedAt:     { type: Date, default: null },
+    postCreated: { type: Boolean, default: false },
 
     createdBy: { type: Schema.Types.ObjectId, required: true },
   },

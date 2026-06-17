@@ -8,7 +8,7 @@ import rateLimit from 'express-rate-limit';
 
 import connectDB from './config/db';
 import quizRoutes from './routes/quiz';
-import { rehydrateSchedules, startCleanupJob } from './jobs/scheduler';
+import { rehydrateSchedules, startCleanupJob, startPostRecoveryJob } from './jobs/scheduler';
 import { initGameSocket } from './socket/gameController';
 
 const app    = express();
@@ -19,6 +19,7 @@ const PORT   = parseInt(process.env.PORT ?? '4005', 10);
 connectDB()
   .then(() => rehydrateSchedules())
   .then(() => startCleanupJob())
+  .then(() => startPostRecoveryJob())
   .catch(console.error);
 
 app.use(helmet());

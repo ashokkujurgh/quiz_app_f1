@@ -7,6 +7,7 @@ import GameAnswer from '../models/GameAnswer';
 import LeaderboardEntry from '../models/LeaderboardEntry';
 import GameHistory from '../models/GameHistory';
 import { Types } from 'mongoose';
+import { createQuizEndedPost } from '../services/quizPostService';
 
 const QUESTION_URL = process.env.QUESTION_SERVICE_URL ?? 'http://localhost:4003';
 const JWT_SECRET   = process.env.JWT_SECRET!;
@@ -47,6 +48,8 @@ const gameStateMap = new Map<string, GameState>();
 const socketMeta   = new Map<string, { userId: string; quizId: string }>();
 // quizId → players waiting/playing (exists even before game starts)
 const quizPlayers  = new Map<string, Map<string, PlayerInfo>>();
+// quizId → set of userIds who joined and then disconnected mid-game (not allowed back in)
+const exitedPlayers = new Map<string, Set<string>>();
 
 export function initGameSocket(httpServer: HttpServer): IOServer {
   io = new IOServer(httpServer, {
@@ -78,6 +81,16 @@ export function initGameSocket(httpServer: HttpServer): IOServer {
       quizId, userName, userAvatar,
     }: { quizId: string; userName: string; userAvatar?: string }) => {
       if (!quizId) return;
+
+      // Block re-entry: if user exited an active game, they cannot rejoin
+      if (exitedPlayers.get(quizId)?.has(user.id)) {
+        socket.emit('already_attempted', {
+          quizId,
+          message: 'You have already attempted this quiz. You cannot re-enter once you have left.',
+        });
+        console.log(`[GameSocket] ${user.id} blocked re-entry into quiz:${quizId}`);
+        return;
+      }
 
       await socket.join(`quiz:${quizId}`);
       socketMeta.set(socket.id, { userId: user.id, quizId });
@@ -201,6 +214,13 @@ export function initGameSocket(httpServer: HttpServer): IOServer {
         gameStateMap.get(quizId)?.players.delete(userId);
         io.to(`quiz:${quizId}`).emit('player_left', { userId });
         socketMeta.delete(socket.id);
+
+        // If the game is still active, mark this user as exited so they can't rejoin
+        if (activeGames.has(quizId)) {
+          if (!exitedPlayers.has(quizId)) exitedPlayers.set(quizId, new Set());
+          exitedPlayers.get(quizId)!.add(userId);
+          console.log(`[GameSocket] ${userId} exited active quiz:${quizId} — re-entry blocked`);
+        }
       }
       console.log(`[GameSocket] disconnected: ${user.id}`);
     });
@@ -411,6 +431,21 @@ export async function startGameSession(quizId: string): Promise<void> {
 
       io.to(room).emit('game_over', { quizId, leaderboard });
 
+      // Auto-create a feed post for public quizzes
+      createQuizEndedPost({
+        quizId,
+        quizTitle:       quiz.title,
+        topic:           quiz.topic?.toString() ?? 'General',
+        participation:   quiz.participation,
+        leaderboard,
+        totalQuestions:  questions.length,
+        durationMinutes: Math.round(durationSeconds / 60),
+        adminUserId:     quiz.createdBy.toString(),
+        adminName:       'QuizHub Admin',
+        adminUsername:   'quizhub_admin',
+        adminAvatar:     null,
+      }).catch(console.error);
+
     } else {
       // ── Per-question timer mode ───────────────────────────────────────────
       const timePerQ      = quiz.timeLimitPerQuestion!;
@@ -477,6 +512,20 @@ export async function startGameSession(quizId: string): Promise<void> {
           correctOption: q.options[q.correctOption]?.text ?? '',
         });
 
+        // Emit live scores so all clients update the players panel immediately
+        const liveState = gameStateMap.get(quizId);
+        if (liveState) {
+          const liveScores = [...liveState.players.values()].map((p) => {
+            const cache = liveState.answerCache.get(p.userId) ?? new Map();
+            let score = 0;
+            cache.forEach(({ questionId: _, answer }, qIdx) => {
+              if (qIdx <= i && answer === questions[qIdx]?.correctOption) score++;
+            });
+            return { userId: p.userId, userName: p.userName, userAvatar: p.userAvatar, score, answered: cache.size };
+          }).sort((a, b) => b.score - a.score);
+          io.to(room).emit('leaderboard_update', { quizId, scores: liveScores });
+        }
+
         if (i < questions.length - 1) await sleep(3000);
       }
 
@@ -491,6 +540,21 @@ export async function startGameSession(quizId: string): Promise<void> {
       await Quiz.findByIdAndUpdate(quizId, { status: 'completed', endedAt: new Date() });
 
       io.to(room).emit('game_over', { quizId, leaderboard });
+
+      // Auto-create a feed post for public quizzes
+      createQuizEndedPost({
+        quizId,
+        quizTitle:       quiz.title,
+        topic:           quiz.topic?.toString() ?? 'General',
+        participation:   quiz.participation,
+        leaderboard,
+        totalQuestions:  questions.length,
+        durationMinutes: quiz.durationMinutes,
+        adminUserId:     quiz.createdBy.toString(),
+        adminName:       'QuizHub Admin',
+        adminUsername:   'quizhub_admin',
+        adminAvatar:     null,
+      }).catch(console.error);
     }
 
   } catch (err) {
@@ -500,5 +564,6 @@ export async function startGameSession(quizId: string): Promise<void> {
     activeGames.delete(quizId);
     gameStateMap.delete(quizId);
     quizPlayers.delete(quizId);
+    exitedPlayers.delete(quizId); // quiz over — reset for next run
   }
 }

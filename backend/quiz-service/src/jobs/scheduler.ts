@@ -1,6 +1,7 @@
 import cron from 'node-cron';
 import Quiz, { IQuiz } from '../models/Quiz';
 import { startGameSession } from '../socket/gameController';
+import { recoverMissingPosts } from '../services/quizPostService';
 
 // quizId → cron task handle
 const _tasks = new Map<string, cron.ScheduledTask>();
@@ -136,4 +137,15 @@ export function startCleanupJob(): void {
     cleanupStaleGames().catch((err) => console.error('[CleanupJob] error:', err));
   }, { timezone: 'UTC' });
   console.log('🕐 Stale-game cleanup job scheduled (every 10 min).');
+}
+
+// ── Post-recovery job — runs every 5 minutes ──────────────────────────────────
+export function startPostRecoveryJob(): void {
+  // Run once immediately on boot to catch any missed posts from last restart
+  recoverMissingPosts().catch((err) => console.error('[PostRecoveryJob] boot run error:', err));
+
+  cron.schedule('*/5 * * * *', () => {
+    recoverMissingPosts().catch((err) => console.error('[PostRecoveryJob] error:', err));
+  }, { timezone: 'UTC' });
+  console.log('📝 Post-recovery job scheduled (every 5 min).');
 }

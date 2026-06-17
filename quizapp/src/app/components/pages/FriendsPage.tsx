@@ -26,11 +26,11 @@ function UserRow({
       sx={{ borderBottom: '1px solid', borderColor: 'divider' }}>
       <Stack direction="row" spacing={1.5} alignItems="center">
         <Avatar src={user.avatar ?? undefined} sx={{ width: 44, height: 44 }}>
-          {user.username[0].toUpperCase()}
+          {(user.name || user.username)[0].toUpperCase()}
         </Avatar>
         <Box>
-          <Typography fontWeight={600} fontSize={14}>{user.username}</Typography>
-          <Typography variant="caption" color="text.secondary">{user.email}</Typography>
+          <Typography fontWeight={600} fontSize={14}>{user.name || user.username}</Typography>
+          <Typography variant="caption" color="text.secondary">@{user.username}</Typography>
         </Box>
       </Stack>
       <Stack direction="row" spacing={1}>{actions}</Stack>

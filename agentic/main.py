@@ -1,8 +1,11 @@
 """
 Entry point — schedules the agent job every 20 minutes via APScheduler.
 Run: python main.py
+
+Set AGENT_ENABLED=false to disable without removing the service.
 """
 import logging
+import os
 import signal
 import sys
 from apscheduler.schedulers.blocking import BlockingScheduler
@@ -18,8 +21,15 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# ── DISABLED ──────────────────────────────────────────────────────────────────
+AGENT_ENABLED = os.getenv("AGENT_ENABLED", "false").lower() == "true"
+
 
 def main() -> None:
+    if not AGENT_ENABLED:
+        logger.info("Quiz generator agent is DISABLED (AGENT_ENABLED=false). Exiting.")
+        return
+
     scheduler = BlockingScheduler(timezone="UTC")
     scheduler.add_job(
         run_agent,

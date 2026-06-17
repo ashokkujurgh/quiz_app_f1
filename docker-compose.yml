@@ -109,6 +109,8 @@ services:
       ALLOWED_ORIGINS: http://localhost:7203,http://localhost:7204
       QUESTION_SERVICE_URL: http://question-service:4003
       TOPIC_SERVICE_URL: http://topic-service:4002
+      POST_SERVICE_URL: http://post-service:4004
+      AUTH_SERVICE_URL: http://auth-service:4001
       DO_SPACES_KEY: DO00M8M3Q9LGTPAGNH8L
       DO_SPACES_SECRET: DO00M8M3Q9LGTPAGNH8L
       DO_SPACES_ENDPOINT: https://quiz-ashok.sfo3.digitaloceanspaces.com
@@ -122,17 +124,32 @@ services:
     restart: unless-stopped
 
   # ── Agentic question generator (cron every 10 min) ───────
-  agentic:
+  # agentic:  # DISABLED — quiz generator agent turned off
+  #   build:
+  #     context: ./agentic
+  #     dockerfile: Dockerfile
+  #   container_name: quizhub-agentic
+  #   env_file:
+  #     - ./agentic/.env
+  #   depends_on:
+  #     - auth-service
+  #     - topic-service
+  #     - question-service
+  #   restart: unless-stopped
+
+  player-agent:
     build:
-      context: ./agentic
+      context: ./agentic/player
       dockerfile: Dockerfile
-    container_name: quizhub-agentic
-    env_file:
-      - ./agentic/.env
+    container_name: quizhub-player-agent
+    environment:
+      - AUTH_SERVICE_URL=http://auth-service:4001
+      - QUIZ_SERVICE_URL=http://quiz-service:4005
+      - QUIZ_SOCKET_URL=http://quiz-service:4005
+      - QUIZ_SOCKET_PATH=/quiz.io/
     depends_on:
       - auth-service
-      - topic-service
-      - question-service
+      - quiz-service
     restart: unless-stopped
 
   post-creator:

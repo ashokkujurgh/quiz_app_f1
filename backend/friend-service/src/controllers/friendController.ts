@@ -97,7 +97,7 @@ export async function listFriends(req: AuthRequest, res: Response): Promise<void
     d.sender.toString() === target ? d.receiver : d.sender
   );
 
-  const users = await User.find({ _id: { $in: friendIds } }).select('username avatar email').lean();
+  const users = await User.find({ _id: { $in: friendIds } }).select('name username avatar email').lean();
   res.json({ success: true, data: users });
 }
 
@@ -106,7 +106,7 @@ export async function incomingRequests(req: AuthRequest, res: Response): Promise
   const me = req.user!.id;
   const docs = await FriendRequest.find({ receiver: me, status: 'pending' }).lean();
   const senderIds = docs.map((d) => d.sender);
-  const users = await User.find({ _id: { $in: senderIds } }).select('username avatar email').lean();
+  const users = await User.find({ _id: { $in: senderIds } }).select('name username avatar email').lean();
 
   const result = docs.map((d) => {
     const user = users.find((u) => u._id.toString() === d.sender.toString());
@@ -120,7 +120,7 @@ export async function outgoingRequests(req: AuthRequest, res: Response): Promise
   const me = req.user!.id;
   const docs = await FriendRequest.find({ sender: me, status: 'pending' }).lean();
   const receiverIds = docs.map((d) => d.receiver);
-  const users = await User.find({ _id: { $in: receiverIds } }).select('username avatar email').lean();
+  const users = await User.find({ _id: { $in: receiverIds } }).select('name username avatar email').lean();
 
   const result = docs.map((d) => {
     const user = users.find((u) => u._id.toString() === d.receiver.toString());
@@ -143,7 +143,7 @@ export async function suggestions(req: AuthRequest, res: Response): Promise<void
   });
 
   const users = await User.find({ _id: { $nin: [...excluded] }, role: { $ne: 'admin' } })
-    .select('username avatar email')
+    .select('name username avatar email')
     .limit(20)
     .lean();
 

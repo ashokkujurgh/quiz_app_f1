@@ -6,7 +6,7 @@ import {
 } from '@mui/material';
 import {
   ArrowBack, Check, EmojiEvents, ArrowForward, Send,
-  AccessTime, Star,
+  AccessTime, Star, BlockOutlined,
 } from '@mui/icons-material';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import { completeQuiz, resetQuiz } from '../../store/slices/quizSlice';
@@ -278,6 +278,7 @@ export function QuizPlayPage() {
   const [gameStarted, setGameStarted] = useState(false);
   const [gameOver, setGameOver]   = useState(false);
   const [error, setError]         = useState('');
+  const [alreadyAttempted, setAlreadyAttempted] = useState(false);
 
   // ── Per-question state ────────────────────────────────────────────────────
   const [currentQuestion, setCurrentQuestion] = useState<QuestionEvent | null>(null);
@@ -380,6 +381,21 @@ export function QuizPlayPage() {
       onPlayerJoined:  upsertPlayer,
       onPlayerLeft:    ({ userId }) => setPlayers((prev) => prev.filter((p) => p.userId !== userId)),
       onPlayersList:   ({ players: list }) => setPlayers(list.map((p) => ({ ...p, score: 0, answered: 0 }))),
+      onLeaderboardUpdate: ({ scores }) => {
+        setPlayers((prev) => {
+          const scoreMap = new Map(scores.map((s) => [s.userId, s]));
+          return prev.map((p) => {
+            const live = scoreMap.get(p.userId);
+            return live ? { ...p, score: live.score, answered: live.answered } : p;
+          }).sort((a, b) => b.score - a.score);
+        });
+        // Also update our own score from the authoritative server data
+        const myLive = scores.find((s) => s.userId === user?.id);
+        if (myLive) setMyScore(myLive.score);
+      },
+      onAlreadyAttempted: () => {
+        setAlreadyAttempted(true);
+      },
     },
   );
 
@@ -403,6 +419,55 @@ export function QuizPlayPage() {
       </Box>
     );
   }
+
+  if (alreadyAttempted) {
+    return (
+      <Box sx={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        minHeight: '100vh', bgcolor: '#0f0f1a', p: 3,
+      }}>
+        <Box sx={{
+          textAlign: 'center', maxWidth: 420,
+          bgcolor: '#1a1a2e', borderRadius: 4, p: 5,
+          border: '1px solid rgba(239,68,68,0.3)',
+          boxShadow: '0 0 40px rgba(239,68,68,0.1)',
+        }}>
+          <Box sx={{
+            width: 80, height: 80, borderRadius: '50%', mx: 'auto', mb: 3,
+            bgcolor: 'rgba(239,68,68,0.12)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <BlockOutlined sx={{ fontSize: 44, color: 'error.main' }} />
+          </Box>
+          <Typography variant="h5" fontWeight={800} color="error.main" mb={1}>
+            Already Attempted
+          </Typography>
+          <Typography variant="body1" color="text.secondary" mb={3}>
+            You have already attempted this quiz. Once you leave an active game you cannot re-enter.
+          </Typography>
+          <Stack spacing={1.5}>
+            <Button
+              variant="contained"
+              fullWidth
+              onClick={() => { dispatch(resetQuiz()); navigate('/quizzes'); }}
+              sx={{ borderRadius: 2, fontWeight: 700 }}
+            >
+              Browse Other Quizzes
+            </Button>
+            <Button
+              variant="outlined"
+              fullWidth
+              onClick={() => { dispatch(resetQuiz()); navigate('/home'); }}
+              sx={{ borderRadius: 2 }}
+            >
+              Go Home
+            </Button>
+          </Stack>
+        </Box>
+      </Box>
+    );
+  }
+
   if (!activeQuiz) return null;
 
   // ── Handlers ──────────────────────────────────────────────────────────────
