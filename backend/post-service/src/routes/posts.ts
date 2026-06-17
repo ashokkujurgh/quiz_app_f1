@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Request, Response } from 'express';
 import { protect, optionalAuth } from '../middleware/auth';
 import {
   getPosts,
@@ -13,9 +13,19 @@ import {
   deleteComment,
   toggleCommentLike,
   getUserPosts,
+  createInternalPost,
 } from '../controllers/postController';
 
 const router = express.Router();
+
+// ── Internal service-to-service (no user auth, shared secret) ────────────────
+const INTERNAL_SECRET = process.env.INTERNAL_SERVICE_SECRET ?? 'internal-quiz-secret';
+router.post('/internal', (req: Request, res: Response, next: express.NextFunction) => {
+  if (req.headers['x-internal-secret'] !== INTERNAL_SECRET) {
+    res.status(403).json({ success: false, message: 'Forbidden' }); return;
+  }
+  next();
+}, createInternalPost);
 
 // ── Feed ──────────────────────────────────────────────────────────────────────
 router.get('/',                                           optionalAuth, getPosts);

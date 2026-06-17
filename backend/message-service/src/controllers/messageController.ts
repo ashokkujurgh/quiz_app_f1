@@ -21,9 +21,18 @@ export async function listConversations(req: AuthRequest, res: Response): Promis
   const users = await User.find({ _id: { $in: otherIds } }).select('username avatar').lean();
   const userMap = new Map(users.map((u) => [u._id.toString(), u]));
 
+  // Count unread messages per conversation
+  const convIds = convs.map((c) => c._id);
+  const meObjId = new mongoose.Types.ObjectId(me);
+  const unreadAgg = await Message.aggregate([
+    { $match: { conversation: { $in: convIds }, readBy: { $ne: meObjId } } },
+    { $group: { _id: '$conversation', count: { $sum: 1 } } },
+  ]);
+  const unreadMap = new Map(unreadAgg.map((r) => [r._id.toString(), r.count as number]));
+
   const result = convs.map((c) => {
     const otherId = c.participants.find((p) => p.toString() !== me)?.toString() ?? '';
-    return { ...c, otherUser: userMap.get(otherId) ?? null };
+    return { ...c, otherUser: userMap.get(otherId) ?? null, unreadCount: unreadMap.get(c._id.toString()) ?? 0 };
   });
 
   res.json({ success: true, data: result });

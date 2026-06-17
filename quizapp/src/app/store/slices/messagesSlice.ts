@@ -23,6 +23,7 @@ export interface Conversation {
   lastMessage: Message | null;
   otherUser: MsgUser | null;
   updatedAt: string;
+  unreadCount?: number;
 }
 
 interface MessagesState {
@@ -112,7 +113,16 @@ const messagesSlice = createSlice({
   extraReducers: (builder) => {
     builder
       .addCase(fetchConversations.pending,  (state) => { state.loadingConvs = true; })
-      .addCase(fetchConversations.fulfilled, (state, a) => { state.loadingConvs = false; state.conversations = a.payload; })
+      .addCase(fetchConversations.fulfilled, (state, a) => {
+        state.loadingConvs = false;
+        state.conversations = a.payload;
+        // Seed unread counts from server data (don't overwrite in-session increments)
+        for (const conv of a.payload) {
+          if (conv.unreadCount && conv.unreadCount > 0) {
+            state.unreadByConv[conv._id] = conv.unreadCount;
+          }
+        }
+      })
       .addCase(fetchConversations.rejected,  (state) => { state.loadingConvs = false; })
 
       .addCase(openConversation.fulfilled, (state, a) => {

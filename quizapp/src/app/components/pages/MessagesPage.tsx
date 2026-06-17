@@ -226,20 +226,21 @@ export function MessagesPage() {
                 {messages.map((msg) => {
                   const isMe = msg.sender === myId;
                   return (
-                    <Box key={msg._id} alignSelf={isMe ? 'flex-end' : 'flex-start'}
-                      sx={{ maxWidth: '70%', px: msg.imageUrl && !msg.text ? 0.5 : 2, py: msg.imageUrl && !msg.text ? 0.5 : 1, bgcolor: isMe ? 'primary.main' : 'action.hover', color: isMe ? 'primary.contrastText' : 'text.primary', borderRadius: isMe ? '18px 18px 4px 18px' : '18px 18px 18px 4px', overflow: 'hidden' }}>
-                      {msg.imageUrl && (
-                        <Box component="img" src={msg.imageUrl} alt="sent image"
-                          sx={{ display: 'block', maxWidth: 260, maxHeight: 300, width: '100%', borderRadius: msg.text ? '12px 12px 0 0' : '14px', objectFit: 'cover', cursor: 'pointer' }}
-                          onClick={() => window.open(msg.imageUrl!, '_blank')}
-                        />
-                      )}
-                      {msg.text && (
-                        <Box px={msg.imageUrl ? 1 : 0} pt={msg.imageUrl ? 0.5 : 0} pb={msg.imageUrl ? 0.5 : 0}>
-                          <Typography fontSize={14}>{msg.text}</Typography>
-                        </Box>
-                      )}
-                      <Typography variant="caption" sx={{ opacity: 0.7, display: 'block', textAlign: 'right', px: 1, pb: 0.5 }}>
+                    <Box key={msg._id} alignSelf={isMe ? 'flex-end' : 'flex-start'} sx={{ maxWidth: '75%', display: 'flex', flexDirection: 'column', alignItems: isMe ? 'flex-end' : 'flex-start', gap: 0.25 }}>
+                      <Box sx={{ px: msg.imageUrl && !msg.text ? 0.5 : 2, py: msg.imageUrl && !msg.text ? 0.5 : 1, bgcolor: isMe ? 'primary.main' : 'action.hover', color: isMe ? 'primary.contrastText' : 'text.primary', borderRadius: isMe ? '18px 18px 4px 18px' : '18px 18px 18px 4px', overflow: 'hidden' }}>
+                        {msg.imageUrl && (
+                          <Box component="img" src={msg.imageUrl} alt="sent image"
+                            sx={{ display: 'block', maxWidth: 260, maxHeight: 300, width: '100%', borderRadius: msg.text ? '12px 12px 0 0' : '14px', objectFit: 'cover', cursor: 'pointer' }}
+                            onClick={() => window.open(msg.imageUrl!, '_blank')}
+                          />
+                        )}
+                        {msg.text && (
+                          <Box px={msg.imageUrl ? 1 : 0} pt={msg.imageUrl ? 0.5 : 0} pb={msg.imageUrl ? 0.5 : 0}>
+                            <Typography fontSize={14}>{msg.text}</Typography>
+                          </Box>
+                        )}
+                      </Box>
+                      <Typography variant="caption" sx={{ opacity: 0.55, px: 0.5 }}>
                         {formatDistanceToNow(new Date(msg.createdAt), { addSuffix: true })}
                       </Typography>
                     </Box>

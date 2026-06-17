@@ -10,6 +10,7 @@ import { deleteImageByUrl } from '../config/spaces';
 import { startGameSession } from '../socket/gameController';
 
 const QUESTION_URL = process.env.QUESTION_SERVICE_URL ?? 'http://localhost:4003';
+const AUTH_SERVICE_URL = process.env.AUTH_SERVICE_URL ?? 'http://auth-service:4001';
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -385,17 +386,30 @@ export const getGlobalLeaderboard: RequestHandler = async (_req, res): Promise<v
       { $limit: 100 },
     ]);
 
-    const ranked = agg.map((e, i) => ({
-      rank:           i + 1,
-      userId:         e._id,
-      userName:       e.userName,
-      userAvatar:     e.userAvatar,
-      totalGames:     e.totalGames,
-      totalScore:     e.totalScore,
-      totalQuestions: e.totalQuestions,
-      avgPercentage:  Math.round(e.avgPercentage),
-      perfectScores:  e.perfectScores,
-    }));
+    // Enrich with fresh user names from auth service
+    const userIds = agg.map((e) => String(e._id));
+    let nameMap: Record<string, { name?: string; username?: string; avatar?: string }> = {};
+    try {
+      const { data } = await axios.post(`${AUTH_SERVICE_URL}/api/auth/users/bulk`, { ids: userIds });
+      if (data.success) {
+        for (const u of data.users) nameMap[String(u._id)] = u;
+      }
+    } catch { /* non-fatal — fall back to stored names */ }
+
+    const ranked = agg.map((e, i) => {
+      const fresh = nameMap[String(e._id)];
+      return {
+        rank:           i + 1,
+        userId:         e._id,
+        userName:       fresh?.name || fresh?.username || e.userName,
+        userAvatar:     fresh?.avatar ?? e.userAvatar,
+        totalGames:     e.totalGames,
+        totalScore:     e.totalScore,
+        totalQuestions: e.totalQuestions,
+        avgPercentage:  Math.round(e.avgPercentage),
+        perfectScores:  e.perfectScores,
+      };
+    });
 
     res.json({ success: true, leaderboard: ranked });
   } catch (err) {

@@ -108,6 +108,17 @@ router.get('/blocked', protect, async (req: AuthRequest, res: Response): Promise
 });
 
 // Specific route BEFORE the :userId param route
+router.post('/users/bulk', async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const ids: string[] = Array.isArray(req.body.ids) ? req.body.ids : [];
+    if (!ids.length) { res.json({ success: true, users: [] }); return; }
+    const users = await User.find({ _id: { $in: ids } }).select('_id name username avatar').lean();
+    res.json({ success: true, users });
+  } catch {
+    res.status(500).json({ success: false, message: 'Failed to fetch users' });
+  }
+});
+
 router.get('/users/search', protect, async (req: AuthRequest, res: Response): Promise<void> => {
   const q = ((req.query.q as string) ?? '').trim();
   if (!q || q.length < 2) { res.json({ success: true, users: [] }); return; }

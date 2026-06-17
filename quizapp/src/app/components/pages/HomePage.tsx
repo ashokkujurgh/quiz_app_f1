@@ -50,7 +50,15 @@ export function HomePage() {
               .catch(() => [] as ApiSubTopic[])
           )
         );
-        setAllSubTopics(results.flat());
+        const flat = results.flat();
+        const engineeringKw = ['engineering', 'engineer'];
+        const isEngineering = (s: ApiSubTopic) =>
+          engineeringKw.some((kw) => s.name.toLowerCase().includes(kw));
+        // Non-engineering first, engineering subtopics after
+        setAllSubTopics([
+          ...flat.filter((s) => !isEngineering(s)),
+          ...flat.filter((s) =>  isEngineering(s)),
+        ]);
       })
       .catch(() => {})
       .finally(() => setTopicsLoading(false));
