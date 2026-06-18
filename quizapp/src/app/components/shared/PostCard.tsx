@@ -4,13 +4,161 @@ import {
   Card, CardContent, CardActions, Box, Typography, IconButton,
   Button, Stack, Divider, Tooltip, Avatar, TextField, CircularProgress, Badge,
   Menu, MenuItem, ListItemIcon, ListItemText, Snackbar, Alert, Dialog,
-  DialogTitle, DialogContent, DialogActions,
+  DialogTitle, DialogContent, DialogActions, LinearProgress,
 } from '@mui/material';
 import {
   ThumbUpOutlined, ThumbUp, ChatBubbleOutline, MoreHoriz, EmojiEvents,
-  SendOutlined, Verified, Groups, Block,
+  SendOutlined, Verified, Groups, Block, Timer, People,
 } from '@mui/icons-material';
-import type { Post, QuizTopic } from '../../types';
+import type { Post, QuizResult, QuizTopic } from '../../types';
+
+const MEDAL = ['🥇', '🥈', '🥉'];
+const INITIAL_SHOW = 5;
+
+function QuizResultCard({ result, isAdmin }: { result: QuizResult; isAdmin: boolean }) {
+  const [expanded, setExpanded] = useState(false);
+  const durationMin = Math.round((result.duration ?? 0) / 60);
+  const allPlayers  = result.topPlayers ?? [];
+  const visiblePlayers = expanded ? allPlayers : allPlayers.slice(0, INITIAL_SHOW);
+  const hasMore = allPlayers.length > INITIAL_SHOW;
+
+  if (isAdmin) {
+    return (
+      <Box sx={{
+        mt: 1.5, borderRadius: 2.5, overflow: 'hidden',
+        border: '1px solid', borderColor: 'divider',
+        background: (t) => t.palette.mode === 'dark'
+          ? 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)'
+          : 'linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%)',
+      }}>
+        {/* Header */}
+        <Box sx={{ px: 2.5, pt: 2, pb: 1.5 }}>
+          <Stack direction="row" alignItems="center" spacing={1} mb={0.5}>
+            <EmojiEvents sx={{ color: '#FFD700', fontSize: 22 }} />
+            <Typography variant="caption" fontWeight={700} sx={{ color: '#FFD700', letterSpacing: 1, textTransform: 'uppercase', fontSize: 11 }}>
+              Quiz Completed
+            </Typography>
+          </Stack>
+          <Typography variant="subtitle1" fontWeight={800} sx={{ color: 'white', lineHeight: 1.3, mb: 1.5 }}>
+            {result.quizTitle}
+          </Typography>
+
+          {/* Stats row */}
+          <Stack direction="row" spacing={3}>
+            {result.playerCount != null && (
+              <Stack direction="row" alignItems="center" spacing={0.5}>
+                <People sx={{ fontSize: 14, color: 'rgba(255,255,255,0.6)' }} />
+                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)' }}>
+                  {result.playerCount} players
+                </Typography>
+              </Stack>
+            )}
+            {durationMin > 0 && (
+              <Stack direction="row" alignItems="center" spacing={0.5}>
+                <Timer sx={{ fontSize: 14, color: 'rgba(255,255,255,0.6)' }} />
+                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)' }}>
+                  {durationMin} min
+                </Typography>
+              </Stack>
+            )}
+            {result.avgPercentage != null && (
+              <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)' }}>
+                Avg {result.avgPercentage}%
+              </Typography>
+            )}
+          </Stack>
+        </Box>
+
+        {/* Leaderboard */}
+        {allPlayers.length > 0 && (
+          <Box sx={{ px: 2, pb: 2 }}>
+            <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.45)', fontWeight: 600, letterSpacing: 0.5, textTransform: 'uppercase', fontSize: 10, mb: 1, display: 'block' }}>
+              Top Finishers
+            </Typography>
+            <Stack spacing={0.75}>
+              {visiblePlayers.map((p, i) => (
+                <Box key={i} sx={{
+                  display: 'flex', alignItems: 'center', gap: 1.5,
+                  bgcolor: i === 0 ? 'rgba(255,215,0,0.12)' : 'rgba(255,255,255,0.05)',
+                  borderRadius: 2, px: 1.5, py: 0.85,
+                  border: i === 0 ? '1px solid rgba(255,215,0,0.25)' : '1px solid rgba(255,255,255,0.06)',
+                }}>
+                  {i < 3
+                    ? <Typography sx={{ fontSize: 16, lineHeight: 1, minWidth: 24, textAlign: 'center' }}>{MEDAL[i]}</Typography>
+                    : <Typography variant="caption" fontWeight={700} sx={{ color: 'rgba(255,255,255,0.4)', minWidth: 24, textAlign: 'center' }}>#{p.rank}</Typography>
+                  }
+                  <Typography variant="body2" fontWeight={i < 3 ? 700 : 500} sx={{ color: i === 0 ? 'white' : 'rgba(255,255,255,0.8)', flex: 1 }} noWrap>
+                    {p.name}
+                  </Typography>
+                  <Box sx={{ textAlign: 'right', flexShrink: 0 }}>
+                    <Typography variant="caption" fontWeight={700} sx={{ color: i === 0 ? '#FFD700' : 'rgba(255,255,255,0.75)', display: 'block', lineHeight: 1.2 }}>
+                      {p.percentage}%
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.35)', fontSize: 10 }}>
+                      {p.score}/{p.total}
+                    </Typography>
+                  </Box>
+                </Box>
+              ))}
+            </Stack>
+
+            {hasMore && (
+              <Button
+                size="small"
+                onClick={(e) => { e.stopPropagation(); setExpanded((v) => !v); }}
+                sx={{ mt: 1, color: 'rgba(255,255,255,0.55)', fontSize: 12, fontWeight: 600, textTransform: 'none', '&:hover': { color: 'white', bgcolor: 'rgba(255,255,255,0.08)' } }}
+              >
+                {expanded ? 'Show less ▲' : `View all ${allPlayers.length} players ▼`}
+              </Button>
+            )}
+          </Box>
+        )}
+      </Box>
+    );
+  }
+
+  // Personal result card
+  const pct = result.percentage;
+  const color = pct >= 80 ? '#22c55e' : pct >= 50 ? '#f59e0b' : '#ef4444';
+  return (
+    <Box sx={{
+      mt: 1.5, borderRadius: 2.5, overflow: 'hidden',
+      border: '1px solid', borderColor: 'divider',
+      background: (t) => t.palette.mode === 'dark'
+        ? 'linear-gradient(135deg, #1a1a2e 0%, #0d1b2a 100%)'
+        : 'linear-gradient(135deg, #1e3a5f 0%, #0f2447 100%)',
+    }}>
+      <Stack direction="row" alignItems="center" px={2.5} pt={2} pb={1.5} spacing={2}>
+        <Box sx={{ position: 'relative', width: 64, height: 64, flexShrink: 0 }}>
+          <svg width={64} height={64} style={{ transform: 'rotate(-90deg)' }}>
+            <circle cx={32} cy={32} r={26} fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth={5} />
+            <circle cx={32} cy={32} r={26} fill="none" stroke={color} strokeWidth={5}
+              strokeDasharray={2 * Math.PI * 26}
+              strokeDashoffset={2 * Math.PI * 26 * (1 - pct / 100)}
+              strokeLinecap="round" />
+          </svg>
+          <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Typography sx={{ color: 'white', fontWeight: 800, fontSize: 13, lineHeight: 1 }}>{pct}%</Typography>
+          </Box>
+        </Box>
+        <Box flex={1} minWidth={0}>
+          <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: 0.8, fontSize: 10, fontWeight: 600 }}>
+            Quiz Result
+          </Typography>
+          <Typography variant="subtitle2" fontWeight={700} sx={{ color: 'white', lineHeight: 1.3 }} noWrap>
+            {result.quizTitle}
+          </Typography>
+          <Stack direction="row" spacing={2} mt={0.5}>
+            <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)' }}>{result.score}/{result.total} correct</Typography>
+            {result.rank && <Typography variant="caption" sx={{ color: '#FFD700', fontWeight: 700 }}>#{result.rank} rank</Typography>}
+          </Stack>
+        </Box>
+      </Stack>
+      <LinearProgress variant="determinate" value={pct}
+        sx={{ height: 3, bgcolor: 'rgba(255,255,255,0.08)', '& .MuiLinearProgress-bar': { bgcolor: color } }} />
+    </Box>
+  );
+}
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { toggleLike, syncLike, incrementComments } from '../../store/slices/postsSlice';
 import { useOnlineUsers } from '../../context/OnlineUsersContext';
@@ -207,33 +355,36 @@ export function PostCard({ post }: Props) {
         </Stack>
 
         {/* Content — 3-line clamp, click to open detail */}
-        <Box onClick={() => navigate(`/posts/${post.slug ?? post.id}`)} sx={{ cursor: 'pointer' }}>
-          {post.title && (
-            <Typography variant="subtitle2" fontWeight={700} mb={0.5}>
-              {post.title}
+        {!(isOfficial && post.quizResult) && (
+          <Box onClick={() => navigate(`/posts/${post.slug ?? post.id}`)} sx={{ cursor: 'pointer' }}>
+            {post.title && (
+              <Typography variant="subtitle2" fontWeight={700} mb={0.5}>
+                {post.title}
+              </Typography>
+            )}
+            <Typography
+              variant="body2"
+              sx={{
+                lineHeight: 1.7,
+                whiteSpace: 'pre-line',
+                display: '-webkit-box',
+                WebkitLineClamp: 4,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
+                mb: 0.5,
+              }}
+            >
+              {post.content}
             </Typography>
-          )}
-          <Typography
-            variant="body2"
-            sx={{
-              lineHeight: 1.7,
-              display: '-webkit-box',
-              WebkitLineClamp: 3,
-              WebkitBoxOrient: 'vertical',
-              overflow: 'hidden',
-              mb: 0.5,
-            }}
-          >
-            {post.content}
-          </Typography>
-          <Typography
-            variant="caption"
-            color="primary.main"
-            sx={{ fontWeight: 600, '&:hover': { textDecoration: 'underline' }, mb: postImages.length ? 1 : 0, display: 'block' }}
-          >
-            Read more
-          </Typography>
-        </Box>
+            <Typography
+              variant="caption"
+              color="primary.main"
+              sx={{ fontWeight: 600, '&:hover': { textDecoration: 'underline' }, mb: postImages.length ? 1 : 0, display: 'block' }}
+            >
+              Read more
+            </Typography>
+          </Box>
+        )}
 
         {/* Images */}
         {postImages.length === 1 && (
@@ -271,52 +422,7 @@ export function PostCard({ post }: Props) {
         )}
 
         {/* Quiz Result Card */}
-        {post.quizResult && (() => {
-          const isAdminSummary = post.userType === 'admin';
-          return (
-            <Box
-              sx={{
-                mt: 1.5, p: 2, borderRadius: 2,
-                background: isAdminSummary
-                  ? 'linear-gradient(135deg, #FF6B0018 0%, #FFD70022 100%)'
-                  : 'linear-gradient(135deg, #5563DE18 0%, #E91E8C12 100%)',
-                border: '1px solid', borderColor: isAdminSummary ? 'warning.light' : 'divider',
-              }}
-            >
-              <Stack direction="row" alignItems="center" spacing={1} mb={0.5}>
-                <EmojiEvents sx={{ color: 'warning.main', fontSize: 20 }} />
-                <Typography variant="caption" fontWeight={700} color={isAdminSummary ? 'warning.dark' : 'primary.main'}>
-                  {isAdminSummary ? '🏆 Quiz Summary' : 'Quiz Result'}
-                </Typography>
-              </Stack>
-              <Typography variant="subtitle2" fontWeight={700}>{post.quizResult.quizTitle}</Typography>
-              <Stack direction="row" spacing={3} mt={0.5}>
-                <Box>
-                  <Typography variant="h5" fontWeight={800} color="primary.main">{post.quizResult.percentage}%</Typography>
-                  <Typography variant="caption" color="text.secondary">{isAdminSummary ? 'Top Score' : 'Score'}</Typography>
-                </Box>
-                <Box>
-                  <Typography variant="h5" fontWeight={800}>{post.quizResult.score}/{post.quizResult.total}</Typography>
-                  <Typography variant="caption" color="text.secondary">Correct</Typography>
-                </Box>
-                {post.quizResult.rank && !isAdminSummary && (
-                  <Box>
-                    <Typography variant="h5" fontWeight={800} color="warning.main">#{post.quizResult.rank}</Typography>
-                    <Typography variant="caption" color="text.secondary">Rank</Typography>
-                  </Box>
-                )}
-                {isAdminSummary && (
-                  <Box>
-                    <Typography variant="h5" fontWeight={800} color="success.main">
-                      #{post.quizResult.rank ?? 1}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">Winner Rank</Typography>
-                  </Box>
-                )}
-              </Stack>
-            </Box>
-          );
-        })()}
+        {post.quizResult && <QuizResultCard result={post.quizResult} isAdmin={post.userType === 'admin'} />}
       </CardContent>
 
       {/* Stats row */}

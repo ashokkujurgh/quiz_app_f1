@@ -15,7 +15,7 @@ def get_token() -> str:
     if _token:
         return _token
     resp = requests.post(
-        f"{AUTH_API_URL}/api/auth/login",
+        f"{AUTH_API_URL}/api/admin/login",
         json={"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD},
         timeout=10,
     )
