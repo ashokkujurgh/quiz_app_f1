@@ -1,5 +1,6 @@
 import { useMemo, useEffect } from 'react';
 import { RouterProvider } from 'react-router';
+import { HelmetProvider } from 'react-helmet-async';
 import { Provider } from 'react-redux';
 import { ThemeProvider, CssBaseline } from '@mui/material';
 import { store } from './store';
@@ -39,10 +40,12 @@ function ThemedApp() {
 
 export default function App() {
   return (
-    <ErrorBoundary>
-      <Provider store={store}>
-        <ThemedApp />
-      </Provider>
-    </ErrorBoundary>
+    <HelmetProvider>
+      <ErrorBoundary>
+        <Provider store={store}>
+          <ThemedApp />
+        </Provider>
+      </ErrorBoundary>
+    </HelmetProvider>
   );
 }

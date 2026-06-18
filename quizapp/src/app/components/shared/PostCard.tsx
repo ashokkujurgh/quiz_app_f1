@@ -10,7 +10,7 @@ import {
   ThumbUpOutlined, ThumbUp, ChatBubbleOutline, MoreHoriz, EmojiEvents,
   SendOutlined, Verified, Groups, Block,
 } from '@mui/icons-material';
-import type { Post } from '../../types';
+import type { Post, QuizTopic } from '../../types';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { toggleLike, syncLike, incrementComments } from '../../store/slices/postsSlice';
 import { useOnlineUsers } from '../../context/OnlineUsersContext';
@@ -142,7 +142,7 @@ export function PostCard({ post }: Props) {
     setSnackMsg(`You blocked ${post.author.name}. Their posts won't appear.`);
   };
 
-  const isOfficial = post.author.role === 'admin';
+  const isOfficial = post.userType === 'admin' || post.author.role === 'admin';
 
   if (blocked) return (
     <Snackbar
@@ -162,25 +162,22 @@ export function PostCard({ post }: Props) {
       mb: 2,
       ...(isOfficial && {
         border: '1.5px solid',
-        borderColor: 'primary.main',
-        borderOpacity: 0.4,
-        background: (theme) => theme.palette.mode === 'dark'
-          ? 'linear-gradient(135deg, rgba(85,99,222,0.08) 0%, rgba(168,85,247,0.05) 100%)'
-          : 'linear-gradient(135deg, rgba(85,99,222,0.04) 0%, rgba(168,85,247,0.03) 100%)',
+        borderColor: 'divider',
+        bgcolor: 'background.paper',
       }),
     }}>
       {/* Label banner */}
       <Box sx={{
         px: 2, py: 0.6,
         display: 'flex', alignItems: 'center', gap: 0.75,
-        bgcolor: isOfficial ? 'primary.main' : 'action.hover',
+        bgcolor: isOfficial ? 'action.selected' : 'action.hover',
         borderBottom: '1px solid', borderColor: 'divider',
       }}>
         {isOfficial
-          ? <Verified sx={{ fontSize: 13, color: 'white' }} />
+          ? <Verified sx={{ fontSize: 13, color: 'text.secondary' }} />
           : <Groups sx={{ fontSize: 13, color: 'text.secondary' }} />}
         <Typography variant="caption" fontWeight={700} sx={{
-          color: isOfficial ? 'white' : 'text.secondary',
+          color: isOfficial ? 'text.secondary' : 'text.secondary',
           letterSpacing: 0.5, textTransform: 'uppercase', fontSize: 10,
         }}>
           {isOfficial ? 'Official' : 'Community'}
@@ -200,7 +197,7 @@ export function PostCard({ post }: Props) {
                 <Verified sx={{ fontSize: 15, color: 'primary.main' }} />
               )}
               <Typography variant="caption" color="text.secondary">@{post.author.username}</Typography>
-              <TopicChip topic={post.topic} />
+              <TopicChip topic={(post.subTopic ?? post.topic) as QuizTopic} />
             </Stack>
             <Typography variant="caption" color="text.secondary">{timeAgo}</Typography>
           </Box>
@@ -211,6 +208,11 @@ export function PostCard({ post }: Props) {
 
         {/* Content — 3-line clamp, click to open detail */}
         <Box onClick={() => navigate(`/posts/${post.id}`)} sx={{ cursor: 'pointer' }}>
+          {post.title && (
+            <Typography variant="subtitle2" fontWeight={700} mb={0.5}>
+              {post.title}
+            </Typography>
+          )}
           <Typography
             variant="body2"
             sx={{
@@ -274,7 +276,7 @@ export function PostCard({ post }: Props) {
             sx={{
               mt: 1.5, p: 2, borderRadius: 2,
               background: 'linear-gradient(135deg, #5563DE18 0%, #E91E8C12 100%)',
-              border: '1px solid', borderColor: 'primary.main', borderOpacity: 0.2,
+              border: '1px solid', borderColor: 'divider',
             }}
           >
             <Stack direction="row" alignItems="center" spacing={1} mb={0.5}>
@@ -343,10 +345,6 @@ export function PostCard({ post }: Props) {
         transformOrigin={{ horizontal: 'right', vertical: 'top' }}
         anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
       >
-        <MenuItem onClick={() => { setMenuAnchor(null); setBlockDialogOpen(true); }} sx={{ color: 'error.main' }}>
-          <ListItemIcon><Block fontSize="small" sx={{ color: 'error.main' }} /></ListItemIcon>
-          <ListItemText>Block {post.author.name}</ListItemText>
-        </MenuItem>
       </Menu>
 
       {/* Block confirm dialog */}

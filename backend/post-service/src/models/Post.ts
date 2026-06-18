@@ -34,11 +34,24 @@ export interface IComment {
 }
 
 // ── Post ──────────────────────────────────────────────────────────────────────
+export interface ISeoMeta {
+  metaTitle: string;
+  metaDescription: string;
+  keywords: string[];
+  ogTitle: string;
+  ogDescription: string;
+  ogImage: string | null;
+  canonical: string | null;
+}
+
 export interface IPost extends Document {
   _id: Types.ObjectId;
   author: IAuthorSnapshot;
   userType: 'user' | 'admin';
+  title: string | null;
+  slug: string | null;
   content: string;
+  seo: ISeoMeta | null;
   image: string | null;   // legacy single image (kept for backwards compat)
   images: string[];       // up to 5 images
   topic: QuizTopic;
@@ -91,13 +104,29 @@ const commentSchema = new Schema<IComment>(
   { timestamps: { createdAt: true, updatedAt: false } }
 );
 
+const seoSchema = new Schema<ISeoMeta>(
+  {
+    metaTitle:       { type: String, default: '', trim: true, maxlength: 70 },
+    metaDescription: { type: String, default: '', trim: true, maxlength: 160 },
+    keywords:        { type: [String], default: [] },
+    ogTitle:         { type: String, default: '', trim: true, maxlength: 90 },
+    ogDescription:   { type: String, default: '', trim: true, maxlength: 200 },
+    ogImage:         { type: String, default: null },
+    canonical:       { type: String, default: null },
+  },
+  { _id: false }
+);
+
 // ── Main schema ───────────────────────────────────────────────────────────────
 
 const postSchema = new Schema<IPost>(
   {
     author:     { type: authorSchema, required: true },
     userType:   { type: String, enum: ['user', 'admin'], default: 'user' },
+    title:      { type: String, default: null, trim: true, maxlength: 300 },
+    slug:       { type: String, default: null, trim: true },
     content:    { type: String, required: true, trim: true, maxlength: 2000 },
+    seo:        { type: seoSchema, default: null },
     image:      { type: String, default: null },
     images:     { type: [String], default: [] },
     topic:      { type: String, required: true },
