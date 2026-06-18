@@ -96,6 +96,7 @@ export function HomePage() {
             title: (p['title'] as string | null) ?? null,
             content: p['content'] as string,
             image: p['image'] as string | undefined,
+            images: (p['images'] as string[] | undefined) ?? [],
             topic: (p['topic'] ?? 'General') as QuizTopic,
             subTopic: (p['subTopic'] as string | null) ?? null,
             userType: (p['userType'] as 'user' | 'admin') ?? 'user',
@@ -105,6 +106,22 @@ export function HomePage() {
             shares: (p['shares'] as number) ?? 0,
             liked: (p['liked'] as boolean) ?? false,
             saved: (p['saved'] as boolean) ?? false,
+            quizResult: (p['quizResult'] as Record<string, unknown> | null | undefined)
+              ? {
+                  quizId:        (p['quizResult'] as Record<string, unknown>)['quizId'] as string,
+                  quizTitle:     (p['quizResult'] as Record<string, unknown>)['quizTitle'] as string,
+                  category:      (p['quizResult'] as Record<string, unknown>)['category'] as QuizTopic,
+                  score:         (p['quizResult'] as Record<string, unknown>)['score'] as number,
+                  total:         (p['quizResult'] as Record<string, unknown>)['total'] as number,
+                  percentage:    (p['quizResult'] as Record<string, unknown>)['percentage'] as number,
+                  rank:          (p['quizResult'] as Record<string, unknown>)['rank'] as number | null,
+                  duration:      (p['quizResult'] as Record<string, unknown>)['duration'] as number,
+                  playerCount:   (p['quizResult'] as Record<string, unknown>)['playerCount'] as number | undefined,
+                  avgPercentage: (p['quizResult'] as Record<string, unknown>)['avgPercentage'] as number | undefined,
+                  topPlayers:    (p['quizResult'] as Record<string, unknown>)['topPlayers'] as import('../../types').TopPlayer[] | undefined,
+                  date: '', answers: [],
+                }
+              : undefined,
           };
         });
         dispatch(setPosts(mapped));

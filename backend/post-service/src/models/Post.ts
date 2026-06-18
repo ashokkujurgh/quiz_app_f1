@@ -12,6 +12,14 @@ export interface IAuthorSnapshot {
 }
 
 // ── Embedded quiz result ──────────────────────────────────────────────────────
+export interface ITopPlayer {
+  rank: number;
+  name: string;
+  score: number;
+  total: number;
+  percentage: number;
+}
+
 export interface IQuizResult {
   quizId: string;
   quizTitle: string;
@@ -21,6 +29,9 @@ export interface IQuizResult {
   percentage: number;
   rank?: number;
   duration: number;
+  playerCount?: number;
+  avgPercentage?: number;
+  topPlayers?: ITopPlayer[];
 }
 
 // ── Comment ───────────────────────────────────────────────────────────────────
@@ -80,16 +91,30 @@ const authorSchema = new Schema<IAuthorSnapshot>(
   { _id: false }
 );
 
-const quizResultSchema = new Schema<IQuizResult>(
+const topPlayerSchema = new Schema<ITopPlayer>(
   {
-    quizId:     { type: String, required: true },
-    quizTitle:  { type: String, required: true },
-    category:   { type: String, required: true },
+    rank:       { type: Number, required: true },
+    name:       { type: String, required: true },
     score:      { type: Number, required: true },
     total:      { type: Number, required: true },
     percentage: { type: Number, required: true },
-    rank:       { type: Number },
-    duration:   { type: Number, required: true },
+  },
+  { _id: false }
+);
+
+const quizResultSchema = new Schema<IQuizResult>(
+  {
+    quizId:        { type: String, required: true },
+    quizTitle:     { type: String, required: true },
+    category:      { type: String, required: true },
+    score:         { type: Number, required: true },
+    total:         { type: Number, required: true },
+    percentage:    { type: Number, required: true },
+    rank:          { type: Number },
+    duration:      { type: Number, required: true },
+    playerCount:   { type: Number },
+    avgPercentage: { type: Number },
+    topPlayers:    { type: [topPlayerSchema], default: undefined },
   },
   { _id: false }
 );

@@ -87,6 +87,14 @@ export interface Quiz {
   questionCount?: number;
 }
 
+export interface TopPlayer {
+  rank: number;
+  name: string;
+  score: number;
+  total: number;
+  percentage: number;
+}
+
 export interface QuizResult {
   quizId: string;
   quizTitle: string;
@@ -98,6 +106,9 @@ export interface QuizResult {
   duration: number;
   date: string;
   answers: number[];
+  playerCount?: number;
+  avgPercentage?: number;
+  topPlayers?: TopPlayer[];
 }
 
 export interface Friend {

@@ -1,12 +1,16 @@
 """
 Save generated posts to the Meenzo post-service via REST API.
+Uses the internal service-to-service endpoint (no user JWT required).
 """
 import logging
+import os
 import requests
-from auth_client import auth_headers, reset_token
 from config import POST_API_URL
 
 logger = logging.getLogger(__name__)
+
+INTERNAL_SECRET = os.getenv("INTERNAL_SERVICE_SECRET", "internal-quiz-secret")
+ADMIN_USER_ID   = os.getenv("ADMIN_USER_ID", "")
 
 
 def save_post(
@@ -17,10 +21,6 @@ def save_post(
     subtopic_name: str,
     seo: dict | None = None,
 ) -> dict | None:
-    """
-    POST /api/posts — saves the generated post as the admin user.
-    Returns the created post dict or None on failure.
-    """
     if seo and image_url and not seo.get("ogImage"):
         seo["ogImage"] = image_url
 
@@ -32,7 +32,7 @@ def save_post(
         "authorName":     "Meenzo",
         "authorUsername": "meenzo",
         "authorAvatar":   None,
-        "timezone":       "Asia/Kolkata",
+        "authorUserId":   ADMIN_USER_ID or None,
         "seo":            seo,
     }
     if image_url:
@@ -40,22 +40,15 @@ def save_post(
         payload["images"] = [image_url]
 
     try:
-        headers = {**auth_headers(), "Content-Type": "application/json"}
         resp = requests.post(
-            f"{POST_API_URL}/api/posts",
+            f"{POST_API_URL}/api/posts/internal",
             json=payload,
-            headers=headers,
+            headers={
+                "x-internal-secret": INTERNAL_SECRET,
+                "Content-Type": "application/json",
+            },
             timeout=30,
         )
-        if resp.status_code == 401:
-            reset_token()
-            headers = {**auth_headers(), "Content-Type": "application/json"}
-            resp = requests.post(
-                f"{POST_API_URL}/api/posts",
-                json=payload,
-                headers=headers,
-                timeout=30,
-            )
         resp.raise_for_status()
         post = resp.json().get("post")
         logger.info("Post saved to MongoDB: %s", post.get("_id") if post else "?")
