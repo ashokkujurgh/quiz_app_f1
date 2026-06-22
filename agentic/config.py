@@ -23,10 +23,13 @@ EMBED_MODEL      = "text-embedding-3-small"
 EMBED_DIM        = 1536
 
 # Similarity threshold — cosine score above this means "already exists"
-SIMILARITY_THRESHOLD = 0.92
+SIMILARITY_THRESHOLD = 0.97
 
 # Cron: every 1 minute
 CRON_INTERVAL_MINUTES = 1
 
 # How many subtopics to pick per run
-SUBTOPICS_PER_RUN = 1
+SUBTOPICS_PER_RUN = 3
+
+# How many existing questions to pass as RAG context (more = less repetition)
+RAG_CONTEXT_SIZE = 15

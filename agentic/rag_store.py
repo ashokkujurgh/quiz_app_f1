@@ -9,7 +9,7 @@ from langchain_openai import OpenAIEmbeddings
 from config import (
     OPENAI_API_KEY, PINECONE_API_KEY, PINECONE_INDEX,
     PINECONE_CLOUD, PINECONE_REGION, EMBED_MODEL, EMBED_DIM,
-    SIMILARITY_THRESHOLD,
+    SIMILARITY_THRESHOLD, RAG_CONTEXT_SIZE,
 )
 
 logger = logging.getLogger(__name__)
@@ -44,7 +44,7 @@ def _get_store() -> PineconeVectorStore:
     return _store
 
 
-def get_similar_questions(subtopic_name: str, k: int = 5) -> list[str]:
+def get_similar_questions(subtopic_name: str, k: int = RAG_CONTEXT_SIZE) -> list[str]:
     """Return existing question texts for a subtopic — used as RAG context."""
     store = _get_store()
     try:
