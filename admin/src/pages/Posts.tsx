@@ -657,7 +657,13 @@ function EditPostModal({
   const [content, setContent] = useState(post.content);
   const [timezone, setTimezone] = useState(post.timezone || LOCAL_TZ || 'UTC');
   const [saving, setSaving]   = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [error, setError]     = useState('');
+
+  // images — seed with existing images
+  const existingImgs = post.images?.length ? post.images : post.image ? [post.image] : [];
+  const [imagePreviews, setImagePreviews] = useState<string[]>(existingImgs);
+  const [imageFiles, setImageFiles]       = useState<File[]>([]);
 
   // topic / subtopic
   const initTopic = topics.find((t) => t.name.toLowerCase() === post.topic.toLowerCase());
@@ -705,6 +711,19 @@ function EditPostModal({
     if (!content.trim()) { setError('Content is required.'); return; }
     setSaving(true); setError('');
     try {
+      // upload any newly picked files
+      let finalImageUrls = imagePreviews.filter((u) => !u.startsWith('blob:'));
+      if (imageFiles.length) {
+        setUploading(true);
+        const fd = new FormData();
+        imageFiles.forEach((f) => fd.append('images', f));
+        const { data: uploadData } = await api.post('/api/auth/upload/images', fd, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        finalImageUrls = [...finalImageUrls, ...(uploadData.urls ?? [])];
+        setUploading(false);
+      }
+
       const subTopicName = subTopics.find((s) => s._id === subTopicId)?.name ?? null;
       const seoPayload = seoMetaTitle.trim() ? {
         metaTitle:       seoMetaTitle.trim(),
@@ -723,6 +742,9 @@ function EditPostModal({
         subTopic:  subTopicName,
         timezone,
         isAiImage,
+        ...(finalImageUrls.length
+          ? { images: finalImageUrls, image: finalImageUrls[0] }
+          : { images: [], image: null }),
         seo:       seoPayload,
       });
       onSaved(data.post);
@@ -849,7 +871,58 @@ function EditPostModal({
             </select>
           </div>
 
+          {/* Image upload */}
+          <div>
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">Images</label>
+            {imagePreviews.length > 0 && (
+              <div className="grid grid-cols-3 gap-2 mb-2">
+                {imagePreviews.map((src, idx) => (
+                  <div key={idx} className="relative group rounded-xl overflow-hidden aspect-video bg-gray-100 dark:bg-gray-800">
+                    <img src={src} alt="" className="w-full h-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setImagePreviews((p) => p.filter((_, i) => i !== idx));
+                        if (src.startsWith('blob:')) {
+                          setImageFiles((f) => f.filter((_, i) => {
+                            const blobIdx = imagePreviews.filter((u) => u.startsWith('blob:')).indexOf(src);
+                            return i !== blobIdx;
+                          }));
+                        }
+                      }}
+                      className="absolute top-1 right-1 bg-black/60 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                    >×</button>
+                  </div>
+                ))}
+              </div>
+            )}
+            {imagePreviews.length < 5 && (
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => {
+                    const files = Array.from(e.target.files ?? []);
+                    const remaining = 5 - imagePreviews.length;
+                    const picked = files.slice(0, remaining);
+                    picked.forEach((f) => {
+                      setImagePreviews((p) => [...p, URL.createObjectURL(f)]);
+                      setImageFiles((prev) => [...prev, f]);
+                    });
+                    e.target.value = '';
+                  }}
+                />
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border border-dashed border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:border-indigo-400 hover:text-indigo-500 transition-colors">
+                  + {imagePreviews.length > 0 ? `Add more (${imagePreviews.length}/5)` : 'Upload images (max 5)'}
+                </span>
+              </label>
+            )}
+          </div>
+
           {/* AI Image flag */}
+          {imagePreviews.length > 0 && (
           <label className="flex items-center gap-2.5 cursor-pointer select-none">
             <input
               type="checkbox"
@@ -862,6 +935,7 @@ function EditPostModal({
               <span className="ml-1.5 px-1.5 py-0.5 text-xs rounded-md bg-purple-100 dark:bg-purple-500/15 text-purple-700 dark:text-purple-400 font-medium">AI Image</span>
             </span>
           </label>
+          )}
 
           {/* SEO — collapsible */}
           <div className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
