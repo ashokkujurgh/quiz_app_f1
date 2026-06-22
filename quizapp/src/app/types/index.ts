@@ -25,6 +25,7 @@ export interface Post {
   content: string;
   image?: string;
   images?: string[];
+  isAiImage?: boolean;
   topic: QuizTopic;
   subTopic?: string | null;
   userType?: 'user' | 'admin';

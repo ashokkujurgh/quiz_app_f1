@@ -421,6 +421,21 @@ export function PostCard({ post }: Props) {
           </Box>
         )}
 
+        {/* AI Image badge */}
+        {post.isAiImage && postImages.length > 0 && (
+          <Box sx={{ mt: 1 }}>
+            <Box component="span" sx={{
+              display: 'inline-flex', alignItems: 'center', gap: 0.5,
+              px: 1, py: 0.25, borderRadius: 1,
+              bgcolor: 'rgba(147,51,234,0.12)',
+              color: 'rgb(147,51,234)',
+              fontSize: '0.7rem', fontWeight: 600,
+            }}>
+              ✦ AI Generated Image
+            </Box>
+          </Box>
+        )}
+
         {/* Quiz Result Card */}
         {post.quizResult && <QuizResultCard result={post.quizResult} isAdmin={post.userType === 'admin'} />}
       </CardContent>
