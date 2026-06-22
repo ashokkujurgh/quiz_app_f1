@@ -15,6 +15,7 @@ from trending import fetch_trending_news, fetch_web_context, fetch_wikipedia_tre
 from generator import generate_post, pick_post_mode, embed_text
 from pinecone_client import post_exists, upsert_post
 from post_client import save_post
+from filter_client import is_content_allowed
 from config import POSTS_PER_RUN
 
 logger = logging.getLogger(__name__)
@@ -94,7 +95,17 @@ def run_agent() -> None:
             logger.info("Duplicate detected (matched=%s) for '%s'. Skipping.", matched_id, subtopic_name)
             continue
 
-        # 8. Save to MongoDB (no image)
+        # 8. Content policy filter
+        filter_text = f"{title}\n{content}" if title else content
+        allowed, filter_reason = is_content_allowed(filter_text)
+        if not allowed:
+            logger.warning(
+                "Post BLOCKED by filter for '%s': %s. Skipping.",
+                subtopic_name, filter_reason,
+            )
+            continue
+
+        # 9. Save to MongoDB (no image)
         post = save_post(
             title=title,
             content=content,
@@ -107,7 +118,7 @@ def run_agent() -> None:
             logger.error("MongoDB save failed for '%s'. Skipping Pinecone upsert.", subtopic_name)
             continue
 
-        # 9. Upsert to Pinecone
+        # 10. Upsert to Pinecone
         upsert_post(
             post_id=post["_id"],
             embedding=embedding,

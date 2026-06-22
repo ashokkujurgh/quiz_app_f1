@@ -11,6 +11,7 @@ PINECONE_API_KEY    = os.getenv("PINECONE_API_KEY")
 TOPIC_API_URL       = os.getenv("TOPIC_API_URL",    "http://localhost:4002")
 POST_API_URL        = os.getenv("POST_API_URL",     "http://localhost:4004")
 AUTH_API_URL        = os.getenv("AUTH_API_URL",     "http://localhost:4001")
+FILTER_API_URL      = os.getenv("FILTER_API_URL",   "http://localhost:5051")
 
 # Admin credentials
 ADMIN_EMAIL         = os.getenv("ADMIN_EMAIL",      "admin@meenzo.com")
