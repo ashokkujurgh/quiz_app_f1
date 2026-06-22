@@ -1,5 +1,5 @@
 import express, { Request, Response } from 'express';
-import { protect, optionalAuth } from '../middleware/auth';
+import { protect, optionalAuth, adminOnly } from '../middleware/auth';
 import {
   getPosts,
   getPost,
@@ -14,6 +14,9 @@ import {
   toggleCommentLike,
   getUserPosts,
   createInternalPost,
+  getPendingPosts,
+  approvePost,
+  rejectPost,
 } from '../controllers/postController';
 
 const router = express.Router();
@@ -26,6 +29,11 @@ router.post('/internal', (req: Request, res: Response, next: express.NextFunctio
   }
   next();
 }, createInternalPost);
+
+// ── Admin approval ────────────────────────────────────────────────────────────
+router.get('/admin/pending',    protect, adminOnly, getPendingPosts);
+router.patch('/:id/approve',   protect, adminOnly, approvePost);
+router.patch('/:id/reject',    protect, adminOnly, rejectPost);
 
 // ── Feed ──────────────────────────────────────────────────────────────────────
 router.get('/',                                           optionalAuth, getPosts);

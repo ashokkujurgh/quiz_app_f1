@@ -51,7 +51,7 @@ export const getPosts: RequestHandler = async (req: AuthRequest, res: Response) 
   try {
     const { topic, subTopic, page = '1', limit = '20', q } = req.query as Record<string, string>;
 
-    const filter: Record<string, unknown> = { isActive: true };
+    const filter: Record<string, unknown> = { isActive: true, approvalStatus: 'approved' };
     if (q?.trim()) {
       filter.$or = [
         { content:  { $regex: q.trim(), $options: 'i' } },
@@ -302,10 +302,10 @@ export const createPost: RequestHandler = async (req: AuthRequest, res: Response
 // ── POST /api/posts/internal (service-to-service, no user JWT required) ──────
 export const createInternalPost: RequestHandler = async (req: AuthRequest, res: Response) => {
   try {
-    const { title, content, image, topic, subTopic, quizResult, authorName, authorUsername, authorAvatar, authorUserId, seo } = req.body as {
+    const { title, content, image, topic, subTopic, quizResult, authorName, authorUsername, authorAvatar, authorUserId, seo, isAiImage } = req.body as {
       title?: string; content?: string; image?: string; topic?: string; subTopic?: string;
       quizResult?: IQuizResult; authorName?: string; authorUsername?: string;
-      authorAvatar?: string; authorUserId?: string;
+      authorAvatar?: string; authorUserId?: string; isAiImage?: boolean;
       seo?: { metaTitle?: string; metaDescription?: string; keywords?: string[]; ogTitle?: string; ogDescription?: string; ogImage?: string | null; canonical?: string | null };
     };
 
@@ -322,16 +322,18 @@ export const createInternalPost: RequestHandler = async (req: AuthRequest, res: 
         username: authorUsername ?? 'meenzo',
         avatar:   authorAvatar   ?? null,
       },
-      userType:   'admin',
-      title:      title?.trim() ?? null,
+      userType:       'admin',
+      title:          title?.trim() ?? null,
       slug,
-      content:    content.trim(),
-      image:      image ?? null,
-      images:     image ? [image] : [],
+      content:        content.trim(),
+      image:          image ?? null,
+      images:         image ? [image] : [],
       topic,
-      subTopic:   subTopic ?? null,
-      quizResult: quizResult ?? null,
-      seo:        (seo as ISeoMeta | null | undefined) ?? null,
+      subTopic:       subTopic ?? null,
+      quizResult:     quizResult ?? null,
+      seo:            (seo as ISeoMeta | null | undefined) ?? null,
+      isAiImage:      isAiImage ?? false,
+      approvalStatus: 'pending',
     });
 
     res.status(201).json({ success: true, post });
@@ -355,19 +357,20 @@ export const updatePost: RequestHandler = async (req: AuthRequest, res: Response
       res.status(403).json({ success: false, message: 'Not authorised.' }); return;
     }
 
-    const { title, content, image, topic, subTopic, timezone, isActive, seo } = req.body as {
-      title?: string | null; content?: string; image?: string; topic?: string; subTopic?: string | null; timezone?: string; isActive?: boolean;
+    const { title, content, image, topic, subTopic, timezone, isActive, isAiImage, seo } = req.body as {
+      title?: string | null; content?: string; image?: string; topic?: string; subTopic?: string | null; timezone?: string; isActive?: boolean; isAiImage?: boolean;
       seo?: { metaTitle?: string; metaDescription?: string; keywords?: string[]; ogTitle?: string; ogDescription?: string; ogImage?: string | null; canonical?: string | null } | null;
     };
 
-    if (title     !== undefined) post.title    = title?.trim() ?? null;
-    if (seo       !== undefined) post.seo      = (seo as typeof post.seo) ?? null;
-    if (content   !== undefined) post.content  = content.trim();
-    if (image     !== undefined) post.image    = image;
+    if (title     !== undefined) post.title     = title?.trim() ?? null;
+    if (seo       !== undefined) post.seo       = (seo as typeof post.seo) ?? null;
+    if (content   !== undefined) post.content   = content.trim();
+    if (image     !== undefined) post.image     = image;
     if (topic?.trim()) post.topic = topic.trim();
-    if (subTopic  !== undefined) post.subTopic = subTopic ?? null;
-    if (timezone  !== undefined) post.timezone = timezone;
-    if (isActive  !== undefined) post.isActive = isActive;
+    if (subTopic  !== undefined) post.subTopic  = subTopic ?? null;
+    if (timezone  !== undefined) post.timezone  = timezone;
+    if (isActive  !== undefined) post.isActive  = isActive;
+    if (isAiImage !== undefined) post.isAiImage = isAiImage;
 
     await post.save();
     res.json({ success: true, post });
@@ -618,5 +621,52 @@ export const getUserPosts: RequestHandler = async (req: AuthRequest, res: Respon
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: 'Failed to fetch user posts.' });
+  }
+};
+
+// ── GET /api/posts/admin/pending  (admin: list pending AI posts) ──────────────
+export const getPendingPosts: RequestHandler = async (_req: AuthRequest, res: Response) => {
+  try {
+    const posts = await Post.find({ approvalStatus: 'pending' })
+      .sort({ createdAt: -1 })
+      .lean();
+    res.json({ success: true, posts });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Failed to fetch pending posts.' });
+  }
+};
+
+// ── PATCH /api/posts/:id/approve  (admin) ────────────────────────────────────
+export const approvePost: RequestHandler = async (req: AuthRequest, res: Response) => {
+  try {
+    if (!isValidId(req.params.id)) { res.status(400).json({ success: false, message: 'Invalid post id.' }); return; }
+    const post = await Post.findByIdAndUpdate(
+      req.params.id,
+      { approvalStatus: 'approved' },
+      { new: true }
+    );
+    if (!post) { res.status(404).json({ success: false, message: 'Post not found.' }); return; }
+    res.json({ success: true, post });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Failed to approve post.' });
+  }
+};
+
+// ── PATCH /api/posts/:id/reject  (admin) ─────────────────────────────────────
+export const rejectPost: RequestHandler = async (req: AuthRequest, res: Response) => {
+  try {
+    if (!isValidId(req.params.id)) { res.status(400).json({ success: false, message: 'Invalid post id.' }); return; }
+    const post = await Post.findByIdAndUpdate(
+      req.params.id,
+      { approvalStatus: 'rejected' },
+      { new: true }
+    );
+    if (!post) { res.status(404).json({ success: false, message: 'Post not found.' }); return; }
+    res.json({ success: true, post });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Failed to reject post.' });
   }
 };

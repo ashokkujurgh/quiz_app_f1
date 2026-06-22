@@ -38,3 +38,11 @@ export const optionalAuth: RequestHandler = (req: AuthRequest, _res: Response, n
   }
   next();
 };
+
+export const adminOnly: RequestHandler = (req: AuthRequest, res: Response, next: NextFunction): void => {
+  if (req.user?.role !== 'admin') {
+    res.status(403).json({ success: false, message: 'Admin access required.' });
+    return;
+  }
+  next();
+};
