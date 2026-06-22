@@ -220,6 +220,7 @@ export function HomePage() {
         content: p['content'] as string,
         image: p['image'] as string | undefined,
         images: p['images'] as string[] | undefined,
+        isAiImage: (p['isAiImage'] as boolean) ?? false,
         topic: p['topic'] as QuizTopic,
         subTopic: (p['subTopic'] as string | null) ?? null,
         userType: (p['userType'] as 'user' | 'admin') ?? 'user',
