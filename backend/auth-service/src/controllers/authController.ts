@@ -94,9 +94,10 @@ export const emailRegister: RequestHandler = async (req: AuthRequest, res: Respo
     try {
       const rawToken   = crypto.randomBytes(32).toString('hex');
       const hashed     = crypto.createHash('sha256').update(rawToken).digest('hex');
-      (user as any).emailVerifyToken   = hashed;
-      (user as any).emailVerifyExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
-      await (user as any).save({ validateBeforeSave: false });
+      await User.findByIdAndUpdate(user._id, {
+        emailVerifyToken:   hashed,
+        emailVerifyExpires: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      });
 
       const verifyUrl = `${process.env.FRONTEND_URL ?? 'https://meenzo.com'}/verify-email?token=${rawToken}`;
       await sendVerificationEmail(user.email, verifyUrl);
@@ -437,8 +438,8 @@ export const verifyEmail: RequestHandler = async (req, res): Promise<void> => {
     if (!user) { res.status(400).json({ success: false, message: 'Verification link is invalid or has expired.' }); return; }
 
     user.isEmailVerified        = true;
-    (user as any).emailVerifyToken   = null;
-    (user as any).emailVerifyExpires = null;
+    user.emailVerifyToken   = null;
+    user.emailVerifyExpires = null;
     await user.save({ validateBeforeSave: false });
 
     res.json({ success: true, message: 'Email verified! You can now log in.' });
@@ -460,9 +461,10 @@ export const resendVerification: RequestHandler = async (req, res): Promise<void
     }
 
     const rawToken = crypto.randomBytes(32).toString('hex');
-    (user as any).emailVerifyToken   = crypto.createHash('sha256').update(rawToken).digest('hex');
-    (user as any).emailVerifyExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
-    await (user as any).save({ validateBeforeSave: false });
+    await User.findByIdAndUpdate(user._id, {
+      emailVerifyToken:   crypto.createHash('sha256').update(rawToken).digest('hex'),
+      emailVerifyExpires: new Date(Date.now() + 24 * 60 * 60 * 1000),
+    });
 
     const verifyUrl = `${process.env.FRONTEND_URL ?? 'https://meenzo.com'}/verify-email?token=${rawToken}`;
     await sendVerificationEmail(user.email, verifyUrl);
@@ -516,8 +518,8 @@ export const resetPassword: RequestHandler = async (req, res): Promise<void> => 
     if (!user) { res.status(400).json({ success: false, message: 'Reset link is invalid or has expired.' }); return; }
 
     user.password             = password;
-    user.passwordResetToken   = null as any;
-    user.passwordResetExpires = null as any;
+    user.passwordResetToken   = null;
+    user.passwordResetExpires = null;
     await user.save();
 
     res.json({ success: true, message: 'Password reset successfully. You can now log in.' });

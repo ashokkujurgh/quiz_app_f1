@@ -101,19 +101,21 @@ const userSchema = new Schema<IUser>(
 
 // ── Hash password before save ─────────────────────────────
 userSchema.pre('save', async function (next) {
-  if (!this.isModified('password') || !this.password) return next();
-  this.password = await bcrypt.hash(this.password, 12);
+  const doc = this as any;
+  if (!this.isModified('password') || !doc.password) return next();
+  doc.password = await bcrypt.hash(doc.password, 12);
   next();
 });
 
 // ── Auto-generate username from email ─────────────────────
 userSchema.pre('validate', function (next) {
-  if (!this.username && this.email) {
-    const base = this.email
+  const doc = this as any;
+  if (!doc.username && doc.email) {
+    const base = doc.email
       .split('@')[0]
       .toLowerCase()
       .replace(/[^a-z0-9_]/g, '_');
-    this.username = `${base}_${Math.floor(Math.random() * 9000) + 1000}`;
+    doc.username = `${base}_${Math.floor(Math.random() * 9000) + 1000}`;
   }
   next();
 });
