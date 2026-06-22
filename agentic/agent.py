@@ -26,6 +26,7 @@ def run_agent() -> None:
         logger.warning("No active subtopics found. Skipping.")
         return
 
+    logger.info("Total available subtopics: %d", len(subtopics))
     selected = random.sample(subtopics, min(SUBTOPICS_PER_RUN, len(subtopics)))
     logger.info("Processing %d subtopics: %s", len(selected), [s["name"] for s in selected])
 
@@ -35,13 +36,15 @@ def run_agent() -> None:
         topic_id     = subtopic["topicId"]
         subtopic_id  = subtopic["_id"]
 
-        logger.info("Generating question for '%s > %s'…", topic_name, subtopic_name)
+        logger.info("--- Generating question for '%s > %s'…", topic_name, subtopic_name)
         question = generate_question(topic_name, subtopic_name)
         if not question:
             logger.warning("No question generated for '%s'. Skipping.", subtopic_name)
             continue
 
+        logger.info("Generated: %s", question.get("text", "")[:80])
         exists, matched_id = question_exists(question["text"])
+        logger.info("Duplicate check result: exists=%s, matched_id=%s", exists, matched_id)
         if exists:
             logger.info(
                 "Duplicate question detected (matched=%s) for '%s'. Skipping.",
@@ -49,6 +52,7 @@ def run_agent() -> None:
             )
             continue
 
+        logger.info("Saving to backend…")
         saved = save_question(question, topic_id, subtopic_id)
         if not saved:
             logger.error("Backend save failed for '%s'. Skipping Pinecone upsert.", subtopic_name)

@@ -72,6 +72,7 @@ def question_exists(text: str) -> tuple[bool, str | None]:
         return False, None
 
     doc, score = results[0]
+    logger.info("Top Pinecone score: %.4f (threshold=%.2f)", score, SIMILARITY_THRESHOLD)
     if score >= SIMILARITY_THRESHOLD:
         matched_id = doc.metadata.get("question_id")
         logger.info("Duplicate detected (score=%.4f, id=%s)", score, matched_id)
