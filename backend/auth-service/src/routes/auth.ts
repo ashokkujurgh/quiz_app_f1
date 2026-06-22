@@ -15,6 +15,10 @@ import {
   uploadAvatar,
   uploadCover,
   updateProfile,
+  forgotPassword,
+  resetPassword,
+  verifyEmail,
+  resendVerification,
 } from '../controllers/authController';
 
 const router = express.Router();
@@ -32,11 +36,15 @@ const updateProfileRules = [
 ];
 
 // ── Routes ────────────────────────────────────────────────
-router.post('/firebase',  firebaseAuth);
-router.post('/register',  emailRegister);
-router.post('/login',     emailLogin);
-router.post('/refresh',   refreshToken);
-router.post('/logout',    protect, logout);
+router.post('/firebase',         firebaseAuth);
+router.post('/register',         emailRegister);
+router.post('/login',            emailLogin);
+router.post('/refresh',          refreshToken);
+router.post('/logout',           protect, logout);
+router.post('/forgot-password',    forgotPassword);
+router.post('/reset-password',     resetPassword);
+router.post('/verify-email',       verifyEmail);
+router.post('/resend-verification', resendVerification);
 router.get('/me',         protect, getMe);
 router.post('/online',    protect, setOnline);
 router.post('/offline',   protect, setOffline);

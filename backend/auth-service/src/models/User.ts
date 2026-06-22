@@ -73,6 +73,11 @@ const userSchema = new Schema<IUser>(
 
     refreshTokens: { type: [refreshTokenSchema], default: [], select: false },
 
+    emailVerifyToken:     { type: String, default: null },
+    emailVerifyExpires:   { type: Date,   default: null },
+    passwordResetToken:   { type: String, default: null },
+    passwordResetExpires: { type: Date,   default: null },
+
     isActive: { type: Boolean, default: true },
     isOnline: { type: Boolean, default: false },
     lastSeen: { type: Date, default: Date.now },

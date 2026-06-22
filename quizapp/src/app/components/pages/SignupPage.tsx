@@ -1,23 +1,20 @@
 import { useState } from 'react';
 import logoUrl from '../../../assets/logo.png';
-import { useNavigate, Link } from 'react-router';
+import { Link } from 'react-router';
 import {
   Box, Card, CardContent, Typography, TextField, Button, Stack,
   IconButton, InputAdornment, Alert,
 } from '@mui/material';
-import { Visibility, VisibilityOff } from '@mui/icons-material';
-import { useAppDispatch } from '../../store/hooks';
-import { loginSuccess } from '../../store/slices/authSlice';
+import { Visibility, VisibilityOff, MarkEmailRead } from '@mui/icons-material';
 
 const API = import.meta.env.VITE_API_URL ?? '';
 
 export function SignupPage() {
-  const navigate = useNavigate();
-  const dispatch = useAppDispatch();
   const [form, setForm] = useState({ name: '', email: '', password: '', confirm: '' });
   const [showPw, setShowPw] = useState(false);
   const [error, setError]   = useState('');
   const [loading, setLoading] = useState(false);
+  const [registered, setRegistered] = useState(false);
 
   const update = (field: string) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((f) => ({ ...f, [field]: e.target.value }));
@@ -43,14 +40,36 @@ export function SignupPage() {
       });
       const data = await res.json();
       if (!res.ok) { setError(data.message ?? 'Registration failed.'); return; }
-      dispatch(loginSuccess({ user: data.user, accessToken: data.accessToken }));
-      navigate('/home');
+      setRegistered(true);
     } catch {
       setError('Network error. Please check your connection.');
     } finally {
       setLoading(false);
     }
   };
+
+  if (registered) {
+    return (
+      <Box sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'background.default', p: 2 }}>
+        <Card sx={{ width: '100%', maxWidth: 420, borderRadius: 3 }}>
+          <CardContent sx={{ p: 4, textAlign: 'center' }}>
+            <MarkEmailRead sx={{ fontSize: 60, color: 'success.main', mb: 2 }} />
+            <Typography variant="h5" fontWeight={700} mb={1}>Check your email</Typography>
+            <Typography variant="body2" color="text.secondary" mb={3}>
+              We sent a verification link to <strong>{form.email}</strong>. Click the link to activate your account.
+            </Typography>
+            <Button variant="contained" component={Link as any} to="/login" sx={{ borderRadius: 2, fontWeight: 700, mb: 2 }} fullWidth>
+              Go to sign in
+            </Button>
+            <Typography variant="body2" color="text.secondary">
+              Didn't receive it?{' '}
+              <Link to="/resend-verification" style={{ color: 'inherit', fontWeight: 600 }}>Resend email</Link>
+            </Typography>
+          </CardContent>
+        </Card>
+      </Box>
+    );
+  }
 
   return (
     <Box
