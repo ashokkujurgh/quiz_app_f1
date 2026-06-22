@@ -263,6 +263,11 @@ export function CreateQuizPage() {
   // Participants
   const [participants, setParticipants] = useState<ApiUser[]>([]);
 
+  // Image upload
+  const [imageFile, setImageFile]   = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState('');
+  const [uploading, setUploading]   = useState(false);
+
   // Submit state
   const [submitting, setSubmitting] = useState(false);
   const [error, setError]           = useState('');
@@ -299,6 +304,24 @@ export function CreateQuizPage() {
 
     setSubmitting(true);
     try {
+      // Upload image first if selected
+      if (imageFile) {
+        setUploading(true);
+        try {
+          const fd = new FormData();
+          fd.append('image', imageFile);
+          const uploadRes = await fetch(`${API}/api/auth/upload/image`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${accessToken}` },
+            body: fd,
+          });
+          const uploadData = await uploadRes.json();
+          if (uploadData.url) body.image = uploadData.url;
+        } catch { /* skip image on error */ } finally {
+          setUploading(false);
+        }
+      }
+
       const res  = await fetch(`${API}/api/quizzes`, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
@@ -375,6 +398,44 @@ export function CreateQuizPage() {
                     InputLabelProps={{ shrink: true }}
                   />
                 </Stack>
+
+                {/* Cover image */}
+                <Box>
+                  <Typography variant="body2" color="text.secondary" mb={1}>Cover Image (optional)</Typography>
+                  {imagePreview ? (
+                    <Box sx={{ position: 'relative', display: 'inline-block' }}>
+                      <Box component="img" src={imagePreview} alt="cover" sx={{ width: '100%', maxHeight: 160, objectFit: 'cover', borderRadius: 2 }} />
+                      <IconButton
+                        size="small"
+                        onClick={() => { setImagePreview(''); setImageFile(null); }}
+                        sx={{ position: 'absolute', top: 4, right: 4, bgcolor: 'rgba(0,0,0,0.5)', color: 'white', '&:hover': { bgcolor: 'rgba(0,0,0,0.7)' } }}
+                      >
+                        <Close fontSize="small" />
+                      </IconButton>
+                    </Box>
+                  ) : (
+                    <Box
+                      component="label"
+                      sx={{
+                        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                        border: '2px dashed', borderColor: 'divider', borderRadius: 2,
+                        py: 3, cursor: 'pointer', '&:hover': { borderColor: 'primary.main', bgcolor: 'action.hover' },
+                      }}
+                    >
+                      <Typography variant="body2" color="text.secondary">Click to upload cover image</Typography>
+                      <Typography variant="caption" color="text.disabled">JPEG, PNG, WebP — max 5 MB</Typography>
+                      <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (!f) return;
+                          setImageFile(f);
+                          setImagePreview(URL.createObjectURL(f));
+                          e.target.value = '';
+                        }}
+                      />
+                    </Box>
+                  )}
+                </Box>
               </Stack>
             </CardContent>
           </Card>
@@ -505,11 +566,11 @@ export function CreateQuizPage() {
           <Button
             variant="contained" size="large" fullWidth
             onClick={handleSubmit}
-            disabled={submitting}
-            startIcon={submitting ? <CircularProgress size={18} color="inherit" /> : undefined}
+            disabled={submitting || uploading}
+            startIcon={(submitting || uploading) ? <CircularProgress size={18} color="inherit" /> : undefined}
             sx={{ py: 1.5, fontWeight: 700, fontSize: '1rem' }}
           >
-            {submitting ? 'Creating Quiz…' : 'Create Quiz'}
+            {uploading ? 'Uploading image…' : submitting ? 'Creating Quiz…' : 'Create Quiz'}
           </Button>
 
         </Stack>

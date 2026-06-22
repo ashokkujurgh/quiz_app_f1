@@ -31,6 +31,8 @@ interface ApiQuiz {
   image?: string | null;
   topic?: { name?: string } | string | null;
   difficulty?: string;
+  scheduledAt?: string | null;
+  startedAt?: string | null;
 }
 
 interface ApiQuestion {
@@ -53,8 +55,10 @@ function mapQuiz(q: ApiQuiz): Omit<Quiz, 'questions'> & { _apiId: string; status
     thumbnail: q.image && q.image.trim() !== '' ? q.image : undefined,
     questionCount: q.questionCount,
     status: q.status,
+    scheduledAt: q.scheduledAt ?? null,
+    startedAt: q.startedAt ?? null,
     questions: [],
-  };
+  } as any;
 }
 
 function mapQuestion(q: ApiQuestion): QuizQuestion {
@@ -110,6 +114,18 @@ function QuizCard({ quiz, loading, onPlay, onHistory, onTest }: {
             <Chip size="small" color="secondary" label="Invite Only" sx={{ fontWeight: 700, fontSize: '0.7rem' }} />
           )}
         </Stack>
+
+        {/* Start time */}
+        {(quiz as any).scheduledAt && quiz.status === 'scheduled' && (
+          <Typography variant="caption" sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1, color: 'info.main', fontWeight: 600 }}>
+            🕐 Starts {new Date((quiz as any).scheduledAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
+          </Typography>
+        )}
+        {(quiz as any).startedAt && quiz.status === 'active' && (
+          <Typography variant="caption" sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1, color: 'success.main', fontWeight: 600 }}>
+            🟢 Started {new Date((quiz as any).startedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
+          </Typography>
+        )}
 
         <Typography variant="subtitle1" fontWeight={700} mb={0.5} sx={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
           {quiz.title}
