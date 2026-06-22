@@ -1008,9 +1008,9 @@ function EditPostModal({
             className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors">
             Cancel
           </button>
-          <button type="submit" form="epform" disabled={saving || !content.trim()}
+          <button type="submit" form="epform" disabled={saving || uploading || !content.trim()}
             className="px-5 py-2 text-sm font-semibold bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl disabled:opacity-50 transition-colors">
-            {saving ? 'Saving…' : 'Save Changes'}
+            {uploading ? 'Uploading…' : saving ? 'Saving…' : 'Save Changes'}
           </button>
         </div>
       </div>
