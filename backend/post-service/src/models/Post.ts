@@ -75,6 +75,8 @@ export interface IPost extends Document {
   comments: IComment[];
   quizResult: IQuizResult | null;
   isActive: boolean;
+  isAiImage: boolean;
+  approvalStatus: 'pending' | 'approved' | 'rejected';
   createdAt: Date;
   updatedAt: Date;
 }
@@ -163,7 +165,9 @@ const postSchema = new Schema<IPost>(
     savedBy:    { type: [Schema.Types.ObjectId], default: [] },
     comments:   { type: [commentSchema], default: [] },
     quizResult: { type: quizResultSchema, default: null },
-    isActive:   { type: Boolean, default: true },
+    isActive:       { type: Boolean, default: true },
+    isAiImage:      { type: Boolean, default: false },
+    approvalStatus: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'approved' },
   },
   { timestamps: true }
 );

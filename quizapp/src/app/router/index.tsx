@@ -19,6 +19,7 @@ import { AdminDashboard } from '../components/pages/AdminDashboard';
 import { PostDetailPage } from '../components/pages/PostDetailPage';
 import { PracticeQuizPage } from '../components/pages/PracticeQuizPage';
 import { UserProfilePage } from '../components/pages/UserProfilePage';
+import { PostsPage } from '../components/pages/PostsPage';
 import { NavOnlyLayout } from '../components/layout/NavOnlyLayout';
 
 function RequireAuth({ children }: { children: JSX.Element }) {
@@ -59,6 +60,7 @@ export const router = createBrowserRouter([
       { path: 'leaderboard',   element: <RequireAuth><LeaderboardPage /></RequireAuth> },
       { path: 'profile',           element: <RequireAuth><ProfilePage /></RequireAuth> },
       { path: 'profile/:userId',   element: <RequireAuth><UserProfilePage /></RequireAuth> },
+      { path: 'posts',         element: <RequireAuth><PostsPage /></RequireAuth> },
       { path: 'history',       element: <RequireAuth><HistoryPage /></RequireAuth> },
       { path: 'notifications',  element: <RequireAuth><NotificationsPage /></RequireAuth> },
       { path: 'settings',      element: <RequireAuth><SettingsPage /></RequireAuth> },
