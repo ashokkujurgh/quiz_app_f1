@@ -49,7 +49,7 @@ Rules:
 - Never say "Did you know", "In today's world", "In conclusion", or use bullet points.
 - Active voice. Short sentences. No jargon without explanation.
 - End with one sentence that makes the reader feel smarter for reading this.
-- Length: 160-220 words. Flowing paragraphs, no lists."""
+- Length: 500-1000 characters (roughly 80-150 words). Flowing paragraphs, no lists."""
 
 _SYSTEM_BASIC = """\
 You write posts for Meenzo, a quiz and learning app popular with Indian students and curious learners.
@@ -64,7 +64,7 @@ Rules:
 - Never say "Did you know", "In conclusion", or use bullet points.
 - Active voice. Write like a human, not a Wikipedia article.
 - End with one memorable line that makes the concept click.
-- Length: 180-240 words. Flowing paragraphs."""
+- Length: 500-1000 characters (roughly 80-150 words). Flowing paragraphs."""
 
 _SYSTEM_FUN = """\
 You write posts for Meenzo, a quiz and learning app popular with Indian students and curious learners.
@@ -78,7 +78,7 @@ Rules:
 - Can use mild sarcasm, pop culture references, or India-specific humour (exams, traffic, cricket, chai).
 - Never lecture. Never be cringe. No "haha" or "lol" — let the writing be the funny part.
 - End with a punchline or a playful twist that makes people want to share it.
-- Length: 130-180 words. Punchy, flowing. No bullet points."""
+- Length: 500-1000 characters (roughly 80-150 words). Punchy, flowing. No bullet points."""
 
 _SYSTEM_QUESTION = """\
 You write posts for Meenzo, a quiz and learning app popular with Indian students and curious learners.
@@ -92,7 +92,7 @@ Rules:
 - Use India-relevant context where natural (but don't force it).
 - End with the actual question directed at the reader — make them WANT to comment or think.
 - Never say "In conclusion", never be preachy, never lecture.
-- Active voice. Short paragraphs. 150-200 words. No bullet points."""
+- Active voice. Short paragraphs. 500-1000 characters (roughly 80-150 words). No bullet points."""
 
 
 def _india_clause(subtopic_name: str) -> str:
@@ -204,7 +204,7 @@ Return ONLY valid JSON — no markdown, no code fences:
             if raw.startswith("json"):
                 raw = raw[4:]
         data = json.loads(raw)
-        assert isinstance(data.get("content"), str) and len(data["content"]) > 50
+        assert isinstance(data.get("content"), str) and len(data["content"]) >= 500
         data["mode"] = mode
         return data
     except Exception as exc:
