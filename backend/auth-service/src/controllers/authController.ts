@@ -1,10 +1,12 @@
 import { Response, RequestHandler } from 'express';
 import { validationResult } from 'express-validator';
+import crypto from 'crypto';
 import User from '../models/User';
 import { createTokenPair, verifyRefreshToken } from '../utils/jwt';
 import { getFirebaseAuth } from '../config/firebase';
 import { deleteFileByUrl } from '../config/spaces';
 import rabbitMQ from '../config/rabbitmq';
+import { sendVerificationEmail, sendPasswordResetEmail } from '../config/mailer';
 import { AuthRequest, IUser, MulterS3File } from '../types';
 
 const emitUserStatus = (userId: string, isOnline: boolean) => {
@@ -81,15 +83,33 @@ export const emailRegister: RequestHandler = async (req: AuthRequest, res: Respo
     }
 
     const user = await User.create({
-      name:     name.trim(),
-      email:    email.trim().toLowerCase(),
+      name:            name.trim(),
+      email:           email.trim().toLowerCase(),
       password,
-      role:     'user',
+      role:            'user',
+      isEmailVerified: false,
     });
+
+    // Issue verification token and send email
+    try {
+      const rawToken   = crypto.randomBytes(32).toString('hex');
+      const hashed     = crypto.createHash('sha256').update(rawToken).digest('hex');
+      (user as any).emailVerifyToken   = hashed;
+      (user as any).emailVerifyExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      await (user as any).save({ validateBeforeSave: false });
+
+      const verifyUrl = `${process.env.FRONTEND_URL ?? 'https://meenzo.com'}/verify-email?token=${rawToken}`;
+      await sendVerificationEmail(user.email, verifyUrl);
+    } catch (mailErr) {
+      console.error('Verification email error:', mailErr);
+    }
 
     rabbitMQ.publish('user.registered', { userId: user._id.toString(), email: user.email }).catch(console.error);
 
-    await sendAuthResponse(res, req, user as IUser);
+    res.status(201).json({
+      success: true,
+      message: 'Account created! Please check your email and verify your account before logging in.',
+    });
   } catch (err) {
     console.error('Register error:', err);
     res.status(500).json({ success: false, message: 'Registration failed.' });
@@ -117,6 +137,10 @@ export const emailLogin: RequestHandler = async (req: AuthRequest, res: Response
     }
     if (user.isActive === false) {
       res.status(403).json({ success: false, message: 'Account disabled. Contact support.' });
+      return;
+    }
+    if (!user.isEmailVerified) {
+      res.status(403).json({ success: false, message: 'EMAIL_NOT_VERIFIED' });
       return;
     }
 
@@ -395,5 +419,110 @@ export const updateProfile: RequestHandler = async (req: AuthRequest, res: Respo
     res.json({ success: true, user });
   } catch {
     res.status(500).json({ success: false, message: 'Profile update failed.' });
+  }
+};
+
+// ── Email Verification ────────────────────────────────────────────────────────
+export const verifyEmail: RequestHandler = async (req, res): Promise<void> => {
+  const { token } = req.body as { token?: string };
+  if (!token) { res.status(400).json({ success: false, message: 'Token is required.' }); return; }
+
+  try {
+    const hashed = crypto.createHash('sha256').update(token).digest('hex');
+    const user   = await User.findOne({
+      emailVerifyToken:   hashed,
+      emailVerifyExpires: { $gt: new Date() },
+    });
+
+    if (!user) { res.status(400).json({ success: false, message: 'Verification link is invalid or has expired.' }); return; }
+
+    user.isEmailVerified        = true;
+    (user as any).emailVerifyToken   = null;
+    (user as any).emailVerifyExpires = null;
+    await user.save({ validateBeforeSave: false });
+
+    res.json({ success: true, message: 'Email verified! You can now log in.' });
+  } catch (err) {
+    console.error('verifyEmail error:', err);
+    res.status(500).json({ success: false, message: 'Verification failed. Please try again.' });
+  }
+};
+
+export const resendVerification: RequestHandler = async (req, res): Promise<void> => {
+  const { email } = req.body as { email?: string };
+  if (!email) { res.status(400).json({ success: false, message: 'Email is required.' }); return; }
+
+  try {
+    const user = await User.findOne({ email: email.toLowerCase().trim() });
+    if (!user || user.isEmailVerified) {
+      res.json({ success: true, message: 'If that email exists and is unverified, a new link has been sent.' });
+      return;
+    }
+
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    (user as any).emailVerifyToken   = crypto.createHash('sha256').update(rawToken).digest('hex');
+    (user as any).emailVerifyExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    await (user as any).save({ validateBeforeSave: false });
+
+    const verifyUrl = `${process.env.FRONTEND_URL ?? 'https://meenzo.com'}/verify-email?token=${rawToken}`;
+    await sendVerificationEmail(user.email, verifyUrl);
+
+    res.json({ success: true, message: 'If that email exists and is unverified, a new link has been sent.' });
+  } catch (err) {
+    console.error('resendVerification error:', err);
+    res.status(500).json({ success: false, message: 'Failed to resend. Please try again.' });
+  }
+};
+
+// ── Forgot Password ───────────────────────────────────────────────────────────
+export const forgotPassword: RequestHandler = async (req, res): Promise<void> => {
+  const { email } = req.body as { email?: string };
+  if (!email) { res.status(400).json({ success: false, message: 'Email is required.' }); return; }
+
+  try {
+    const user = await User.findOne({ email: email.toLowerCase().trim() });
+    // Always return 200 to avoid email enumeration
+    if (!user) { res.json({ success: true, message: 'If that email is registered you will receive a reset link.' }); return; }
+
+    const token   = crypto.randomBytes(32).toString('hex');
+    const expires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+    user.passwordResetToken   = crypto.createHash('sha256').update(token).digest('hex');
+    user.passwordResetExpires = expires;
+    await user.save({ validateBeforeSave: false });
+
+    const resetUrl = `${process.env.FRONTEND_URL ?? 'https://meenzo.com'}/reset-password?token=${token}`;
+    await sendPasswordResetEmail(user.email, resetUrl);
+
+    res.json({ success: true, message: 'If that email is registered you will receive a reset link.' });
+  } catch (err) {
+    console.error('forgotPassword error:', err);
+    res.status(500).json({ success: false, message: 'Failed to send reset email. Please try again.' });
+  }
+};
+
+export const resetPassword: RequestHandler = async (req, res): Promise<void> => {
+  const { token, password } = req.body as { token?: string; password?: string };
+  if (!token || !password) { res.status(400).json({ success: false, message: 'Token and new password are required.' }); return; }
+  if (password.length < 6) { res.status(400).json({ success: false, message: 'Password must be at least 6 characters.' }); return; }
+
+  try {
+    const hashed = crypto.createHash('sha256').update(token).digest('hex');
+    const user   = await User.findOne({
+      passwordResetToken:   hashed,
+      passwordResetExpires: { $gt: new Date() },
+    });
+
+    if (!user) { res.status(400).json({ success: false, message: 'Reset link is invalid or has expired.' }); return; }
+
+    user.password             = password;
+    user.passwordResetToken   = null as any;
+    user.passwordResetExpires = null as any;
+    await user.save();
+
+    res.json({ success: true, message: 'Password reset successfully. You can now log in.' });
+  } catch (err) {
+    console.error('resetPassword error:', err);
+    res.status(500).json({ success: false, message: 'Password reset failed. Please try again.' });
   }
 };

@@ -20,6 +20,10 @@ import { PostDetailPage } from '../components/pages/PostDetailPage';
 import { PracticeQuizPage } from '../components/pages/PracticeQuizPage';
 import { UserProfilePage } from '../components/pages/UserProfilePage';
 import { PostsPage } from '../components/pages/PostsPage';
+import { ForgotPasswordPage } from '../components/pages/ForgotPasswordPage';
+import { ResetPasswordPage } from '../components/pages/ResetPasswordPage';
+import { VerifyEmailPage } from '../components/pages/VerifyEmailPage';
+import { ResendVerificationPage } from '../components/pages/ResendVerificationPage';
 import { NavOnlyLayout } from '../components/layout/NavOnlyLayout';
 
 function RequireAuth({ children }: { children: JSX.Element }) {
@@ -36,8 +40,12 @@ function RedirectIfAuth({ children }: { children: JSX.Element }) {
 
 export const router = createBrowserRouter([
   { path: '/', element: <Navigate to="/home" replace /> },
-  { path: '/login',        element: <RedirectIfAuth><LoginPage /></RedirectIfAuth> },
-  { path: '/signup',       element: <RedirectIfAuth><SignupPage /></RedirectIfAuth> },
+  { path: '/login',            element: <RedirectIfAuth><LoginPage /></RedirectIfAuth> },
+  { path: '/signup',           element: <RedirectIfAuth><SignupPage /></RedirectIfAuth> },
+  { path: '/forgot-password',      element: <RedirectIfAuth><ForgotPasswordPage /></RedirectIfAuth> },
+  { path: '/reset-password',       element: <ResetPasswordPage /> },
+  { path: '/verify-email',         element: <VerifyEmailPage /> },
+  { path: '/resend-verification',  element: <ResendVerificationPage /> },
   { path: '/posts/:slug',  element: <PostDetailPage /> },
   { path: '/quiz/play/:quizId', element: <RequireAuth><QuizPlayPage /></RequireAuth> },
   {

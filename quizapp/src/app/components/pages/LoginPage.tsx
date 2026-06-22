@@ -20,6 +20,7 @@ export function LoginPage() {
   const [remember, setRemember] = useState(false);
   const [error, setError]       = useState('');
   const [loading, setLoading]   = useState(false);
+  const [showResend, setShowResend] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,7 +34,15 @@ export function LoginPage() {
         body: JSON.stringify({ email, password }),
       });
       const data = await res.json();
-      if (!res.ok) { setError(data.message ?? 'Invalid email or password.'); return; }
+      if (!res.ok) {
+        if (data.message === 'EMAIL_NOT_VERIFIED') {
+          setError('Please verify your email before signing in. Check your inbox or resend below.');
+          setShowResend(true);
+        } else {
+          setError(data.message ?? 'Invalid email or password.');
+        }
+        return;
+      }
       dispatch(loginSuccess({ user: data.user, accessToken: data.accessToken }));
       navigate('/home');
     } catch {
@@ -70,7 +79,14 @@ export function LoginPage() {
 
         <Card elevation={0} sx={{ border: '1px solid', borderColor: 'divider' }}>
           <CardContent sx={{ p: 4 }}>
-            {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+            {error && (
+              <Alert severity="error" sx={{ mb: 1 }}>
+                {error}
+                {showResend && (
+                  <> <Link to="/resend-verification" style={{ color: 'inherit', fontWeight: 700 }}>Resend verification email</Link></>
+                )}
+              </Alert>
+            )}
 
             <form onSubmit={handleSubmit}>
               <Stack spacing={2.5}>
@@ -105,7 +121,7 @@ export function LoginPage() {
                     control={<Checkbox checked={remember} onChange={(e) => setRemember(e.target.checked)} size="small" />}
                     label={<Typography variant="body2">Remember me</Typography>}
                   />
-                  <Typography variant="body2" color="primary" sx={{ cursor: 'pointer', fontWeight: 600 }}>
+                  <Typography variant="body2" color="primary" fontWeight={600} component={Link as any} to="/forgot-password" sx={{ textDecoration: 'none' }}>
                     Forgot password?
                   </Typography>
                 </Stack>
