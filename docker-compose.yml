@@ -31,6 +31,9 @@ services:
     environment:
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
       CLIENT_URL: http://localhost:7203
+      MAIL_USER: info@meenzo.com
+      MAIL_PASSWORD: Qazplmnx@ma01
+      FRONTEND_URL: https://meenzo.com
     depends_on:
       rabbitmq:
         condition: service_healthy
