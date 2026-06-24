@@ -7,10 +7,13 @@ import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
 import { Server } from 'socket.io';
 import connectDB from './config/db';
+import { initFirebase } from './config/firebase';
 import { setIO } from './config/socket';
 import messageRoutes from './routes/messages';
 import { authenticateSocket } from './middleware/auth';
 import { registerChatHandlers } from './socket/chatHandler';
+
+initFirebase();
 
 const app    = express();
 const server = http.createServer(app);

@@ -1,10 +1,14 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:http/http.dart' as http;
 import '../services/session_service.dart';
 import '../services/notification_service.dart';
+
+const String _authServiceUrl = 'https://api.meenzo.com/api/auth';
 
 const String _appUrl = 'https://meenzo.com';
 
@@ -39,6 +43,9 @@ class _WebViewScreenState extends State<WebViewScreen> {
           setState(() => _isLoading = false);
           await _injectSessionBridge();
           await _restoreSession();
+          // Register FCM token with backend whenever a page loads (covers login)
+          final fcmToken = await NotificationService.getToken();
+          if (fcmToken != null) await _registerFcmToken(fcmToken);
         },
         onWebResourceError: (error) {
           if (error.isForMainFrame ?? true) {
@@ -135,10 +142,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
         await SessionService.clear();
       } else if (raw.contains('"type":"fcm"')) {
         final token = _extract(raw, 'token');
-        if (token != null) {
-          // Send FCM token to your backend here if needed
-          debugPrint('FCM token from web: $token');
-        }
+        if (token != null) await _registerFcmToken(token);
       }
     } catch (e) {
       debugPrint('Session bridge error: $e');
@@ -148,6 +152,38 @@ class _WebViewScreenState extends State<WebViewScreen> {
   String? _extract(String json, String key) {
     final pattern = RegExp('"$key":"((?:[^"\\\\]|\\\\.)*)"');
     return pattern.firstMatch(json)?.group(1);
+  }
+
+  Future<void> _registerFcmToken(String fcmToken) async {
+    try {
+      final session = await SessionService.getAll();
+      // Try to get accessToken from session
+      String? accessToken;
+      for (final entry in session.entries) {
+        if (entry.key == 'accessToken') {
+          accessToken = entry.value;
+          break;
+        }
+        // Handle Redux persist:auth or auth key with JSON value
+        if ((entry.key == 'persist:auth' || entry.key == 'auth') && entry.value.contains('accessToken')) {
+          final match = RegExp(r'"accessToken"\s*:\s*"([^"]+)"').firstMatch(entry.value);
+          if (match != null) { accessToken = match.group(1); break; }
+        }
+      }
+      if (accessToken == null) return;
+
+      await http.post(
+        Uri.parse('$_authServiceUrl/fcm-token'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $accessToken',
+        },
+        body: jsonEncode({'token': fcmToken}),
+      );
+      debugPrint('FCM token registered with backend.');
+    } catch (e) {
+      debugPrint('FCM token registration failed: $e');
+    }
   }
 
   void _handleNotificationNavigation(String? url) {

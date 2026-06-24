@@ -7,9 +7,12 @@ import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
 
 import connectDB from './config/db';
+import { initFirebase } from './config/firebase';
 import quizRoutes from './routes/quiz';
 import { rehydrateSchedules, startCleanupJob, startPostRecoveryJob } from './jobs/scheduler';
 import { initGameSocket } from './socket/gameController';
+
+initFirebase();
 
 const app    = express();
 app.set('trust proxy', 1);

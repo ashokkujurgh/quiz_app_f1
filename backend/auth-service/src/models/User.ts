@@ -78,6 +78,8 @@ const userSchema = new Schema<IUser>(
     passwordResetToken:   { type: String, default: null },
     passwordResetExpires: { type: Date,   default: null },
 
+    fcmTokens: { type: [String], default: [] },
+
     isActive: { type: Boolean, default: true },
     isOnline: { type: Boolean, default: false },
     lastSeen: { type: Date, default: Date.now },

@@ -7,7 +7,7 @@ import { Send, ArrowBack, Message as MessageIcon, Image as ImageIcon, Close } fr
 import { io, Socket } from 'socket.io-client';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import {
-  fetchConversations, fetchMessages, sendMessage,
+  fetchConversations, fetchMessages, sendMessage, markConvRead,
   setActiveConv, appendMessage, setTyping, upsertConversation,
   type Conversation,
 } from '../../store/slices/messagesSlice';
@@ -104,11 +104,12 @@ export function MessagesPage() {
     return () => { socket.disconnect(); };
   }, [token, dispatch]);
 
-  // Join/leave conversation room
+  // Join/leave conversation room + mark as read
   useEffect(() => {
     if (!activeConvId) return;
     socketRef.current?.emit('conversation:join', activeConvId);
     dispatch(fetchMessages(activeConvId));
+    dispatch(markConvRead(activeConvId));
     return () => { socketRef.current?.emit('conversation:leave', activeConvId); };
   }, [activeConvId, dispatch]);
 

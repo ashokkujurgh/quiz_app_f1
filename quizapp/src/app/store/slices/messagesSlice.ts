@@ -61,6 +61,11 @@ export const fetchMessages = createAsyncThunk('messages/fetchMessages', async (c
   return { convId, messages: data.data as Message[] };
 });
 
+export const markConvRead = createAsyncThunk('messages/markConvRead', async (convId: string) => {
+  await apiFetch(`/api/messages/conversations/${convId}/read`, { method: 'POST' });
+  return convId;
+});
+
 export const sendMessage = createAsyncThunk(
   'messages/sendMessage',
   async ({ convId, text, imageUrl }: { convId: string; text: string; imageUrl?: string }) => {
@@ -116,9 +121,10 @@ const messagesSlice = createSlice({
       .addCase(fetchConversations.fulfilled, (state, a) => {
         state.loadingConvs = false;
         state.conversations = a.payload;
-        // Seed unread counts from server data (don't overwrite in-session increments)
+        // Seed unread counts from server — skip the currently open conversation (already cleared)
         for (const conv of a.payload) {
-          if (conv.unreadCount && conv.unreadCount > 0) {
+          if (conv._id === state.activeConvId) continue;
+          if (conv.unreadCount !== undefined) {
             state.unreadByConv[conv._id] = conv.unreadCount;
           }
         }
@@ -146,6 +152,9 @@ const messagesSlice = createSlice({
         if (!state.messages.find((m) => m._id === a.payload._id)) {
           state.messages.push(a.payload);
         }
+      })
+      .addCase(markConvRead.fulfilled, (state, a) => {
+        state.unreadByConv[a.payload] = 0;
       });
   },
 });

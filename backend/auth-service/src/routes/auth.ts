@@ -116,6 +116,47 @@ router.get('/blocked', protect, async (req: AuthRequest, res: Response): Promise
 });
 
 // Specific route BEFORE the :userId param route
+// ── FCM token management ──────────────────────────────────
+router.post('/fcm-token', protect, async (req: AuthRequest, res: Response): Promise<void> => {
+  const { token } = req.body as { token?: string };
+  if (!token) { res.status(400).json({ success: false, message: 'token is required.' }); return; }
+  await User.findByIdAndUpdate(req.user!._id, { $addToSet: { fcmTokens: token } });
+  res.json({ success: true });
+});
+
+router.delete('/fcm-token', protect, async (req: AuthRequest, res: Response): Promise<void> => {
+  const { token } = req.body as { token?: string };
+  if (!token) { res.status(400).json({ success: false, message: 'token is required.' }); return; }
+  await User.findByIdAndUpdate(req.user!._id, { $pull: { fcmTokens: token } });
+  res.json({ success: true });
+});
+
+// Internal: fetch FCM tokens for specific user IDs (used by message/post services)
+router.post('/users/fcm-tokens/batch', async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const ids: string[] = Array.isArray(req.body.userIds) ? req.body.userIds : [];
+    if (!ids.length) { res.json({ success: true, tokens: [] }); return; }
+    const users = await User.find({ _id: { $in: ids }, isActive: true, fcmTokens: { $exists: true, $not: { $size: 0 } } })
+      .select('fcmTokens').lean();
+    const tokens = users.flatMap((u: any) => u.fcmTokens as string[]);
+    res.json({ success: true, tokens });
+  } catch {
+    res.status(500).json({ success: false, message: 'Failed to fetch FCM tokens' });
+  }
+});
+
+// Internal: used by quiz-service to fetch all active FCM tokens for broadcast
+router.get('/users/fcm-tokens', async (_req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const users = await User.find({ isActive: true, fcmTokens: { $exists: true, $not: { $size: 0 } } })
+      .select('fcmTokens').lean();
+    const tokens = users.flatMap((u: any) => u.fcmTokens as string[]);
+    res.json({ success: true, tokens });
+  } catch {
+    res.status(500).json({ success: false, message: 'Failed to fetch FCM tokens' });
+  }
+});
+
 router.post('/users/bulk', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const ids: string[] = Array.isArray(req.body.ids) ? req.body.ids : [];
