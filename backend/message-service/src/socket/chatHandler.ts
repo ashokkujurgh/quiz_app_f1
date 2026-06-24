@@ -2,6 +2,7 @@ import { Server, Socket } from 'socket.io';
 import mongoose from 'mongoose';
 import Message from '../models/Message';
 import Conversation from '../models/Conversation';
+import { sendMessageNotification } from '../services/notificationService';
 
 interface AuthSocket extends Socket {
   user?: { id: string; username: string; email: string };
@@ -47,6 +48,18 @@ export function registerChatHandlers(io: Server, socket: AuthSocket): void {
       conv.participants.forEach((p) => {
         io.to(`user:${p.toString()}`).emit('message:new', msgObj);
       });
+
+      // Push notification to offline recipients
+      const recipientIds = conv.participants
+        .map((p) => p.toString())
+        .filter((id) => id !== me);
+      const senderUser = socket.user!;
+      sendMessageNotification(
+        recipientIds,
+        senderUser.username,
+        text.trim(),
+        conversationId,
+      ).catch(console.error);
     } catch (err) {
       console.error('[ChatSocket] message:send error:', err);
     }

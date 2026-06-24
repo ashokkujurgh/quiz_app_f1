@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import OpenAI from 'openai';
 import Post, { IQuizResult, ISeoMeta } from '../models/Post';
 import { AuthRequest } from '../middleware/auth';
+import { sendNewPostNotification, sendCommentNotification } from '../services/notificationService';
 
 // ── OpenAI client ─────────────────────────────────────────────────────────────
 const openai = process.env.OPENAI_API_KEY
@@ -524,6 +525,14 @@ export const addComment: RequestHandler = async (req: AuthRequest, res: Response
     await post.save();
 
     const saved = post.comments[post.comments.length - 1];
+
+    // Notify post author (skip if commenter is the author)
+    const authorId = post.author.userId.toString();
+    if (authorId !== req.user!.id) {
+      const postTitle = post.title ?? post.content.split(' ').slice(0, 8).join(' ');
+      sendCommentNotification(authorId, authorName, postTitle, post._id.toString()).catch(console.error);
+    }
+
     res.status(201).json({ success: true, comment: saved });
   } catch (err) {
     console.error(err);
@@ -647,6 +656,11 @@ export const approvePost: RequestHandler = async (req: AuthRequest, res: Respons
       { new: true }
     );
     if (!post) { res.status(404).json({ success: false, message: 'Post not found.' }); return; }
+
+    // Notify all users that a new post is live
+    const notifTitle = post.title ?? post.content.split(' ').slice(0, 8).join(' ');
+    sendNewPostNotification(post._id.toString(), notifTitle, post.topic ?? '').catch(console.error);
+
     res.json({ success: true, post });
   } catch (err) {
     console.error(err);

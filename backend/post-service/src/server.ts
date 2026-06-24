@@ -6,7 +6,10 @@ import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
 
 import connectDB from './config/db';
+import { initFirebase } from './config/firebase';
 import postRoutes from './routes/posts';
+
+initFirebase();
 
 const app  = express();
 const PORT = parseInt(process.env.PORT ?? '4004', 10);
