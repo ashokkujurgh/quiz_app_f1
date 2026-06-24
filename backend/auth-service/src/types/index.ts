@@ -40,6 +40,7 @@ export interface IUser extends Document {
   emailVerifyExpires:   Date   | null;
   passwordResetToken:   string | null;
   passwordResetExpires: Date   | null;
+  fcmTokens: string[];
   isActive: boolean;
   refreshTokens: IRefreshToken[];
   isOnline: boolean;
