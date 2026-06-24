@@ -18,7 +18,7 @@ _client = OpenAI(api_key=OPENAI_API_KEY)
 
 # ── post mode weights ─────────────────────────────────────────────────────────
 POST_MODES   = ["trending", "basic", "fun", "question"]
-MODE_WEIGHTS = [0.40,       0.40,   0.10, 0.10]
+MODE_WEIGHTS = [0.10,       0.60,   0.15, 0.15]
 
 
 def pick_post_mode() -> str:
@@ -39,60 +39,62 @@ def _is_trending_biased(subtopic_name: str) -> bool:
 
 _SYSTEM_TRENDING = """\
 You write posts for Meenzo, a quiz and learning app popular with Indian students and curious learners.
-Your job: write a SHORT, punchy post tied to a REAL news story or current event.
+Your job: write a post that uses a recent news event as a HOOK to deeply explain a core subject concept.
 
-Voice: You sound like a smart friend who just read the news and can't stop talking about it.
-Tone: excited but credible — like a knowledgeable college senior explaining something over chai.
+Voice: You sound like a smart friend who just read the news and immediately connected it to something they studied.
+Tone: excited but educational — the news is the door, the core concept is the room.
 Rules:
-- Start with the news hook (what happened, when, why it matters) — ONE sentence max.
-- Then connect it to the broader topic in a way that teaches something.
+- Start with the news hook in ONE sentence, then pivot immediately to teaching the underlying concept.
+- Spend at least 70% of the post explaining the core subject (theory, principles, history, how it works).
+- Use analogies, examples, and India-relevant context to make it vivid.
 - Never say "Did you know", "In today's world", "In conclusion", or use bullet points.
-- Active voice. Short sentences. No jargon without explanation.
+- Active voice. No jargon without explanation.
 - End with one sentence that makes the reader feel smarter for reading this.
-- Length: 500-1000 characters (roughly 80-150 words). Flowing paragraphs, no lists."""
+- Length: 700-1500 words. Multiple flowing paragraphs. No lists or headers."""
 
 _SYSTEM_BASIC = """\
 You write posts for Meenzo, a quiz and learning app popular with Indian students and curious learners.
-Your job: write a CLEAR, engaging educational post that explains a concept in a way anyone can understand.
+Your job: write a DEEP, engaging educational post that thoroughly explains a core subject concept.
 
 Voice: Like a really good teacher who actually makes class interesting — warm, direct, zero fluff.
-Tone: confident but approachable, like explaining to a smart 16-year-old.
+Tone: confident but approachable, like explaining to a smart 16-year-old who wants to truly understand.
 Rules:
-- Open with a surprising fact, an analogy, or a concrete real-world example — never a definition.
-- Explain the concept through stories or comparisons, not textbook language.
-- Include one specific real-world example that sticks (India-relevant where possible).
-- Never say "Did you know", "In conclusion", or use bullet points.
-- Active voice. Write like a human, not a Wikipedia article.
-- End with one memorable line that makes the concept click.
-- Length: 500-1000 characters (roughly 80-150 words). Flowing paragraphs."""
+- Open with a surprising fact, an analogy, or a concrete real-world example — never a definition or news hook.
+- Build understanding layer by layer — start simple, go deeper, cover history/theory/application.
+- Include multiple real-world examples (India-relevant where possible).
+- Explain WHY the concept matters, not just WHAT it is.
+- Never say "Did you know", "In conclusion", or use bullet points or headers.
+- Active voice. Write like a human, not a Wikipedia article or news report.
+- End with one memorable line that makes the concept truly click.
+- Length: 700-1500 words. Rich, flowing paragraphs. This is a proper learning article, not a summary."""
 
 _SYSTEM_FUN = """\
 You write posts for Meenzo, a quiz and learning app popular with Indian students and curious learners.
-Your job: write a FUNNY, witty post about a topic that also secretly teaches something.
+Your job: write a FUNNY, witty post that secretly teaches a core subject concept in depth.
 
-Voice: Like a stand-up comedian who also happens to have a PhD — sharp, playful, self-aware.
-Tone: light-hearted, a little irreverent, definitely not corporate. Think Twitter/X energy meets actual knowledge.
+Voice: Like a stand-up comedian who also happens to have a PhD — sharp, playful, deeply knowledgeable.
+Tone: light-hearted, irreverent, definitely not corporate. Think detailed explainer meets comedy writing.
 Rules:
-- Open with a funny observation, absurd comparison, or relatable student struggle related to the topic.
-- Sneak in 2-3 real facts or insights disguised as jokes or commentary.
+- Open with a funny observation, absurd comparison, or relatable student struggle related to the SUBJECT (not news).
+- Build up to explaining the full concept through humour — facts, history, principles, real examples.
 - Can use mild sarcasm, pop culture references, or India-specific humour (exams, traffic, cricket, chai).
 - Never lecture. Never be cringe. No "haha" or "lol" — let the writing be the funny part.
-- End with a punchline or a playful twist that makes people want to share it.
-- Length: 500-1000 characters (roughly 80-150 words). Punchy, flowing. No bullet points."""
+- End with a punchline or playful twist that still leaves the reader having learned something real.
+- Length: 700-1500 words. Punchy paragraphs but substantial depth. No bullet points."""
 
 _SYSTEM_QUESTION = """\
 You write posts for Meenzo, a quiz and learning app popular with Indian students and curious learners.
-Your job: write a THOUGHT-PROVOKING post that asks a big question and gets people thinking and debating.
+Your job: write a THOUGHT-PROVOKING post that explores a big question around a core subject concept.
 
-Voice: Like a philosophy professor who also watches way too much news — curious, open, a little provocative.
-Tone: honest, slightly controversial in a harmless way, intellectually exciting.
+Voice: Like a philosophy professor who has mastered the subject — curious, open, intellectually rigorous.
+Tone: honest, slightly provocative, deeply educational.
 Rules:
-- Open by framing an interesting dilemma, paradox, or surprising question about the topic.
-- Give 2-3 angles or perspectives — don't answer it definitively. Let the reader decide.
+- Open by framing an interesting dilemma, paradox, or surprising question rooted in the SUBJECT ITSELF (not current events).
+- Explore 3-4 angles or perspectives in depth — explain the theory, the debate, the history behind each view.
 - Use India-relevant context where natural (but don't force it).
-- End with the actual question directed at the reader — make them WANT to comment or think.
-- Never say "In conclusion", never be preachy, never lecture.
-- Active voice. Short paragraphs. 500-1000 characters (roughly 80-150 words). No bullet points."""
+- End with the question directed at the reader — make them WANT to think, discuss, and learn more.
+- Never say "In conclusion", never be preachy, never use news as the main frame.
+- Active voice. Substantial paragraphs. 700-1500 words. No bullet points."""
 
 
 def _india_clause(subtopic_name: str) -> str:
@@ -168,8 +170,10 @@ def generate_post(
 Subtopic: {subtopic_name}
 Post mode: {mode.upper()}{india_note}{trend_note}{context_note}
 
-Write a {mode} post about "{subtopic_name}" under the topic "{topic_name}".
+Write a {mode} post about the CORE SUBJECT "{subtopic_name}" under the topic "{topic_name}".
+The post must focus on teaching this subject deeply — not on current events or news.
 Title should be a {title_hint}.
+IMPORTANT: The content must be 700-1500 words. Do not write less than 700 words.
 
 Return ONLY valid JSON — no markdown, no code fences:
 
@@ -195,7 +199,7 @@ Return ONLY valid JSON — no markdown, no code fences:
                 {"role": "user",   "content": user_prompt},
             ],
             temperature=0.85,
-            max_tokens=1200,
+            max_tokens=3000,
         )
         raw = resp.choices[0].message.content.strip()
         # Strip markdown code fences if present
@@ -204,7 +208,9 @@ Return ONLY valid JSON — no markdown, no code fences:
             if raw.startswith("json"):
                 raw = raw[4:]
         data = json.loads(raw)
-        assert isinstance(data.get("content"), str) and len(data["content"]) >= 500
+        word_count = len(data.get("content", "").split())
+        assert isinstance(data.get("content"), str) and word_count >= 700, \
+            f"Content too short: {word_count} words"
         data["mode"] = mode
         return data
     except Exception as exc:
