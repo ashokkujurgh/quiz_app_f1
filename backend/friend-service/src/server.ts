@@ -5,7 +5,10 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
 import connectDB from './config/db';
+import { initFirebase } from './config/firebase';
 import friendRoutes from './routes/friends';
+
+initFirebase();
 
 const app  = express();
 const PORT = process.env.PORT ?? 4006;
