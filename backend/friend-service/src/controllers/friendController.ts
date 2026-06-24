@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import FriendRequest from '../models/FriendRequest';
 import User from '../models/User';
 import { AuthRequest } from '../middleware/auth';
+import { sendFriendRequestNotification, sendFriendAcceptedNotification } from '../services/notificationService';
 
 // POST /api/friends/request/:userId
 export async function sendRequest(req: AuthRequest, res: Response): Promise<void> {
@@ -22,11 +23,13 @@ export async function sendRequest(req: AuthRequest, res: Response): Promise<void
     existing.receiver = new mongoose.Types.ObjectId(userId);
     existing.status   = 'pending';
     await existing.save();
+    sendFriendRequestNotification(userId, req.user!.username).catch(console.error);
     res.json({ success: true, data: existing });
     return;
   }
 
   const request = await FriendRequest.create({ sender: me, receiver: userId, status: 'pending' });
+  sendFriendRequestNotification(userId, req.user!.username).catch(console.error);
   res.status(201).json({ success: true, data: request });
 }
 
@@ -39,6 +42,8 @@ export async function acceptRequest(req: AuthRequest, res: Response): Promise<vo
   }
   request.status = 'accepted';
   await request.save();
+  // Notify the original sender that their request was accepted
+  sendFriendAcceptedNotification(request.sender.toString(), req.user!.username).catch(console.error);
   res.json({ success: true, data: request });
 }
 
