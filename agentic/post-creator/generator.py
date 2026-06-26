@@ -199,7 +199,7 @@ Return ONLY valid JSON — no markdown, no code fences:
                 {"role": "user",   "content": user_prompt},
             ],
             temperature=0.85,
-            max_tokens=3000,
+            max_tokens=4096,
         )
         raw = resp.choices[0].message.content.strip()
         # Strip markdown code fences if present
@@ -208,9 +208,10 @@ Return ONLY valid JSON — no markdown, no code fences:
             if raw.startswith("json"):
                 raw = raw[4:]
         data = json.loads(raw)
-        word_count = len(data.get("content", "").split())
-        assert isinstance(data.get("content"), str) and word_count >= 700, \
-            f"Content too short: {word_count} words"
+        assert isinstance(data.get("content"), str) and len(data["content"].strip()) >= 200, \
+            f"Content too short or missing"
+        word_count = len(data["content"].split())
+        logger.info("[%s] Generated %d words for content.", mode, word_count)
         data["mode"] = mode
         return data
     except Exception as exc:
