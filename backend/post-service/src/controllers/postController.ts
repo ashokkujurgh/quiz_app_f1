@@ -258,16 +258,18 @@ export const createPost: RequestHandler = async (req: AuthRequest, res: Response
       }
     }
 
-    // ── OpenAI second-layer: topic relevance + safety (all users including admin) ──
-    const aiCheck = await openAIValidate(content.trim(), topic, subTopic ?? null, imageList);
-    if (!aiCheck.allowed) {
-      res.status(422).json({
-        success: false,
-        message: aiCheck.reason?.toLowerCase().includes('topic')
-          ? `⚠️ Your post doesn't seem to belong to the "${subTopic ?? topic}" topic. Please post in the correct category or update your content to match.`
-          : `⚠️ Your post was flagged by our content review: ${aiCheck.reason ?? 'policy violation detected'}. Please revise and try again.`,
-      });
-      return;
+    // ── OpenAI second-layer: topic relevance + safety (users only — admins are trusted) ──
+    if (userType === 'user') {
+      const aiCheck = await openAIValidate(content.trim(), topic, subTopic ?? null, imageList);
+      if (!aiCheck.allowed) {
+        res.status(422).json({
+          success: false,
+          message: aiCheck.reason?.toLowerCase().includes('topic')
+            ? `⚠️ Your post doesn't seem to belong to the "${subTopic ?? topic}" topic. Please post in the correct category or update your content to match.`
+            : `⚠️ Your post was flagged by our content review: ${aiCheck.reason ?? 'policy violation detected'}. Please revise and try again.`,
+        });
+        return;
+      }
     }
 
     const titleText = title?.trim() ?? content.trim().split(' ').slice(0, 10).join(' ');
@@ -334,7 +336,7 @@ export const createInternalPost: RequestHandler = async (req: AuthRequest, res: 
       quizResult:     quizResult ?? null,
       seo:            (seo as ISeoMeta | null | undefined) ?? null,
       isAiImage:      isAiImage ?? false,
-      approvalStatus: 'pending',
+      approvalStatus: 'approved',
     });
 
     res.status(201).json({ success: true, post });
