@@ -28,6 +28,8 @@ TRENDING_BIASED_SUBTOPICS = {
     "geopolitics", "geo politics", "international relations", "current affairs",
     "geography", "environment", "climate",
     "innovation", "technology", "artificial intelligence", "robotics",
+    "history", "polity", "political science", "civics",
+    "social science", "social studies", "sociology",
 }
 
 # RSS feeds — topic-specific + Google News for real-time trending
@@ -122,12 +124,13 @@ def _rss_feed_key(subtopic_name: str) -> str:
     name = subtopic_name.lower()
     if any(k in name for k in ["engineer", "computer", "software", "it ", "information tech"]):
         return "engineering"
+    # checked before the generic "science" bucket so compound subjects route correctly
+    if any(k in name for k in ["geopolit", "international", "affairs", "diplomacy", "war", "polit", "civic", "social scien", "sociolog"]):
+        return "geopolitics"
     if any(k in name for k in ["science", "physics", "chemistry", "biology", "space"]):
         return "science"
     if any(k in name for k in ["econom", "finance", "market", "trade", "gdp", "inflation"]):
         return "economics"
-    if any(k in name for k in ["geopolit", "international", "affairs", "diplomacy", "war", "politic"]):
-        return "geopolitics"
     if any(k in name for k in ["geography", "environment", "climate", "ocean", "forest"]):
         return "geography"
     if any(k in name for k in ["innovat", "ai", "robot", "tech", "startup", "digital"]):
