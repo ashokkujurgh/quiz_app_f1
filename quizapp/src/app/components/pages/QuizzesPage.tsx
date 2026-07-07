@@ -12,6 +12,7 @@ import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import { startQuiz } from '../../store/slices/quizSlice';
 import { EmptyState } from '../shared/EmptyState';
 import type { Quiz, QuizQuestion, QuizTopic } from '../../types';
+import { formatDuration } from '../../utils/formatDuration';
 
 const SOCKET_URL = import.meta.env.VITE_API_URL || window.location.origin;
 const API = import.meta.env.VITE_API_URL ?? '';
@@ -137,7 +138,7 @@ function QuizCard({ quiz, loading, onPlay, onHistory, onTest }: {
         <Stack direction="row" spacing={2} mb={2}>
           <Stack direction="row" spacing={0.5} alignItems="center">
             <Timer sx={{ fontSize: 14, color: 'text.secondary' }} />
-            <Typography variant="caption" color="text.secondary">{mins} min</Typography>
+            <Typography variant="caption" color="text.secondary">{formatDuration(mins)}</Typography>
           </Stack>
           <Stack direction="row" spacing={0.5} alignItems="center">
             <QuizIcon sx={{ fontSize: 14, color: 'text.secondary' }} />

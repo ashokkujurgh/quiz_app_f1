@@ -5,6 +5,7 @@ import {
 import { Timer, StarRate, PlayArrow } from '@mui/icons-material';
 import type { Quiz } from '../../types';
 import { TopicChip, topicColors } from './TopicChip';
+import { formatDuration } from '../../utils/formatDuration';
 
 const difficultyColor = {
   Easy: 'success',
@@ -81,7 +82,7 @@ export function QuizCard({ quiz, onClick }: Props) {
             <Stack direction="row" spacing={2} alignItems="center">
               <Stack direction="row" spacing={0.5} alignItems="center">
                 <Timer sx={{ fontSize: 14, color: 'text.secondary' }} />
-                <Typography variant="caption" color="text.secondary">{mins} min</Typography>
+                <Typography variant="caption" color="text.secondary">{formatDuration(mins)}</Typography>
               </Stack>
               <Stack direction="row" spacing={0.5} alignItems="center">
                 <PlayArrow sx={{ fontSize: 14, color: 'text.secondary' }} />
