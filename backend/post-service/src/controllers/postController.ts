@@ -652,7 +652,8 @@ export const approvePost: RequestHandler = async (req: AuthRequest, res: Respons
     if (!isValidId(req.params.id)) { res.status(400).json({ success: false, message: 'Invalid post id.' }); return; }
     const post = await Post.findByIdAndUpdate(
       req.params.id,
-      { approvalStatus: 'approved' },
+      // bump createdAt to approval time so the post surfaces at the top of the createdAt-sorted feed
+      { approvalStatus: 'approved', createdAt: new Date() },
       { new: true }
     );
     if (!post) { res.status(404).json({ success: false, message: 'Post not found.' }); return; }
