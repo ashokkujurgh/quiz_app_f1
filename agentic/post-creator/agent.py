@@ -12,7 +12,7 @@ Post-creator agent:
 import logging
 from topic_client import fetch_all_subtopics, pick_subtopics_with_priority
 from trending import fetch_trending_news, fetch_web_context, fetch_wikipedia_trending, match_trending_to_subtopic
-from generator import generate_post, pick_post_mode, embed_text
+from generator import generate_post, pick_post_mode, pick_level, embed_text
 from pinecone_client import post_exists, upsert_post
 from post_client import save_post
 from filter_client import is_content_allowed
@@ -46,9 +46,10 @@ def run_agent() -> None:
         topic_name    = subtopic["topicName"]
         subtopic_name = subtopic["name"]
 
-        # 4. Pick post mode
-        mode = pick_post_mode()
-        logger.info("Processing: %s > %s  [mode=%s]", topic_name, subtopic_name, mode)
+        # 4. Pick post mode + reading level
+        mode  = pick_post_mode()
+        level = pick_level()
+        logger.info("Processing: %s > %s  [mode=%s, level=%s]", topic_name, subtopic_name, mode, level)
 
         # 5a. Fetch live trending news (always — used by trending + question modes)
         trending_news = fetch_trending_news(subtopic, limit=6)
@@ -70,6 +71,7 @@ def run_agent() -> None:
             topic_name=topic_name,
             subtopic_name=subtopic_name,
             mode=mode,
+            level=level,
             trending_news=trending_news if trending_news else None,
             web_context=web_context or None,
             trending_hint=trending_hint,
@@ -128,13 +130,15 @@ def run_agent() -> None:
                 "topic":    topic_name,
                 "subtopic": subtopic_name,
                 "mode":     mode,
+                "level":    level,
                 "trending": trending_hint or "",
             },
         )
 
         logger.info(
-            "✅ [%s] Post created: '%s' (%s > %s)",
+            "✅ [%s/%s] Post created: '%s' (%s > %s)",
             mode.upper(),
+            level.upper(),
             (title or "(no title)")[:60],
             topic_name,
             subtopic_name,

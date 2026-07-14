@@ -45,5 +45,9 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Meenzo needs access to your photo library to attach images to posts, messages, your profile, and quizzes.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Meenzo needs access to your camera to take photos for posts, messages, your profile, and quizzes.</string>
 </dict>
 </plist>

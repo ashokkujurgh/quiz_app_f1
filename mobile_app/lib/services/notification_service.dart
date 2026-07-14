@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
@@ -6,6 +8,25 @@ typedef NavigationCallback = void Function(String? url);
 class NotificationService {
   static final _localNotifications = FlutterLocalNotificationsPlugin();
   static NavigationCallback? _navigationCallback;
+
+  /// No backend notification service exists (verified: no notification-service
+  /// in docker-compose.yml, and notificationsSlice.ts on the web app uses mock
+  /// data) — so the Notifications feature is built entirely from the FCM
+  /// messages this app actually receives, via this broadcast stream, rather
+  /// than a REST-backed feed.
+  static final _messageReceivedController = StreamController<RemoteMessage>.broadcast();
+  static Stream<RemoteMessage> get onMessageReceived => _messageReceivedController.stream;
+
+  /// Set when the app is launched (cold start) from a terminated state via a
+  /// notification tap. Consumed once the router/auth state is actually ready
+  /// to navigate, instead of firing on a blind delay.
+  static String? _pendingInitialUrl;
+
+  static String? consumePendingInitialUrl() {
+    final url = _pendingInitialUrl;
+    _pendingInitialUrl = null;
+    return url;
+  }
 
   static const _androidChannel = AndroidNotificationChannel(
     'meenzo_high_importance',
@@ -41,20 +62,23 @@ class NotificationService {
     // Foreground messages
     FirebaseMessaging.onMessage.listen((message) {
       showLocalNotification(message);
+      _messageReceivedController.add(message);
     });
 
     // App opened from notification (background → foreground)
     FirebaseMessaging.onMessageOpenedApp.listen((message) {
+      _messageReceivedController.add(message);
       final url = message.data['url'] as String?;
       _navigationCallback?.call(url);
     });
 
-    // App launched from terminated state via notification
+    // App launched from terminated state via notification. Stored rather
+    // than fired immediately — the router/auth state isn't ready this early
+    // in bootstrap; the shell consumes this once it is (see app_router.dart).
     final initial = await FirebaseMessaging.instance.getInitialMessage();
     if (initial != null) {
-      final url = initial.data['url'] as String?;
-      // Delay so the WebView is ready
-      Future.delayed(const Duration(seconds: 2), () => _navigationCallback?.call(url));
+      _pendingInitialUrl = initial.data['url'] as String?;
+      _messageReceivedController.add(initial);
     }
   }
 

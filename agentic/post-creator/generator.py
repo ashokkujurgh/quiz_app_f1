@@ -1,9 +1,13 @@
 """
 AI content generation with four human-like post modes:
-  trending  (40%) — news-hooked, current events angle
-  basic     (40%) — clear educational explainer, real-world examples
+  trending  (30%) — news-hooked, current events angle
+  basic     (50%) — clear educational explainer, real-world examples
   fun       (10%) — witty, light-hearted, meme-energy but still informative
   question  (10%) — thought-provoking question that sparks debate/discussion
+
+Each post also gets a reading level, independent of mode:
+  foundation (70%) — high-school / job-seeker level, no jargon left unexplained
+  advanced   (30%) — assumes the reader already knows the subject's fundamentals
 """
 import logging
 import json
@@ -24,6 +28,18 @@ MODE_WEIGHTS = [0.30,       0.50,   0.10, 0.10]
 
 def pick_post_mode() -> str:
     return random.choices(POST_MODES, weights=MODE_WEIGHTS, k=1)[0]
+
+
+# ── reading-level weights ──────────────────────────────────────────────────────
+# Meenzo's audience is mainly job-seekers/exam aspirants, not subject specialists —
+# so most posts should read at a high-school / plain-language level, with a
+# smaller share going deeper for readers who already know the fundamentals.
+LEVELS        = ["foundation", "advanced"]
+LEVEL_WEIGHTS = [0.70,          0.30]
+
+
+def pick_level() -> str:
+    return random.choices(LEVELS, weights=LEVEL_WEIGHTS, k=1)[0]
 
 
 def _is_india_biased(subtopic_name: str) -> bool:
@@ -114,6 +130,26 @@ Rules:
 """ + _QUALITY_BAR
 
 
+_LEVEL_FOUNDATION = """
+
+READING LEVEL: FOUNDATION (high-school student / job-seeker studying for exams, no specialist background in this subject).
+- The instant a technical term appears, explain it in one plain-language clause — never assume the reader has studied this subject before.
+- Prefer short, direct sentences over long specialist ones. If a concept needs a formula, number, or technical name, give its plain-English meaning right next to it.
+- Examples must be everyday and concrete — things a 10th-12th grade student or exam aspirant would recognize — not research-paper-level specifics or insider references.
+- Depth still matters: go deep on WHY and HOW, but build that depth through clear step-by-step explanation, not through denser vocabulary."""
+
+_LEVEL_ADVANCED = """
+
+READING LEVEL: ADVANCED (reader already knows the fundamentals of this subject).
+- You may use precise domain/technical terminology without pausing to define the basics.
+- Go deeper into mechanisms, edge cases, technical nuance, or specialist debate than a beginner post would.
+- Still ground everything in concrete facts and examples — advanced means more precise, not more abstract."""
+
+
+def _level_clause(level: str) -> str:
+    return _LEVEL_ADVANCED if level == "advanced" else _LEVEL_FOUNDATION
+
+
 def _india_clause(subtopic_name: str) -> str:
     if _is_india_50(subtopic_name):
         return (
@@ -152,13 +188,14 @@ def generate_post(
     topic_name: str,
     subtopic_name: str,
     mode: str,
+    level: str = "foundation",
     trending_news: list[dict] | None = None,
     web_context: str | None = None,
     trending_hint: str | None = None,
 ) -> dict | None:
     """
-    Generate a post with the given mode.
-    Returns { title, content, seo, mode } or None on failure.
+    Generate a post with the given mode and reading level.
+    Returns { title, content, seo, mode, level } or None on failure.
     """
     system_map = {
         "trending": _SYSTEM_TRENDING,
@@ -166,7 +203,7 @@ def generate_post(
         "fun":      _SYSTEM_FUN,
         "question": _SYSTEM_QUESTION,
     }
-    system_prompt = system_map.get(mode, _SYSTEM_BASIC)
+    system_prompt = system_map.get(mode, _SYSTEM_BASIC) + _level_clause(level)
 
     india_note   = _india_clause(subtopic_name)
     context_note = _context_clause(web_context, trending_news, mode)
@@ -237,8 +274,9 @@ Return ONLY valid JSON — no markdown, no code fences:
                 logger.warning("[%s] Still has issues after 2 rewrites (%s) — using it anyway.", mode, "; ".join(remaining))
 
         word_count = len(data["content"].split())
-        logger.info("[%s] Generated %d words for content.", mode, word_count)
+        logger.info("[%s/%s] Generated %d words for content.", mode, level, word_count)
         data["mode"] = mode
+        data["level"] = level
         return data
     except Exception as exc:
         logger.error("[%s] Content generation failed: %s", mode, exc)
