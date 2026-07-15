@@ -21,11 +21,38 @@ export interface PostAuthor {
 
 export interface Comment {
   _id: string;
-  text: string;
-  authorName: string;
-  authorUsername?: string;
-  authorAvatar?: string | null;
+  content: string;
+  author: {
+    userId?: string;
+    name: string;
+    username?: string;
+    avatar?: string | null;
+  };
+  likes?: number;
+  liked?: boolean;
   createdAt: string;
+}
+
+export interface TopPlayer {
+  rank: number;
+  name: string;
+  score: number;
+  total: number;
+  percentage: number;
+}
+
+export interface QuizResult {
+  quizId: string;
+  quizTitle: string;
+  category?: string;
+  score: number;
+  total: number;
+  percentage: number;
+  rank?: number | null;
+  duration?: number;
+  playerCount?: number;
+  avgPercentage?: number;
+  topPlayers?: TopPlayer[];
 }
 
 export interface Post {
@@ -38,6 +65,7 @@ export interface Post {
   topic: string;
   subTopic?: string | null;
   author: PostAuthor;
+  userType?: 'user' | 'admin';
   likedBy?: string[];
   savedBy?: string[];
   liked?: boolean;
@@ -47,13 +75,7 @@ export interface Post {
   comments?: Comment[];
   approvalStatus?: 'approved' | 'pending' | 'rejected';
   createdAt: string;
-  quizResult?: {
-    quizId: string;
-    quizTitle: string;
-    score: number;
-    total: number;
-    percentage: number;
-  } | null;
+  quizResult?: QuizResult | null;
 }
 
 export type QuizStatus = 'draft' | 'scheduled' | 'active' | 'completed' | 'cancelled';

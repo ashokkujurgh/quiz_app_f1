@@ -6,7 +6,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { HomeStackParamList } from '../../navigation/types';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
-import { fetchFeed, toggleLike, toggleSave } from '../../store/slices/postsSlice';
+import { fetchFeed, toggleLike } from '../../store/slices/postsSlice';
 import * as topicsApi from '../../api/services/topics';
 import { colors } from '../../theme/colors';
 import { fonts } from '../../theme/typography';
@@ -89,47 +89,49 @@ export default function HomeFeedScreen({ navigation }: Props) {
         </View>
       </View>
 
-      {!subTopicsLoading && subTopics.length > 0 ? (
-        <ScrollView
-          style={styles.subTopicWrapOuter}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.subTopicWrap}
-          nestedScrollEnabled
-        >
-          <TouchableOpacity onPress={() => setActiveSubTopicId(null)}>
-            {activeSubTopicId === null ? (
-              <LinearGradient colors={GRAD} locations={GRAD_LOCATIONS} start={DIAGONAL_START} end={DIAGONAL_END} style={styles.subTopicPill}>
-                <Text style={styles.subTopicTextActive}>All</Text>
-              </LinearGradient>
-            ) : (
-              <View style={[styles.subTopicPill, styles.subTopicPillInactive]}>
-                <Text style={styles.subTopicTextInactive}>All</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-          {subTopics.map((s) => {
-            const active = s._id === activeSubTopicId;
-            return (
-              <TouchableOpacity key={s._id} onPress={() => setActiveSubTopicId(active ? null : s._id)}>
-                {active ? (
-                  <LinearGradient colors={GRAD} locations={GRAD_LOCATIONS} start={DIAGONAL_START} end={DIAGONAL_END} style={styles.subTopicPill}>
-                    <Text style={styles.subTopicTextActive}>{s.name}</Text>
-                  </LinearGradient>
-                ) : (
-                  <View style={[styles.subTopicPill, styles.subTopicPillInactive]}>
-                    <Text style={styles.subTopicTextInactive}>{s.name}</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-      ) : null}
-
       <FlatList
         data={posts}
         keyExtractor={(item) => item._id}
         contentContainerStyle={styles.listContent}
+        ListHeaderComponent={
+          !subTopicsLoading && subTopics.length > 0 ? (
+            <ScrollView
+              horizontal
+              style={styles.subTopicWrapOuter}
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.subTopicWrap}
+              nestedScrollEnabled
+            >
+              <TouchableOpacity onPress={() => setActiveSubTopicId(null)}>
+                {activeSubTopicId === null ? (
+                  <LinearGradient colors={GRAD} locations={GRAD_LOCATIONS} start={DIAGONAL_START} end={DIAGONAL_END} style={styles.subTopicPill}>
+                    <Text style={styles.subTopicTextActive}>All</Text>
+                  </LinearGradient>
+                ) : (
+                  <View style={[styles.subTopicPill, styles.subTopicPillInactive]}>
+                    <Text style={styles.subTopicTextInactive}>All</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+              {subTopics.map((s) => {
+                const active = s._id === activeSubTopicId;
+                return (
+                  <TouchableOpacity key={s._id} onPress={() => setActiveSubTopicId(active ? null : s._id)}>
+                    {active ? (
+                      <LinearGradient colors={GRAD} locations={GRAD_LOCATIONS} start={DIAGONAL_START} end={DIAGONAL_END} style={styles.subTopicPill}>
+                        <Text style={styles.subTopicTextActive}>{s.name}</Text>
+                      </LinearGradient>
+                    ) : (
+                      <View style={[styles.subTopicPill, styles.subTopicPillInactive]}>
+                        <Text style={styles.subTopicTextInactive}>{s.name}</Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          ) : null
+        }
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
         renderItem={({ item }) => (
@@ -137,7 +139,6 @@ export default function HomeFeedScreen({ navigation }: Props) {
             post={item}
             onPress={() => navigation.navigate('PostDetail', { postId: item._id })}
             onLike={() => dispatch(toggleLike(item._id))}
-            onSave={() => dispatch(toggleSave(item._id))}
           />
         )}
         ItemSeparatorComponent={() => <View style={{ height: 16 }} />}
@@ -167,11 +168,11 @@ const styles = StyleSheet.create({
   headerIcons: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   bellBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.secondary, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
   bellDot: { position: 'absolute', top: 6, right: 6, width: 8, height: 8, borderRadius: 4, backgroundColor: colors.primary },
-  // Bounded height + vertical scroll (rather than one long horizontal row) so a large
-  // subtopic list wraps into multiple rows and scrolls in place instead of pushing
-  // the whole page down or requiring endless horizontal swiping.
-  subTopicWrapOuter: { flexGrow: 0, flexShrink: 0, maxHeight: 116, marginBottom: 12 },
-  subTopicWrap: { paddingHorizontal: 20, flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  // Lives inside the FlatList header so it scrolls away with the feed; negative
+  // horizontal margins cancel listContent's padding so the row spans full width
+  // and pills can slide edge-to-edge.
+  subTopicWrapOuter: { flexGrow: 0, flexShrink: 0, marginBottom: 12, marginHorizontal: -20 },
+  subTopicWrap: { paddingHorizontal: 20, flexDirection: 'row', gap: 8, alignItems: 'center' },
   subTopicPill: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999 },
   subTopicPillInactive: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.chipBorder },
   subTopicTextActive: { color: '#fff', fontFamily: fonts.headingSemiBold, fontSize: 12 },

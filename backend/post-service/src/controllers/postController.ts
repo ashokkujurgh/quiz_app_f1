@@ -540,6 +540,44 @@ export const addComment: RequestHandler = async (req: AuthRequest, res: Response
   }
 };
 
+// ── PATCH /api/posts/:id/comments/:commentId ──────────────────────────────────
+export const updateComment: RequestHandler = async (req: AuthRequest, res: Response) => {
+  try {
+    if (!isValidId(req.params.id) || !isValidId(req.params.commentId)) {
+      res.status(400).json({ success: false, message: 'Invalid id.' }); return;
+    }
+
+    const { content } = req.body as { content?: string };
+    if (!content?.trim()) {
+      res.status(400).json({ success: false, message: 'Comment content is required.' }); return;
+    }
+
+    const post = await Post.findById(req.params.id);
+    if (!post || !post.isActive) { res.status(404).json({ success: false, message: 'Post not found.' }); return; }
+
+    const comment = post.comments.find((c) => c._id.toString() === req.params.commentId);
+    if (!comment) { res.status(404).json({ success: false, message: 'Comment not found.' }); return; }
+
+    if (comment.author.userId.toString() !== req.user!.id) {
+      res.status(403).json({ success: false, message: 'Not authorised.' }); return;
+    }
+
+    const policy = await checkContentPolicy(content.trim());
+    if (!policy.allowed) {
+      res.status(422).json({ success: false, message: `Comment blocked: ${policy.reason ?? 'policy violation'}` });
+      return;
+    }
+
+    comment.content = content.trim();
+    await post.save();
+
+    res.json({ success: true, comment });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Failed to update comment.' });
+  }
+};
+
 // ── DELETE /api/posts/:id/comments/:commentId ─────────────────────────────────
 export const deleteComment: RequestHandler = async (req: AuthRequest, res: Response) => {
   try {

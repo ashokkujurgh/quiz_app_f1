@@ -10,6 +10,7 @@ import {
   toggleSave,
   getComments,
   addComment,
+  updateComment,
   deleteComment,
   toggleCommentLike,
   getUserPosts,
@@ -50,6 +51,7 @@ router.post('/:id/save',                                  protect,      toggleSa
 // ── Comments ──────────────────────────────────────────────────────────────────
 router.get('/:id/comments',                               optionalAuth, getComments);
 router.post('/:id/comments',                              protect,      addComment);
+router.patch('/:id/comments/:commentId',                  protect,      updateComment);
 router.delete('/:id/comments/:commentId',                 protect,      deleteComment);
 router.post('/:id/comments/:commentId/like',              protect,      toggleCommentLike);
 

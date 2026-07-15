@@ -55,6 +55,13 @@ async function resolveTopicName(topicId: string): Promise<string> {
   return 'General';
 }
 
+/** Resolve a subtopic ObjectId to its name; null when absent or unresolvable. */
+async function resolveSubTopicName(subTopicId: string | null): Promise<string | null> {
+  if (!subTopicId || !ID_RE.test(subTopicId)) return null;
+  const name = await resolveTopicName(subTopicId);
+  return name === 'General' ? null : name;
+}
+
 // ── Leaderboard entry shape (matches gameController) ─────────────────────────
 interface LeaderboardRow {
   userId:      string;
@@ -79,6 +86,7 @@ interface QuizEndedPayload {
   quizId:         string;
   quizTitle:      string;
   topic:          string;       // topic name string (may be ObjectId if unresolved)
+  subTopic:       string | null; // subtopic ObjectId (resolved to a name here)
   participation:  string;       // 'public' | 'private' | 'invite_only'
   leaderboard:    LeaderboardRow[];
   totalQuestions: number;
@@ -101,8 +109,9 @@ export async function createQuizEndedPost(payload: QuizEndedPayload): Promise<vo
     return;
   }
 
-  const [topicName, enrichedLeaderboard] = await Promise.all([
+  const [topicName, subTopicName, enrichedLeaderboard] = await Promise.all([
     resolveTopicName(payload.topic),
+    resolveSubTopicName(payload.subTopic),
     enrichPlayerNames(payload.leaderboard),
   ]);
   const content = buildPostContent(payload.quizTitle);
@@ -124,7 +133,7 @@ export async function createQuizEndedPost(payload: QuizEndedPayload): Promise<vo
     ? {
         quizId:        payload.quizId,
         quizTitle:     payload.quizTitle,
-        category:      topicName,
+        category:      subTopicName ?? topicName,
         score:         winner.score,
         total:         winner.total ?? payload.totalQuestions,
         percentage:    winner.percentage,
@@ -142,7 +151,7 @@ export async function createQuizEndedPost(payload: QuizEndedPayload): Promise<vo
       {
         content,
         topic:          topicName,
-        subTopic:       null,
+        subTopic:       subTopicName,
         authorName:     payload.adminName,
         authorUsername: payload.adminUsername,
         authorAvatar:   payload.adminAvatar,
@@ -213,6 +222,7 @@ export async function recoverMissingPosts(): Promise<void> {
       quizId,
       quizTitle:       quiz.title,
       topic:           quiz.topic?.toString() ?? 'General',
+      subTopic:        quiz.subTopic?.toString() ?? null,
       participation:   quiz.participation,
       leaderboard,
       totalQuestions:  quiz.questionCount,

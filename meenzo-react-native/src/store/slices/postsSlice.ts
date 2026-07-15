@@ -32,12 +32,12 @@ export const createPost = createAsyncThunk('posts/createPost', async (body: post
 
 export const toggleLike = createAsyncThunk('posts/toggleLike', async (postId: string) => {
   const res = await postsApi.toggleLike(postId);
-  return res.post;
+  return { postId, liked: res.liked, likes: res.likes };
 });
 
 export const toggleSave = createAsyncThunk('posts/toggleSave', async (postId: string) => {
   const res = await postsApi.toggleSave(postId);
-  return res.post;
+  return { postId, saved: res.saved };
 });
 
 const postsSlice = createSlice({
@@ -73,13 +73,40 @@ const postsSlice = createSlice({
       .addCase(createPost.fulfilled, (state, action) => {
         state.posts.unshift(action.payload);
       })
+      // Optimistic flip on tap; server response then syncs the exact values,
+      // and a failed request flips back.
+      .addCase(toggleLike.pending, (state, action) => {
+        const p = state.posts.find((x) => x._id === action.meta.arg);
+        if (p) {
+          p.liked = !p.liked;
+          p.likes = (p.likes ?? 0) + (p.liked ? 1 : -1);
+        }
+      })
       .addCase(toggleLike.fulfilled, (state, action) => {
-        const idx = state.posts.findIndex((p) => p._id === action.payload._id);
-        if (idx >= 0) state.posts[idx] = action.payload;
+        const p = state.posts.find((x) => x._id === action.payload.postId);
+        if (p) {
+          p.liked = action.payload.liked;
+          p.likes = action.payload.likes;
+        }
+      })
+      .addCase(toggleLike.rejected, (state, action) => {
+        const p = state.posts.find((x) => x._id === action.meta.arg);
+        if (p) {
+          p.liked = !p.liked;
+          p.likes = (p.likes ?? 0) + (p.liked ? 1 : -1);
+        }
+      })
+      .addCase(toggleSave.pending, (state, action) => {
+        const p = state.posts.find((x) => x._id === action.meta.arg);
+        if (p) p.saved = !p.saved;
       })
       .addCase(toggleSave.fulfilled, (state, action) => {
-        const idx = state.posts.findIndex((p) => p._id === action.payload._id);
-        if (idx >= 0) state.posts[idx] = action.payload;
+        const p = state.posts.find((x) => x._id === action.payload.postId);
+        if (p) p.saved = action.payload.saved;
+      })
+      .addCase(toggleSave.rejected, (state, action) => {
+        const p = state.posts.find((x) => x._id === action.meta.arg);
+        if (p) p.saved = !p.saved;
       });
   },
 });

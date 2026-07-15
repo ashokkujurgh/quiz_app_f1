@@ -40,12 +40,27 @@ export const updatePost = (id: string, body: Partial<CreatePostBody>) =>
 
 export const deletePost = (id: string) => del<{ success: boolean }>(`/api/posts/${id}`);
 
-export const toggleLike = (id: string) => post<{ success: boolean; post: Post }>(`/api/posts/${id}/like`, {});
+export const toggleLike = (id: string) => post<{ success: boolean; liked: boolean; likes: number }>(`/api/posts/${id}/like`, {});
 
-export const toggleSave = (id: string) => post<{ success: boolean; post: Post }>(`/api/posts/${id}/save`, {});
+export const toggleSave = (id: string) => post<{ success: boolean; saved: boolean }>(`/api/posts/${id}/save`, {});
 
 export const fetchComments = (id: string) =>
   get<{ success: boolean; comments: Comment[] }>(`/api/posts/${id}/comments`);
 
-export const addComment = (id: string, text: string) =>
-  post<{ success: boolean; comment: Comment }>(`/api/posts/${id}/comments`, { text });
+export const updateComment = (postId: string, commentId: string, content: string) =>
+  patch<{ success: boolean; comment: Comment }>(`/api/posts/${postId}/comments/${commentId}`, { content });
+
+export const deleteComment = (postId: string, commentId: string) =>
+  del<{ success: boolean }>(`/api/posts/${postId}/comments/${commentId}`);
+
+export const addComment = (
+  id: string,
+  content: string,
+  author: { name: string; username?: string; avatar?: string | null },
+) =>
+  post<{ success: boolean; comment: Comment }>(`/api/posts/${id}/comments`, {
+    content,
+    authorName: author.name,
+    authorUsername: author.username ?? 'user',
+    authorAvatar: author.avatar ?? null,
+  });

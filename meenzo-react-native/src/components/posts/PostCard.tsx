@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
-import { Heart, MessageSquare, Share2, Bookmark } from 'lucide-react-native';
+import { Heart, MessageSquare } from 'lucide-react-native';
 import type { Post } from '../../types';
 import { colors } from '../../theme/colors';
 import { fonts } from '../../theme/typography';
@@ -8,18 +8,20 @@ import { radius } from '../../theme/spacing';
 import { relativeTime } from '../../utils/relativeTime';
 import LetterAvatar from '../ui/LetterAvatar';
 import Card from '../ui/Card';
+import QuizResultCard from './QuizResultCard';
 
 interface Props {
   post: Post;
   onPress?: () => void;
   onLike?: () => void;
-  onSave?: () => void;
 }
 
-export default function PostCard({ post, onPress, onLike, onSave }: Props) {
+export default function PostCard({ post, onPress, onLike }: Props) {
   const liked = !!post.liked;
-  const saved = !!post.saved;
   const image = post.image ?? post.images?.[0];
+  const isOfficial = post.userType === 'admin';
+  // Official game posts show only the quiz result card, like the web app
+  const hideBody = isOfficial && !!post.quizResult;
 
   return (
     <TouchableOpacity activeOpacity={0.9} onPress={onPress}>
@@ -33,39 +35,39 @@ export default function PostCard({ post, onPress, onLike, onSave }: Props) {
             </Text>
           </View>
           <View style={styles.categoryPill}>
-            <Text style={styles.categoryText}>{post.topic}</Text>
+            <Text style={styles.categoryText}>{post.subTopic || post.topic}</Text>
           </View>
         </View>
 
-        <View style={styles.body}>
-          {post.title ? <Text style={styles.title}>{post.title}</Text> : null}
-          <Text style={styles.excerpt} numberOfLines={2}>
-            {post.content}
-          </Text>
-        </View>
+        {!hideBody ? (
+          <View style={styles.body}>
+            {post.title ? <Text style={styles.title}>{post.title}</Text> : null}
+            <Text style={styles.excerpt} numberOfLines={2}>
+              {post.content}
+            </Text>
+          </View>
+        ) : null}
 
-        {image ? (
+        {!hideBody && image ? (
           <View style={styles.imageWrap}>
             <Image source={{ uri: image }} style={styles.image} resizeMode="cover" />
           </View>
         ) : null}
 
+        {post.quizResult ? (
+          <View style={styles.quizResultWrap}>
+            <QuizResultCard result={post.quizResult} isAdmin={isOfficial} />
+          </View>
+        ) : null}
+
         <View style={styles.actions}>
-          <TouchableOpacity style={[styles.actionPill, liked && styles.likedPill]} onPress={onLike}>
-            <Heart size={14} color={liked ? colors.accent : colors.mutedForeground} fill={liked ? colors.accent : 'none'} />
-            <Text style={[styles.actionText, liked && { color: colors.accent }]}>{post.likes ?? 0}</Text>
-          </TouchableOpacity>
           <View style={styles.actionPill}>
             <MessageSquare size={14} color={colors.mutedForeground} />
             <Text style={styles.actionText}>{post.commentsCount ?? 0}</Text>
           </View>
-          <View style={styles.actionPill}>
-            <Share2 size={14} color={colors.mutedForeground} />
-            <Text style={styles.actionText}>0</Text>
-          </View>
-          <View style={{ flex: 1 }} />
-          <TouchableOpacity style={[styles.saveBtn, saved && styles.savedBtn]} onPress={onSave}>
-            <Bookmark size={14} color={saved ? colors.primary : colors.mutedForeground} fill={saved ? colors.primary : 'none'} />
+          <TouchableOpacity style={[styles.actionPill, liked && styles.likedPill]} onPress={onLike}>
+            <Heart size={14} color={liked ? colors.accent : colors.mutedForeground} fill={liked ? colors.accent : 'none'} />
+            <Text style={[styles.actionText, liked && { color: colors.accent }]}>{post.likes ?? 0}</Text>
           </TouchableOpacity>
         </View>
       </Card>
@@ -85,11 +87,10 @@ const styles = StyleSheet.create({
   title: { fontFamily: fonts.headingBold, fontSize: 14, color: colors.foreground, lineHeight: 18, marginBottom: 6 },
   excerpt: { fontFamily: fonts.bodyRegular, fontSize: 12, color: colors.mutedForeground, lineHeight: 18 },
   imageWrap: { marginHorizontal: 16, marginBottom: 12, height: 160, borderRadius: radius.md, overflow: 'hidden', backgroundColor: colors.secondary },
+  quizResultWrap: { paddingHorizontal: 16, paddingBottom: 12, marginTop: -4 },
   image: { width: '100%', height: '100%' },
-  actions: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 16, gap: 4 },
+  actions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', paddingHorizontal: 16, paddingBottom: 16, gap: 4 },
   actionPill: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, backgroundColor: colors.actionPillBg },
   likedPill: { backgroundColor: colors.likedBg },
   actionText: { fontFamily: fonts.bodyMedium, fontSize: 12, color: colors.mutedForeground },
-  saveBtn: { padding: 8, borderRadius: 999 },
-  savedBtn: { backgroundColor: colors.savedBg },
 });
