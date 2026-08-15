@@ -30,8 +30,17 @@ export type FriendsStackParamList = {
 
 export type MessagesStackParamList = {
   ConversationsList: undefined;
-  Chat: { conversationId: string; otherUserName: string; otherUserAvatar?: string | null; otherUserId?: string };
+  Chat: {
+    conversationId: string;
+    otherUserName: string;
+    otherUserAvatar?: string | null;
+    otherUserId?: string;
+    isGroup?: boolean;
+  };
   UserProfile: { userId: string };
+  CreateGroup: undefined;
+  GroupInfo: { conversationId: string };
+  AddGroupMembers: { conversationId: string; existingMemberIds: string[] };
 };
 
 export type ProfileStackParamList = {

@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { Check, UserPlus, X } from 'lucide-react-native';
+import { Check, UserPlus, X, MessageCircle } from 'lucide-react-native';
 import { colors } from '../../theme/colors';
 import { fonts } from '../../theme/typography';
 import { GRAD, GRAD_LOCATIONS, DIAGONAL_START, DIAGONAL_END } from '../../theme/gradients';
@@ -14,6 +14,7 @@ export type FriendRowAction =
   | { type: 'added' }
   | { type: 'incoming'; onAccept: () => void; onDecline: () => void }
   | { type: 'sent'; onCancel: () => void }
+  | { type: 'message'; onPress: () => void }
   | { type: 'none' };
 
 interface Props {
@@ -47,6 +48,7 @@ export default function FriendRow({ userId, name, username, avatar, mutual, acti
             </Text>
           ) : null}
           {typeof mutual === 'number' ? <Text style={styles.mutual}>{mutual} mutual friends</Text> : null}
+          <Text style={[styles.statusText, online ? styles.statusOnline : styles.statusOffline]}>{online ? 'Online' : 'Offline'}</Text>
         </View>
       </TouchableOpacity>
 
@@ -84,6 +86,12 @@ export default function FriendRow({ userId, name, username, avatar, mutual, acti
           <Text style={styles.cancelText}>Cancel</Text>
         </TouchableOpacity>
       ) : null}
+
+      {action.type === 'message' ? (
+        <TouchableOpacity activeOpacity={0.85} style={styles.messageBtn} onPress={action.onPress}>
+          <MessageCircle size={16} color={colors.primary} />
+        </TouchableOpacity>
+      ) : null}
     </Card>
   );
 }
@@ -97,6 +105,9 @@ const styles = StyleSheet.create({
   name: { fontFamily: fonts.headingSemiBold, fontSize: 14, color: colors.foreground },
   handle: { fontFamily: fonts.bodyRegular, fontSize: 11, color: colors.mutedForeground, marginTop: 1 },
   mutual: { fontFamily: fonts.bodyMedium, fontSize: 11, color: colors.primary, marginTop: 2 },
+  statusText: { fontFamily: fonts.bodyMedium, fontSize: 11, marginTop: 2 },
+  statusOnline: { color: colors.online },
+  statusOffline: { color: colors.mutedForeground },
   actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12 },
   actionTextLight: { fontFamily: fonts.headingBold, fontSize: 11, color: '#fff' },
   addedBtn: { backgroundColor: colors.addedBg, borderWidth: 1, borderColor: colors.addedBorder },
@@ -106,4 +117,14 @@ const styles = StyleSheet.create({
   declineBtn: { backgroundColor: colors.actionPillBg },
   cancelBtn: { backgroundColor: colors.actionPillBg },
   cancelText: { fontFamily: fonts.headingBold, fontSize: 11, color: colors.mutedForeground },
+  messageBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.softPrimaryBg,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+  },
 });

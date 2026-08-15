@@ -13,6 +13,7 @@ import {
   cancelFriendRequest,
 } from '../../store/slices/friendsSlice';
 import * as authApi from '../../api/services/auth';
+import * as messagesApi from '../../api/services/messages';
 import { colors } from '../../theme/colors';
 import { fonts } from '../../theme/typography';
 import SegmentedTabs from '../../components/ui/SegmentedTabs';
@@ -39,6 +40,16 @@ export default function FriendsListScreen({ navigation }: Props) {
   useEffect(() => {
     dispatch(fetchAllFriendData());
   }, [dispatch]);
+
+  // Opens (or creates) the conversation with this friend, then hands off to the
+  // Messages tab's own stack — FriendsStack has no 'Chat' route itself.
+  const openChat = async (userId: string, name: string, avatar?: string | null) => {
+    const res = await messagesApi.openConversation(userId);
+    (navigation as any).getParent()?.navigate('MessagesStack', {
+      screen: 'Chat',
+      params: { conversationId: res.data._id, otherUserName: name, otherUserAvatar: avatar, otherUserId: userId },
+    });
+  };
 
   useEffect(() => {
     if (!searching || query.trim().length < 2) {
@@ -93,7 +104,7 @@ export default function FriendsListScreen({ navigation }: Props) {
           name: f.name,
           username: f.username,
           avatar: f.avatar,
-          action: { type: 'none' as const },
+          action: { type: 'message' as const, onPress: () => openChat(f._id, f.name, f.avatar) },
         })),
     );
   } else if (tab === 1) {

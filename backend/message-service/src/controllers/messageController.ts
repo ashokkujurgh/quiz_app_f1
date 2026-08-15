@@ -14,11 +14,10 @@ export async function listConversations(req: AuthRequest, res: Response): Promis
     .populate('lastMessage')
     .lean();
 
-  // Collect other participant IDs
-  const otherIds = convs.flatMap((c) =>
-    c.participants.filter((p) => p.toString() !== me)
-  );
-  const users = await User.find({ _id: { $in: otherIds } }).select('username avatar').lean();
+  // Collect every participant across all conversations (both the "other" side of 1-1 DMs
+  // and every member of groups) so a single query can populate both cases.
+  const allParticipantIds = convs.flatMap((c) => c.participants.map((p) => p.toString()));
+  const users = await User.find({ _id: { $in: allParticipantIds } }).select('name username avatar').lean();
   const userMap = new Map(users.map((u) => [u._id.toString(), u]));
 
   // Count unread messages per conversation
@@ -31,8 +30,13 @@ export async function listConversations(req: AuthRequest, res: Response): Promis
   const unreadMap = new Map(unreadAgg.map((r) => [r._id.toString(), r.count as number]));
 
   const result = convs.map((c) => {
+    const unreadCount = unreadMap.get(c._id.toString()) ?? 0;
+    if (c.isGroup) {
+      const participantUsers = c.participants.map((p) => userMap.get(p.toString())).filter(Boolean);
+      return { ...c, participantUsers, unreadCount };
+    }
     const otherId = c.participants.find((p) => p.toString() !== me)?.toString() ?? '';
-    return { ...c, otherUser: userMap.get(otherId) ?? null, unreadCount: unreadMap.get(c._id.toString()) ?? 0 };
+    return { ...c, otherUser: userMap.get(otherId) ?? null, unreadCount };
   });
 
   res.json({ success: true, data: result });

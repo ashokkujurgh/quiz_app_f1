@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Image, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Image, KeyboardAvoidingView, Platform, Alert, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowLeft, Heart, MessageSquare, Send, Pencil, Trash2, X } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -198,8 +198,8 @@ export default function PostDetailScreen({ route, navigation }: Props) {
             if (commentError) setCommentError('');
           }}
         />
-        <TouchableOpacity style={styles.sendBtn} onPress={onComment} disabled={posting}>
-          <Send size={13} color="#fff" />
+        <TouchableOpacity style={[styles.sendBtn, posting && styles.sendBtnDisabled]} onPress={onComment} disabled={posting}>
+          {posting ? <ActivityIndicator size="small" color="#fff" /> : <Send size={13} color="#fff" />}
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
@@ -255,4 +255,5 @@ const styles = StyleSheet.create({
     color: colors.foreground,
   },
   sendBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
+  sendBtnDisabled: { opacity: 0.7 },
 });

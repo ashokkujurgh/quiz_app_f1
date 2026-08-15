@@ -162,13 +162,27 @@ export interface FriendRequest {
   createdAt: string;
 }
 
+export interface ConversationUser {
+  _id: string;
+  username?: string;
+  name?: string;
+  avatar?: string | null;
+}
+
 export interface Conversation {
   _id: string;
   participants: string[];
-  otherUser: { _id?: string; username?: string; name?: string; avatar?: string | null };
+  otherUser?: ConversationUser | null;
   lastMessage?: { _id: string; text: string; createdAt: string } | null;
   unreadCount?: number;
   updatedAt: string;
+  isGroup?: boolean;
+  name?: string | null;
+  icon?: string | null;
+  admins?: string[];
+  createdBy?: string | null;
+  participantUsers?: ConversationUser[];
+  isAdmin?: boolean;
 }
 
 export interface Message {

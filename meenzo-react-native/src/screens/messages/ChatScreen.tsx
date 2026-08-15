@@ -21,10 +21,12 @@ import { fetchMessages, markConvRead, setActiveConv, sendMessage } from '../../s
 import { useMessagesSocket } from '../../sockets/useMessagesSocket';
 import { usePresence } from '../../sockets/PresenceContext';
 import { uploadChatImageAsset } from '../../api/services/uploads';
+import * as messagesApi from '../../api/services/messages';
 import { colors } from '../../theme/colors';
 import { fonts } from '../../theme/typography';
 import { GRAD, GRAD_LOCATIONS, DIAGONAL_START, DIAGONAL_END } from '../../theme/gradients';
 import LetterAvatar from '../../components/ui/LetterAvatar';
+import type { ConversationUser } from '../../types';
 
 type Props = NativeStackScreenProps<MessagesStackParamList, 'Chat'>;
 
@@ -33,7 +35,7 @@ const TYPING_TIMEOUT = 1500;
 export default function ChatScreen({ route, navigation }: Props) {
   const insets = useSafeAreaInsets();
   const dispatch = useAppDispatch();
-  const { conversationId, otherUserName, otherUserAvatar, otherUserId } = route.params;
+  const { conversationId, otherUserName, otherUserAvatar, otherUserId, isGroup } = route.params;
   const token = useAppSelector((s) => s.auth.accessToken);
   const myId = useAppSelector((s) => s.auth.user?._id);
   const messages = useAppSelector((s) => s.messages.messages);
@@ -44,11 +46,13 @@ export default function ChatScreen({ route, navigation }: Props) {
   const [input, setInput] = useState('');
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  const [memberCount, setMemberCount] = useState(0);
+  const [memberMap, setMemberMap] = useState<Record<string, ConversationUser>>({});
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const listRef = useRef<FlatList>(null);
 
-  const online = otherUserId ? isOnline(otherUserId) : false;
-  const otherTyping = otherUserId ? typingUsers.includes(otherUserId) : false;
+  const online = !isGroup && otherUserId ? isOnline(otherUserId) : false;
+  const otherTyping = !isGroup && otherUserId ? typingUsers.includes(otherUserId) : false;
 
   useEffect(() => {
     dispatch(setActiveConv(conversationId));
@@ -60,6 +64,24 @@ export default function ChatScreen({ route, navigation }: Props) {
       dispatch(setActiveConv(null));
     };
   }, [conversationId, dispatch]);
+
+  // Groups can have any number of senders, so build a lookup for names/avatars shown above
+  // each incoming bubble — 1-1 chats don't need this since "not me" always means the one
+  // other participant already known from route params.
+  useEffect(() => {
+    if (!isGroup) return;
+    messagesApi
+      .fetchGroupDetails(conversationId)
+      .then((res) => {
+        setMemberCount(res.data.participantUsers?.length ?? 0);
+        const map: Record<string, ConversationUser> = {};
+        (res.data.participantUsers ?? []).forEach((u) => {
+          map[u._id] = u;
+        });
+        setMemberMap(map);
+      })
+      .catch(() => undefined);
+  }, [isGroup, conversationId]);
 
   const pickImage = async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -96,14 +118,26 @@ export default function ChatScreen({ route, navigation }: Props) {
   return (
     <KeyboardAvoidingView style={[styles.flex, { paddingTop: insets.top }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+        <TouchableOpacity
+          style={styles.backBtn}
+          onPress={() => {
+            // Chat can be reached from several stacks (Friends, a friend's UserProfile, the
+            // conversation list itself), which can leave more than one entry ahead of it —
+            // plain goBack() would only pop one and could land on another Chat screen instead
+            // of the list. Always resetting to the stack's root guarantees the list.
+            navigation.popToTop();
+          }}
+        >
           <ArrowLeft size={16} color={colors.foreground} />
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.identityTapArea}
-          activeOpacity={otherUserId ? 0.7 : 1}
-          disabled={!otherUserId}
-          onPress={() => otherUserId && navigation.navigate('UserProfile', { userId: otherUserId })}
+          activeOpacity={isGroup || otherUserId ? 0.7 : 1}
+          disabled={!isGroup && !otherUserId}
+          onPress={() => {
+            if (isGroup) navigation.navigate('GroupInfo', { conversationId });
+            else if (otherUserId) navigation.navigate('UserProfile', { userId: otherUserId });
+          }}
         >
           <View style={styles.avatarWrap}>
             <LetterAvatar name={otherUserName} uri={otherUserAvatar} size={36} />
@@ -111,9 +145,13 @@ export default function ChatScreen({ route, navigation }: Props) {
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.headerName}>{otherUserName}</Text>
-            <Text style={[styles.status, { color: online ? colors.online : colors.mutedForeground }]}>
-              {otherTyping ? 'Typing…' : online ? 'Online' : 'Offline'}
-            </Text>
+            {isGroup ? (
+              <Text style={styles.status}>{memberCount > 0 ? `${memberCount} members` : ' '}</Text>
+            ) : (
+              <Text style={[styles.status, { color: online ? colors.online : colors.mutedForeground }]}>
+                {otherTyping ? 'Typing…' : online ? 'Online' : 'Offline'}
+              </Text>
+            )}
           </View>
         </TouchableOpacity>
         <View style={styles.headerActions}>
@@ -134,9 +172,15 @@ export default function ChatScreen({ route, navigation }: Props) {
         onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
         renderItem={({ item }) => {
           const me = item.sender === myId;
+          const sender = isGroup ? memberMap[item.sender] : undefined;
           const time = new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
           return (
             <View style={[styles.bubbleRow, me ? styles.bubbleRowMe : styles.bubbleRowThem]}>
+              {!me && isGroup ? (
+                <View style={styles.groupSenderAvatar}>
+                  <LetterAvatar name={sender?.name ?? sender?.username ?? '?'} uri={sender?.avatar} size={26} />
+                </View>
+              ) : null}
               {me ? (
                 <LinearGradient
                   colors={GRAD}
@@ -151,6 +195,9 @@ export default function ChatScreen({ route, navigation }: Props) {
                 </LinearGradient>
               ) : (
                 <View style={[styles.bubble, styles.bubbleThem]}>
+                  {isGroup ? (
+                    <Text style={styles.groupSenderName}>{sender?.name ?? sender?.username ?? 'Member'}</Text>
+                  ) : null}
                   {item.imageUrl ? <Image source={{ uri: item.imageUrl }} style={styles.bubbleImage} /> : null}
                   {item.text ? <Text style={styles.bubbleTextThem}>{item.text}</Text> : null}
                   <Text style={styles.bubbleTimeThem}>{time}</Text>
@@ -199,16 +246,18 @@ const styles = StyleSheet.create({
   avatarWrap: { position: 'relative' },
   onlineDot: { position: 'absolute', bottom: 0, right: 0, width: 10, height: 10, borderRadius: 5, backgroundColor: colors.online, borderWidth: 2, borderColor: colors.background },
   headerName: { fontFamily: fonts.headingBold, fontSize: 14, color: colors.foreground },
-  status: { fontFamily: fonts.bodyRegular, fontSize: 11, marginTop: 1 },
+  status: { fontFamily: fonts.bodyRegular, fontSize: 11, marginTop: 1, color: colors.mutedForeground },
   headerActions: { flexDirection: 'row', gap: 8 },
   callBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.softPrimaryBg, alignItems: 'center', justifyContent: 'center' },
   messagesContent: { paddingHorizontal: 16, paddingVertical: 16, gap: 10 },
-  bubbleRow: { flexDirection: 'row' },
+  bubbleRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 6 },
   bubbleRowMe: { justifyContent: 'flex-end' },
   bubbleRowThem: { justifyContent: 'flex-start' },
+  groupSenderAvatar: { marginBottom: 2 },
   bubble: { maxWidth: '78%', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 18 },
   bubbleMe: { borderBottomRightRadius: 4 },
   bubbleThem: { backgroundColor: colors.inputBackground, borderBottomLeftRadius: 4 },
+  groupSenderName: { fontFamily: fonts.headingSemiBold, fontSize: 11, color: colors.primary, marginBottom: 2 },
   bubbleImage: { width: 180, height: 140, borderRadius: 12, marginBottom: 6 },
   bubbleTextMe: { fontFamily: fonts.bodyRegular, fontSize: 14, color: '#fff', lineHeight: 19 },
   bubbleTextThem: { fontFamily: fonts.bodyRegular, fontSize: 14, color: colors.foreground, lineHeight: 19 },

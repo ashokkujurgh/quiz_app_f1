@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { MessageCircle } from 'lucide-react-native';
+import { MessageCircle, UsersRound } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { MessagesStackParamList } from '../../navigation/types';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
@@ -17,8 +17,18 @@ import Card from '../../components/ui/Card';
 import EmptyState from '../../components/ui/EmptyState';
 import { GRAD, GRAD_LOCATIONS, DIAGONAL_START, DIAGONAL_END } from '../../theme/gradients';
 import { LinearGradient } from 'expo-linear-gradient';
+import type { Conversation } from '../../types';
 
 type Props = NativeStackScreenProps<MessagesStackParamList, 'ConversationsList'>;
+
+function displayName(c: Conversation): string {
+  if (c.isGroup) return c.name ?? 'Group';
+  return c.otherUser?.name ?? c.otherUser?.username ?? 'Unknown';
+}
+
+function displayAvatar(c: Conversation): string | null | undefined {
+  return c.isGroup ? c.icon : c.otherUser?.avatar;
+}
 
 export default function ConversationsListScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
@@ -29,21 +39,20 @@ export default function ConversationsListScreen({ navigation }: Props) {
 
   useEffect(() => {
     dispatch(fetchConversations());
-  }, [dispatch]);
+    const unsub = navigation.addListener('focus', () => dispatch(fetchConversations()));
+    return unsub;
+  }, [navigation, dispatch]);
 
-  const onlineConvs = conversations.filter((c) => c.otherUser?._id && isOnline(c.otherUser._id));
-  const filtered = conversations.filter((c) => {
-    if (!search) return true;
-    const name = c.otherUser?.name ?? c.otherUser?.username ?? '';
-    return name.toLowerCase().includes(search.toLowerCase());
-  });
+  const onlineConvs = conversations.filter((c) => !c.isGroup && c.otherUser?._id && isOnline(c.otherUser._id));
+  const filtered = conversations.filter((c) => !search || displayName(c).toLowerCase().includes(search.toLowerCase()));
 
-  const openChat = (conv: (typeof conversations)[number]) => {
+  const openChat = (conv: Conversation) => {
     navigation.navigate('Chat', {
       conversationId: conv._id,
-      otherUserName: conv.otherUser?.name ?? conv.otherUser?.username ?? 'Unknown',
-      otherUserAvatar: conv.otherUser?.avatar,
+      otherUserName: displayName(conv),
+      otherUserAvatar: displayAvatar(conv),
       otherUserId: conv.otherUser?._id,
+      isGroup: conv.isGroup,
     });
   };
 
@@ -51,7 +60,7 @@ export default function ConversationsListScreen({ navigation }: Props) {
     <View style={[styles.flex, { paddingTop: insets.top }]}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Messages</Text>
-        <IconButton size={36}>
+        <IconButton size={36} onPress={() => navigation.navigate('CreateGroup')}>
           <MessageCircle size={15} color={colors.primary} />
         </IconButton>
       </View>
@@ -67,11 +76,11 @@ export default function ConversationsListScreen({ navigation }: Props) {
             {onlineConvs.map((c) => (
               <TouchableOpacity key={c._id} style={styles.activeItem} onPress={() => openChat(c)}>
                 <View style={styles.activeAvatarWrap}>
-                  <LetterAvatar name={c.otherUser?.name ?? '?'} uri={c.otherUser?.avatar} size={44} />
+                  <LetterAvatar name={displayName(c)} uri={displayAvatar(c)} size={44} />
                   <View style={styles.activeDot} />
                 </View>
                 <Text style={styles.activeName} numberOfLines={1}>
-                  {(c.otherUser?.name ?? '').split(' ')[0]}
+                  {displayName(c).split(' ')[0]}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -86,18 +95,23 @@ export default function ConversationsListScreen({ navigation }: Props) {
         showsVerticalScrollIndicator={false}
         renderItem={({ item }) => {
           const unread = unreadByConv[item._id] ?? item.unreadCount ?? 0;
-          const online = item.otherUser?._id ? isOnline(item.otherUser._id) : false;
+          const online = !item.isGroup && item.otherUser?._id ? isOnline(item.otherUser._id) : false;
           return (
             <TouchableOpacity activeOpacity={0.85} onPress={() => openChat(item)}>
               <Card style={styles.convRow}>
                 <View style={styles.avatarWrap}>
-                  <LetterAvatar name={item.otherUser?.name ?? '?'} uri={item.otherUser?.avatar} size={44} />
+                  <LetterAvatar name={displayName(item)} uri={displayAvatar(item)} size={44} />
                   {online ? <View style={styles.onlineDot} /> : null}
+                  {item.isGroup ? (
+                    <View style={styles.groupBadge}>
+                      <UsersRound size={9} color="#fff" />
+                    </View>
+                  ) : null}
                 </View>
                 <View style={styles.convMeta}>
                   <View style={styles.convTopRow}>
                     <Text style={[styles.convName, unread > 0 && styles.convNameUnread]} numberOfLines={1}>
-                      {item.otherUser?.name ?? item.otherUser?.username ?? 'Unknown'}
+                      {displayName(item)}
                     </Text>
                     <Text style={styles.convTime}>{relativeTime(item.updatedAt)}</Text>
                   </View>
@@ -144,6 +158,19 @@ const styles = StyleSheet.create({
   convRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 },
   avatarWrap: { position: 'relative' },
   onlineDot: { position: 'absolute', bottom: 1, right: 1, width: 10, height: 10, borderRadius: 5, backgroundColor: colors.online, borderWidth: 2, borderColor: colors.card },
+  groupBadge: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: colors.card,
+  },
   convMeta: { flex: 1, minWidth: 0 },
   convTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 },
   convName: { fontFamily: fonts.headingSemiBold, fontSize: 14, color: colors.foreground, flexShrink: 1 },
