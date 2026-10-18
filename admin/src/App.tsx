@@ -6,6 +6,7 @@ import Quiz from './pages/Quiz';
 import Topics from './pages/Topics';
 import Questions from './pages/Questions';
 import Posts from './pages/Posts';
+import ApprovePost from './pages/ApprovePost';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -82,6 +83,15 @@ export default function App() {
                     </ErrorBoundary>
                   </Layout>
                 </ProtectedRoute>
+              }
+            />
+            {/* Opened from the approval reminder email — logs in, then approves */}
+            <Route
+              path="/approve/:id"
+              element={
+                <ErrorBoundary>
+                  <ApprovePost />
+                </ErrorBoundary>
               }
             />
             <Route path="*" element={<Navigate to="/" replace />} />

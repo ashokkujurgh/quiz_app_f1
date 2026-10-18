@@ -7,8 +7,9 @@ import logging
 import smtplib
 import ssl
 from email.message import EmailMessage
+from urllib.parse import quote
 from config import (
-    APPROVAL_EMAIL_TO, MAIL_USER, MAIL_PASSWORD, SMTP_HOST, SMTP_PORT,
+    APPROVAL_EMAIL_TO, MAIL_USER, MAIL_PASSWORD, SMTP_HOST, SMTP_PORT, ADMIN_PANEL_URL, ADMIN_EMAIL,
 )
 
 logger = logging.getLogger(__name__)
@@ -36,6 +37,8 @@ def send_approval_email(
     preview = content[:600].rsplit(" ", 1)[0] + "…" if len(content) > 600 else content
     words   = len(content.split())
     region_label = "India" if region == "india" else "World"
+    # Opens the admin approve page: email is filled in, the reviewer types the password
+    approve_url  = f"{ADMIN_PANEL_URL.rstrip('/')}/approve/{post.get('_id')}?email={quote(ADMIN_EMAIL)}"
 
     msg = EmailMessage()
     msg["Subject"] = f"Reminder: new post waiting for approval — {heading[:80]}"
@@ -47,7 +50,8 @@ def send_approval_email(
         f"{heading}\n"
         f"{topic_name} > {subtopic_name} · {mode} · {level} · {region_label} · {words} words\n\n"
         f"{preview}\n\n"
-        f"Please review it in the admin panel under Posts → Pending Approval.\n"
+        f"Approve it here (you'll be asked for the admin password):\n{approve_url}\n\n"
+        f"Or review it in the admin panel under Posts → Pending Approval.\n"
         f"Post ID: {post.get('_id')}\n"
     )
 
@@ -69,7 +73,8 @@ def send_approval_email(
       </p>
       {image_html}
       {paragraphs}
-      <p style="color:#444;font-size:14px;margin:16px 0 4px">Please review it in the admin panel under <strong>Posts → Pending Approval</strong>.</p>
+      <a href="{esc(approve_url)}" style="display:inline-block;margin:16px 0 8px;padding:12px 28px;background:#4f46e5;color:#fff;text-decoration:none;border-radius:6px;font-weight:600">Approve post</a>
+      <p style="color:#888;font-size:13px;margin:0 0 4px">You'll be asked for the admin password before the post is approved. You can also review it in the admin panel under Posts → Pending Approval.</p>
       <p style="color:#888;font-size:12px;margin:0">Post ID: {esc(str(post.get('_id')))}</p>
       <hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0"/>
       <p style="color:#aaa;font-size:12px">© 2026 Meenzo</p>
