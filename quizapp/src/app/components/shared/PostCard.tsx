@@ -57,7 +57,7 @@ function QuizResultCard({ result, isAdmin }: { result: QuizResult; isAdmin: bool
               <Stack direction="row" alignItems="center" spacing={0.5}>
                 <Timer sx={{ fontSize: 14, color: 'rgba(255,255,255,0.6)' }} />
                 <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)' }}>
-                  {durationMin} min
+                  {formatDuration(durationMin)}
                 </Typography>
               </Stack>
             )}
@@ -166,6 +166,7 @@ import { OnlineBadge } from './OnlineBadge';
 import { useBlockedUsers } from '../../hooks/useBlockedUsers';
 import { UserAvatar } from './UserAvatar';
 import { withOfficialAvatar } from './officialAvatar';
+import { formatDuration } from '../../utils/formatDuration';
 import { TopicChip } from './TopicChip';
 import { formatDistanceToNow } from 'date-fns';
 

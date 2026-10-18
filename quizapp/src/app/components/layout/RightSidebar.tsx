@@ -8,6 +8,7 @@ import { SportsEsports, FiberManualRecord, Quiz as QuizIcon, PlayArrow } from '@
 import { useAppSelector } from '../../store/hooks';
 import { apiFetch } from '../../utils/apiFetch';
 import { loadTopicsWithSubtopics } from '../../utils/topicsCache';
+import { formatDuration } from '../../utils/formatDuration';
 
 const API = import.meta.env.VITE_API_URL ?? '';
 
@@ -72,7 +73,7 @@ function LiveGamesSection() {
               <FiberManualRecord sx={{ color: 'success.main', fontSize: 10, flexShrink: 0, animation: 'pulse 1.2s infinite', '@keyframes pulse': { '0%,100%': { opacity: 1 }, '50%': { opacity: 0.3 } } }} />
               <Box flex={1} minWidth={0}>
                 <Typography variant="caption" fontWeight={700} noWrap display="block">{g.title}</Typography>
-                <Typography variant="caption" color="text.secondary">{g.questionCount} questions · {g.durationMinutes}min</Typography>
+                <Typography variant="caption" color="text.secondary">{g.questionCount} questions · {formatDuration(g.durationMinutes)}</Typography>
               </Box>
               <Button size="small" variant="contained" color="success" sx={{ fontSize: '0.6rem', py: 0.25, px: 0.75, minWidth: 0, flexShrink: 0 }}>
                 Join
