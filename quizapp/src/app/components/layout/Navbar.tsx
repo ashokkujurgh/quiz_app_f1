@@ -123,6 +123,29 @@ export function Navbar({ onMenuToggle }: Props) {
             ...(t.palette.mode === 'dark' && { bgcolor: '#fff', borderRadius: 2, p: 0.5 }) })}
           onClick={() => navigate('/home')}
         />
+        {/* Wordmark in the logo's colours — navy→teal; light→teal in dark mode, where navy would vanish */}
+        <Typography
+          component="span"
+          onClick={() => navigate('/home')}
+          sx={(t) => ({
+            display: { xs: 'none', sm: 'block' },
+            cursor: 'pointer',
+            fontSize: 24,
+            fontWeight: 800,
+            letterSpacing: '-0.02em',
+            lineHeight: 1,
+            userSelect: 'none',
+            background: t.palette.mode === 'dark'
+              ? 'linear-gradient(90deg, #E8ECF8 0%, #06D5CF 100%)'
+              : 'linear-gradient(90deg, #0F1B45 0%, #047E7A 100%)',
+            WebkitBackgroundClip: 'text',
+            backgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            color: 'transparent',
+          })}
+        >
+          Meenzo
+        </Typography>
         </Box>
 
         {/* Search — centre column */}
