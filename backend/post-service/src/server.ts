@@ -8,6 +8,7 @@ import rateLimit from 'express-rate-limit';
 import connectDB from './config/db';
 import { initFirebase } from './config/firebase';
 import postRoutes from './routes/posts';
+import seoRoutes from './routes/seo';
 
 initFirebase();
 
@@ -15,6 +16,9 @@ const app  = express();
 const PORT = parseInt(process.env.PORT ?? '4004', 10);
 
 connectDB().catch(console.error);
+
+// SEO pages serve the SPA's HTML — keep them out of helmet's API-oriented headers
+app.use('/seo', seoRoutes);
 
 app.use(helmet());
 app.use(cors({

@@ -1,0 +1,6 @@
+# Meenzo — crawl rules. Pages that should not appear in search carry a noindex
+# meta tag instead of being blocked here, so crawlers can still read that tag.
+User-agent: *
+Allow: /
+
+Sitemap: https://meenzo.com/sitemap.xml

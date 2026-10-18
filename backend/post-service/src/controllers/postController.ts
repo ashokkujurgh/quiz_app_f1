@@ -4,6 +4,7 @@ import OpenAI from 'openai';
 import Post, { IQuizResult, ISeoMeta } from '../models/Post';
 import { AuthRequest } from '../middleware/auth';
 import { sendNewPostNotification, sendCommentNotification } from '../services/notificationService';
+import { notifyIndexNow } from './seoController';
 
 // ── OpenAI client ─────────────────────────────────────────────────────────────
 const openai = process.env.OPENAI_API_KEY
@@ -292,6 +293,9 @@ export const createPost: RequestHandler = async (req: AuthRequest, res: Response
       quizResult: quizResult ?? null,
       seo:        (seo as ISeoMeta | null | undefined) ?? null,
     });
+
+    // User posts are live immediately (approved by default) — notify IndexNow engines
+    if (post.approvalStatus === 'approved') notifyIndexNow(post.slug);
 
     res.status(201).json({ success: true, post });
   } catch (err) {
@@ -699,6 +703,9 @@ export const approvePost: RequestHandler = async (req: AuthRequest, res: Respons
     // Notify all users that a new post is live
     const notifTitle = post.title ?? post.content.split(' ').slice(0, 8).join(' ');
     sendNewPostNotification(post._id.toString(), notifTitle, post.topic ?? '').catch(console.error);
+
+    // Tell IndexNow engines (Bing, Yandex) the post is live; Google finds it via the sitemap
+    notifyIndexNow(post.slug);
 
     res.json({ success: true, post });
   } catch (err) {

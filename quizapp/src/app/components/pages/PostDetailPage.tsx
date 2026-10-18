@@ -402,7 +402,8 @@ export function PostDetailPage() {
   const ogDesc     = seo?.ogDescription || pageDesc;
   const ogImage    = seo?.ogImage    || post?.image  || null;
   const keywords   = seo?.keywords?.join(', ') || `${post?.topic}, ${post?.author?.name}, meenzo`;
-  const canonical  = seo?.canonical  || (typeof window !== 'undefined' ? window.location.href : '');
+  // Same canonical the server puts in the HTML: origin + path, no query string or hash
+  const canonical  = seo?.canonical  || (typeof window !== 'undefined' ? window.location.origin + window.location.pathname : '');
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: 'background.default' }}>

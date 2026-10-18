@@ -35,7 +35,12 @@ services:
   post-service:
     ports: !override
       - "127.0.0.1:7207:4004"
-    environment: *origins
+    environment:
+      <<: *origins
+      SITE_URL: https://meenzo.com
+      FRONTEND_INTERNAL_URL: http://frontend
+      # IndexNow key (public by design — also served at https://meenzo.com/<key>.txt)
+      INDEXNOW_KEY: 83b4e1d838f8f7745363073ec4ed490b
 
   question-service:
     ports: !override
