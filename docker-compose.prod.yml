@@ -51,6 +51,10 @@ services:
       <<: *origins
       PORT: "4005"   # .env says 4004; compose + nginx expect 4005
 
+  player-agent:
+    env_file:
+      - ./agentic/.env   # ADMIN_EMAIL / ADMIN_PASSWORD for the admin login
+
   post-creator:
     ports: !override
       - "127.0.0.1:5050:5050"
