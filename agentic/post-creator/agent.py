@@ -8,7 +8,8 @@ Post-creator agent:
 6. Embed title+content → check Pinecone for duplicates
 7. Generate a cover image (Gemini) and upload it to Spaces — optional, skipped on failure
 8. Save post to MongoDB via post-service
-9. Upsert embedding to Pinecone
+9. Email the reviewer for approval
+10. Upsert embedding to Pinecone
 """
 import logging
 from topic_client import fetch_all_subtopics, pick_subtopics_with_priority
@@ -18,6 +19,7 @@ from auth_client import upload_image
 from pinecone_client import post_exists, upsert_post
 from post_client import save_post
 from filter_client import is_content_allowed
+from notifier import send_approval_email
 from config import POSTS_PER_RUN, IMAGE_ENABLED
 
 logger = logging.getLogger(__name__)
@@ -135,7 +137,14 @@ def run_agent() -> None:
             logger.error("MongoDB save failed for '%s'. Skipping Pinecone upsert.", subtopic_name)
             continue
 
-        # 11. Upsert to Pinecone
+        # 11. Email the reviewer a reminder that a post is waiting for approval (failures are logged, not fatal)
+        send_approval_email(
+            post=post, title=title, content=content, image_url=image_url,
+            topic_name=topic_name, subtopic_name=subtopic_name,
+            mode=mode, level=level, region=region,
+        )
+
+        # 12. Upsert to Pinecone
         upsert_post(
             post_id=post["_id"],
             embedding=embedding,

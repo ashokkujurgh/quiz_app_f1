@@ -12,6 +12,13 @@ POST_API_URL        = os.getenv("POST_API_URL",     "http://localhost:4004")
 AUTH_API_URL        = os.getenv("AUTH_API_URL",     "http://localhost:4001")
 FILTER_API_URL      = os.getenv("FILTER_API_URL",   "http://localhost:5051")
 
+# Approval email — sent after each generated post (leave APPROVAL_EMAIL_TO empty to disable)
+APPROVAL_EMAIL_TO   = os.getenv("APPROVAL_EMAIL_TO", "")
+MAIL_USER           = os.getenv("MAIL_USER",        "info@meenzo.com")
+MAIL_PASSWORD       = os.getenv("MAIL_PASSWORD")
+SMTP_HOST           = os.getenv("SMTP_HOST",        "smtp.hostinger.com")
+SMTP_PORT           = int(os.getenv("SMTP_PORT",    "465"))
+
 # Admin credentials
 ADMIN_EMAIL         = os.getenv("ADMIN_EMAIL",      "admin@meenzo.com")
 ADMIN_PASSWORD      = os.getenv("ADMIN_PASSWORD",   "Admin@1234")
