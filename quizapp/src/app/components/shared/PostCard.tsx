@@ -28,7 +28,7 @@ function QuizResultCard({ result, isAdmin }: { result: QuizResult; isAdmin: bool
         mt: 1.5, borderRadius: 2.5, overflow: 'hidden',
         border: '1px solid', borderColor: 'divider',
         background: (t) => t.palette.mode === 'dark'
-          ? 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)'
+          ? 'linear-gradient(135deg, #111936 0%, #0F1B45 100%)'
           : 'linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%)',
       }}>
         {/* Header */}
@@ -125,7 +125,7 @@ function QuizResultCard({ result, isAdmin }: { result: QuizResult; isAdmin: bool
       mt: 1.5, borderRadius: 2.5, overflow: 'hidden',
       border: '1px solid', borderColor: 'divider',
       background: (t) => t.palette.mode === 'dark'
-        ? 'linear-gradient(135deg, #1a1a2e 0%, #0d1b2a 100%)'
+        ? 'linear-gradient(135deg, #111936 0%, #0A0F1F 100%)'
         : 'linear-gradient(135deg, #1e3a5f 0%, #0f2447 100%)',
     }}>
       <Stack direction="row" alignItems="center" px={2.5} pt={2} pb={1.5} spacing={2}>

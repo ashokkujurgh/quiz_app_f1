@@ -72,7 +72,7 @@ export function HistoryPage() {
       {/* Summary cards */}
       <Stack direction="row" spacing={2} mb={3} flexWrap="wrap">
         {[
-          { label: 'Total Quizzes', value: totalQuizzes, icon: '🎮', color: '#5563DE' },
+          { label: 'Total Quizzes', value: totalQuizzes, icon: '🎮', color: '#0AA8A3' },
           { label: 'Avg Score',     value: `${avgScore}%`, icon: '📊', color: '#22c55e' },
           { label: 'Perfect Scores', value: perfect,      icon: '🏆', color: '#f59e0b' },
         ].map(({ label, value, icon, color }) => (

@@ -61,7 +61,7 @@ export function LoginPage() {
         justifyContent: 'center',
         bgcolor: 'background.default',
         p: 2,
-        background: 'linear-gradient(135deg, #5563DE12 0%, #E91E8C08 100%)',
+        background: 'linear-gradient(135deg, #0F1B4510 0%, #06D5CF14 100%)',
       }}
     >
       <Box sx={{ width: '100%', maxWidth: 440 }}>
@@ -71,7 +71,8 @@ export function LoginPage() {
             component="img"
             src={logoUrl}
             alt="Meenzo"
-            sx={{ height: 60, maxWidth: 180, objectFit: 'contain' }}
+            sx={(t) => ({ height: 60, maxWidth: 180, objectFit: 'contain',
+              ...(t.palette.mode === 'dark' && { bgcolor: '#fff', borderRadius: 3, p: 1 }) })}
           />
           <Typography variant="h5" fontWeight={800}>Welcome back to Meenzo</Typography>
           <Typography variant="body2" color="text.secondary">Sign in to continue your learning journey</Typography>

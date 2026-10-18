@@ -111,7 +111,8 @@ export function Navbar({ onMenuToggle }: Props) {
           component="img"
           src={logoUrl}
           alt="Meenzo"
-          sx={{ height: 40, maxWidth: 140, objectFit: 'contain', cursor: 'pointer', display: { xs: 'none', sm: 'block' } }}
+          sx={(t) => ({ height: 40, maxWidth: 140, objectFit: 'contain', cursor: 'pointer', display: { xs: 'none', sm: 'block' },
+            ...(t.palette.mode === 'dark' && { bgcolor: '#fff', borderRadius: 2, p: 0.5 }) })}
           onClick={() => navigate('/home')}
         />
 

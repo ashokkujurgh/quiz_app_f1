@@ -19,7 +19,7 @@ interface Props {
 }
 
 export function QuizCard({ quiz, onClick }: Props) {
-  const accent = topicColors[quiz.category] ?? '#6366f1';
+  const accent = topicColors[quiz.category] ?? '#0AA8A3';
   const mins = Math.floor(quiz.duration / 60);
 
   return (

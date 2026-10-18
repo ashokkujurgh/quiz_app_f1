@@ -42,7 +42,7 @@ function CircleTimer({ value, max, isLow, label }: { value: number; max: number;
   const r = 36; const circ = 2 * Math.PI * r;
   const pct = max > 0 ? value / max : 0;
   const offset = circ * (1 - pct);
-  const color = isLow ? '#ef4444' : '#6366f1';
+  const color = isLow ? '#ef4444' : '#06D5CF';
   const mins = Math.floor(value / 60);
   const secs = value % 60;
   const display = max >= 60 ? `${mins}:${secs.toString().padStart(2, '0')}` : `${value}`;
@@ -101,7 +101,7 @@ function PlayersPanel({ players, totalQ, myScore, currentQ }: { players: LivePla
               <Stack direction="row" spacing={1} alignItems="center" mb={0.75}>
                 <Typography sx={{ fontSize: '0.75rem', width: 18, flexShrink: 0 }}>{medal ?? `#${i + 1}`}</Typography>
                 <Badge overlap="circular" anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }} variant="dot"
-                  sx={{ '& .MuiBadge-badge': { bgcolor: '#22c55e', boxShadow: '0 0 0 2px #1a1a2e', width: 8, height: 8, borderRadius: '50%', minWidth: 'unset' } }}>
+                  sx={{ '& .MuiBadge-badge': { bgcolor: '#22c55e', boxShadow: '0 0 0 2px #111936', width: 8, height: 8, borderRadius: '50%', minWidth: 'unset' } }}>
                   <Avatar src={p.userAvatar} sx={{ width: 30, height: 30, fontSize: 12, bgcolor: `hsl(${(p.userName.charCodeAt(0) * 37) % 360},60%,50%)` }}>
                     {p.userName[0]}
                   </Avatar>
@@ -144,7 +144,7 @@ function PlayerStrip({ players }: { players: LivePlayer[] }) {
           <Stack key={p.userId} alignItems="center" spacing={0.5}>
             <Box sx={{ position: 'relative' }}>
               <Badge overlap="circular" anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }} variant="dot"
-                sx={{ '& .MuiBadge-badge': { bgcolor: '#22c55e', boxShadow: '0 0 0 2px #1a1a2e', width: 8, height: 8, borderRadius: '50%', minWidth: 'unset' } }}>
+                sx={{ '& .MuiBadge-badge': { bgcolor: '#22c55e', boxShadow: '0 0 0 2px #111936', width: 8, height: 8, borderRadius: '50%', minWidth: 'unset' } }}>
                 <Avatar src={p.userAvatar} sx={{ width: 38, height: 38, fontSize: 14, bgcolor: `hsl(${(p.userName.charCodeAt(0) * 37) % 360},60%,50%)`, border: i === 0 ? '2px solid #f59e0b' : 'none' }}>
                   {p.userName[0]}
                 </Avatar>
@@ -167,7 +167,7 @@ function PlayerStrip({ players }: { players: LivePlayer[] }) {
 
 // ── Option button ─────────────────────────────────────────────────────────────
 const OPTION_LABELS = ['A', 'B', 'C', 'D'];
-const OPTION_COLORS = ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981'];
+const OPTION_COLORS = ['#2A3F8F', '#047E7A', '#06b6d4', '#10b981'];
 
 function OptionButton({
   idx, text, selected, ended, correctAnswer, onClick,
@@ -415,8 +415,8 @@ export function QuizPlayPage() {
 
   if (restoring) {
     return (
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', bgcolor: '#0f0f1a' }}>
-        <CircularProgress sx={{ color: '#6366f1' }} />
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', bgcolor: '#0A0F1F' }}>
+        <CircularProgress sx={{ color: '#06D5CF' }} />
       </Box>
     );
   }
@@ -425,11 +425,11 @@ export function QuizPlayPage() {
     return (
       <Box sx={{
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        minHeight: '100vh', bgcolor: '#0f0f1a', p: 3,
+        minHeight: '100vh', bgcolor: '#0A0F1F', p: 3,
       }}>
         <Box sx={{
           textAlign: 'center', maxWidth: 420,
-          bgcolor: '#1a1a2e', borderRadius: 4, p: 5,
+          bgcolor: '#111936', borderRadius: 4, p: 5,
           border: '1px solid rgba(239,68,68,0.3)',
           boxShadow: '0 0 40px rgba(239,68,68,0.1)',
         }}>
@@ -514,10 +514,10 @@ export function QuizPlayPage() {
 
   // ── Background gradient (changes with question index) ─────────────────────
   const gradients = [
-    'linear-gradient(135deg, #0f0f1a 0%, #1a1040 100%)',
-    'linear-gradient(135deg, #0f0f1a 0%, #0d2040 100%)',
-    'linear-gradient(135deg, #0f0f1a 0%, #1a2010 100%)',
-    'linear-gradient(135deg, #0f0f1a 0%, #201015 100%)',
+    'linear-gradient(135deg, #0A0F1F 0%, #0F1B45 100%)',
+    'linear-gradient(135deg, #0A0F1F 0%, #0d2040 100%)',
+    'linear-gradient(135deg, #0A0F1F 0%, #1a2010 100%)',
+    'linear-gradient(135deg, #0A0F1F 0%, #201015 100%)',
   ];
   const bgIdx = (currentQuestion?.questionIndex ?? ttCurrentIdx) % gradients.length;
 
@@ -588,10 +588,10 @@ export function QuizPlayPage() {
               <Box sx={{ height: 6, borderRadius: 3, bgcolor: 'rgba(255,255,255,0.1)', overflow: 'hidden' }}>
                 <Box sx={{
                   height: '100%', borderRadius: 3,
-                  background: 'linear-gradient(90deg, #6366f1, #a855f7)',
+                  background: 'linear-gradient(90deg, #06D5CF, #04A9A4)',
                   width: `${progressPct}%`,
                   transition: 'width 0.5s ease',
-                  boxShadow: '0 0 8px rgba(99,102,241,0.6)',
+                  boxShadow: '0 0 8px rgba(6,213,207,0.6)',
                 }} />
               </Box>
             </Box>
@@ -602,10 +602,10 @@ export function QuizPlayPage() {
             <Box sx={{ textAlign: 'center', py: 10 }}>
               <Box sx={{
                 width: 80, height: 80, borderRadius: '50%', mx: 'auto', mb: 3,
-                background: 'linear-gradient(135deg, #6366f1, #a855f7)',
+                background: 'linear-gradient(135deg, #1E2F6E, #047E7A)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 animation: 'pulse 2s infinite',
-                '@keyframes pulse': { '0%,100%': { boxShadow: '0 0 0 0 rgba(99,102,241,0.4)' }, '50%': { boxShadow: '0 0 0 20px rgba(99,102,241,0)' } },
+                '@keyframes pulse': { '0%,100%': { boxShadow: '0 0 0 0 rgba(6,213,207,0.4)' }, '50%': { boxShadow: '0 0 0 20px rgba(6,213,207,0)' } },
               }}>
                 <AccessTime sx={{ fontSize: 36, color: 'white' }} />
               </Box>
@@ -615,7 +615,7 @@ export function QuizPlayPage() {
                 {[0, 1, 2].map((i) => (
                   <Box key={i} sx={{
                     width: 10, height: 10, borderRadius: '50%',
-                    bgcolor: '#6366f1', opacity: 0.4,
+                    bgcolor: '#06D5CF', opacity: 0.4,
                     animation: `bounce 1.4s ${i * 0.2}s infinite`,
                     '@keyframes bounce': { '0%,80%,100%': { transform: 'scale(0)' }, '40%': { transform: 'scale(1)', opacity: 1 } },
                   }} />
@@ -691,10 +691,10 @@ export function QuizPlayPage() {
                 <Box sx={{ mt: 3, height: 4, borderRadius: 2, bgcolor: 'rgba(255,255,255,0.1)', overflow: 'hidden' }}>
                   <Box sx={{
                     height: '100%', borderRadius: 2,
-                    background: pqTimerLow ? '#ef4444' : 'linear-gradient(90deg,#6366f1,#a855f7)',
+                    background: pqTimerLow ? '#ef4444' : 'linear-gradient(90deg,#06D5CF,#04A9A4)',
                     width: `${currentQuestion.timeLimit > 0 ? (questionTimeLeft / currentQuestion.timeLimit) * 100 : 0}%`,
                     transition: 'width 0.9s linear',
-                    boxShadow: pqTimerLow ? '0 0 8px rgba(239,68,68,0.8)' : '0 0 8px rgba(99,102,241,0.6)',
+                    boxShadow: pqTimerLow ? '0 0 8px rgba(239,68,68,0.8)' : '0 0 8px rgba(6,213,207,0.6)',
                   }} />
                 </Box>
               )}
@@ -713,8 +713,8 @@ export function QuizPlayPage() {
           {gameMode === 'total_timer' && gameStarted && ttQ && !gameOver && (
             <>
               {ttSubmitted && (
-                <Box sx={{ mb: 2, p: 1.5, borderRadius: 2, bgcolor: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.4)', textAlign: 'center' }}>
-                  <Typography fontWeight={700} sx={{ color: '#a5b4fc' }}>
+                <Box sx={{ mb: 2, p: 1.5, borderRadius: 2, bgcolor: 'rgba(6,213,207,0.15)', border: '1px solid rgba(6,213,207,0.4)', textAlign: 'center' }}>
+                  <Typography fontWeight={700} sx={{ color: '#7FEAE6' }}>
                     {ttTimeLeft === 0 ? "⏱ Time's up! Your answers have been submitted." : '✅ Submitted! Waiting for quiz to end…'}
                   </Typography>
                 </Box>
@@ -783,11 +783,11 @@ export function QuizPlayPage() {
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                           transition: 'all 0.15s',
                           background: isCurrent
-                            ? 'linear-gradient(135deg,#6366f1,#a855f7)'
+                            ? 'linear-gradient(135deg,#1E2F6E,#047E7A)'
                             : isAnswered ? 'rgba(34,197,94,0.25)' : 'rgba(255,255,255,0.08)',
                           border: '1px solid',
-                          borderColor: isCurrent ? '#6366f1' : isAnswered ? 'rgba(34,197,94,0.5)' : 'rgba(255,255,255,0.12)',
-                          boxShadow: isCurrent ? '0 0 8px rgba(99,102,241,0.6)' : 'none',
+                          borderColor: isCurrent ? '#06D5CF' : isAnswered ? 'rgba(34,197,94,0.5)' : 'rgba(255,255,255,0.12)',
+                          boxShadow: isCurrent ? '0 0 8px rgba(6,213,207,0.6)' : 'none',
                           transform: isCurrent ? 'scale(1.15)' : 'scale(1)',
                         }}
                       >
@@ -807,7 +807,7 @@ export function QuizPlayPage() {
                     onClick={() => setTtCurrentIdx((i) => i - 1)}
                     sx={{
                       flex: 1, borderColor: 'rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.7)',
-                      '&:hover': { borderColor: '#6366f1', color: '#a5b4fc' },
+                      '&:hover': { borderColor: '#06D5CF', color: '#7FEAE6' },
                       '&.Mui-disabled': { borderColor: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.2)' },
                     }}
                   >
@@ -827,7 +827,7 @@ export function QuizPlayPage() {
                     <Button
                       variant="contained" endIcon={<ArrowForward />}
                       onClick={() => setTtCurrentIdx((i) => i + 1)}
-                      sx={{ flex: 1, background: 'linear-gradient(135deg,#6366f1,#a855f7)', fontWeight: 700 }}
+                      sx={{ flex: 1, background: 'linear-gradient(135deg,#1E2F6E,#047E7A)', fontWeight: 700 }}
                     >
                       Next
                     </Button>

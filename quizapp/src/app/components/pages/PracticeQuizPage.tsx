@@ -27,7 +27,7 @@ interface PracticeState {
   questions?:   ApiQuestion[]; // pre-loaded (from "Play as Test")
 }
 
-const OPTION_COLORS = ['#6366f1', '#a855f7', '#06b6d4', '#10b981'];
+const OPTION_COLORS = ['#2A3F8F', '#047E7A', '#06b6d4', '#10b981'];
 const OPTION_LABELS = ['A', 'B', 'C', 'D'];
 
 export function PracticeQuizPage() {
@@ -69,8 +69,8 @@ export function PracticeQuizPage() {
 
   // ── Loading ───────────────────────────────────────────────────────────────
   if (loading) return (
-    <Box sx={{ minHeight: 'calc(100vh - 64px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2, background: 'linear-gradient(135deg, #0f0f1a 0%, #1a0a2e 50%, #0d1117 100%)' }}>
-      <CircularProgress size={52} sx={{ color: '#a855f7' }} />
+    <Box sx={{ minHeight: 'calc(100vh - 64px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2, background: 'linear-gradient(135deg, #0A0F1F 0%, #0F1B45 50%, #0d1117 100%)' }}>
+      <CircularProgress size={52} sx={{ color: '#06D5CF' }} />
       <Typography color="rgba(255,255,255,0.7)" variant="h6">Loading questions…</Typography>
       <Typography color="rgba(255,255,255,0.4)" variant="body2">{state.subTopicName}</Typography>
     </Box>
@@ -90,10 +90,10 @@ export function PracticeQuizPage() {
       pct >= 90 ? { label: 'Excellent!',  emoji: '🏆', color: '#f59e0b', glow: '#f59e0b40' } :
       pct >= 75 ? { label: 'Great Job!',  emoji: '🎉', color: '#22c55e', glow: '#22c55e40' } :
       pct >= 60 ? { label: 'Good Effort!',emoji: '👍', color: '#3b82f6', glow: '#3b82f640' } :
-                  { label: 'Nice Try!',   emoji: '💪', color: '#a855f7', glow: '#a855f740' };
+                  { label: 'Nice Try!',   emoji: '💪', color: '#06D5CF', glow: '#06D5CF40' };
 
     return (
-      <Box sx={{ minHeight: 'calc(100vh - 64px)', background: 'linear-gradient(135deg, #0f0f1a 0%, #1a0a2e 50%, #0d1117 100%)', py: 4, px: 2 }}>
+      <Box sx={{ minHeight: 'calc(100vh - 64px)', background: 'linear-gradient(135deg, #0A0F1F 0%, #0F1B45 50%, #0d1117 100%)', py: 4, px: 2 }}>
         <Box sx={{ maxWidth: 700, mx: 'auto' }}>
 
           {/* Score Hero */}
@@ -119,7 +119,7 @@ export function PracticeQuizPage() {
               {[
                 { label: 'Correct',   value: correct,                    color: '#22c55e' },
                 { label: 'Wrong',     value: questions.length - correct,  color: '#ef4444' },
-                { label: 'Total',     value: questions.length,            color: '#a855f7' },
+                { label: 'Total',     value: questions.length,            color: '#06D5CF' },
               ].map(({ label, value, color }) => (
                 <Box key={label} sx={{ textAlign: 'center', px: 2, py: 1.5, borderRadius: 2, bgcolor: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>
                   <Typography variant="h5" fontWeight={800} sx={{ color }}>{value}</Typography>
@@ -181,7 +181,7 @@ export function PracticeQuizPage() {
             </Button>
             <Button variant="contained" startIcon={<Replay />}
               onClick={() => navigate('/home', { state: { openPractice: true } })}
-              sx={{ flex: 1, bgcolor: '#6366f1', '&:hover': { bgcolor: '#4f46e5' }, fontWeight: 700 }}>
+              sx={{ flex: 1, bgcolor: '#047E7A', '&:hover': { bgcolor: '#036663' }, fontWeight: 700 }}>
               Practice Again
             </Button>
           </Stack>
@@ -197,7 +197,7 @@ export function PracticeQuizPage() {
   const pctDone  = (current / total) * 100;
 
   return (
-    <Box sx={{ minHeight: 'calc(100vh - 64px)', background: 'linear-gradient(135deg, #0f0f1a 0%, #1a0a2e 50%, #0d1117 100%)', py: 3, px: 2 }}>
+    <Box sx={{ minHeight: 'calc(100vh - 64px)', background: 'linear-gradient(135deg, #0A0F1F 0%, #0F1B45 50%, #0d1117 100%)', py: 3, px: 2 }}>
       <Box sx={{ maxWidth: 720, mx: 'auto' }}>
 
         {/* Top bar */}
@@ -208,7 +208,7 @@ export function PracticeQuizPage() {
           </Button>
           <Stack direction="row" spacing={1} alignItems="center">
             <Chip label={state.subTopicName} size="small"
-              sx={{ bgcolor: 'rgba(99,102,241,0.2)', color: '#a5b4fc', border: '1px solid rgba(99,102,241,0.4)', fontWeight: 600 }} />
+              sx={{ bgcolor: 'rgba(6,213,207,0.2)', color: '#7FEAE6', border: '1px solid rgba(6,213,207,0.4)', fontWeight: 600 }} />
             <Typography sx={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.8rem' }}>
               {current + 1} / {total}
             </Typography>
@@ -220,7 +220,7 @@ export function PracticeQuizPage() {
 
         {/* Progress bar */}
         <LinearProgress variant="determinate" value={pctDone}
-          sx={{ mb: 3, height: 5, borderRadius: 3, bgcolor: 'rgba(255,255,255,0.08)', '& .MuiLinearProgress-bar': { background: 'linear-gradient(90deg, #6366f1, #a855f7)' } }} />
+          sx={{ mb: 3, height: 5, borderRadius: 3, bgcolor: 'rgba(255,255,255,0.08)', '& .MuiLinearProgress-bar': { background: 'linear-gradient(90deg, #06D5CF, #04A9A4)' } }} />
 
         {/* Question card */}
         <Box sx={{
@@ -229,7 +229,7 @@ export function PracticeQuizPage() {
           backdropFilter: 'blur(12px)', p: { xs: 2.5, sm: 3.5 }, mb: 2.5,
           boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
         }}>
-          <Typography variant="caption" sx={{ color: '#a855f7', fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', display: 'block', mb: 1.5 }}>
+          <Typography variant="caption" sx={{ color: '#06D5CF', fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', display: 'block', mb: 1.5 }}>
             Question {current + 1}
           </Typography>
           <Typography variant="h6" fontWeight={700} sx={{ color: 'white', mb: 3, lineHeight: 1.5 }}>
@@ -293,7 +293,7 @@ export function PracticeQuizPage() {
             <Button
               variant="contained" endIcon={<ArrowForward />}
               onClick={() => setCurrent((c) => c + 1)}
-              sx={{ flex: 1, background: 'linear-gradient(135deg, #6366f1, #a855f7)', fontWeight: 700, boxShadow: '0 4px 16px rgba(99,102,241,0.4)', '&:hover': { background: 'linear-gradient(135deg, #4f46e5, #9333ea)' } }}
+              sx={{ flex: 1, background: 'linear-gradient(135deg, #1E2F6E, #047E7A)', fontWeight: 700, boxShadow: '0 4px 16px rgba(6,213,207,0.4)', '&:hover': { background: 'linear-gradient(135deg, #182659, #036663)' } }}
             >
               Next
             </Button>
@@ -320,13 +320,13 @@ export function PracticeQuizPage() {
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 cursor: 'pointer', fontSize: '0.7rem', fontWeight: 700,
                 bgcolor: i === current
-                  ? 'rgba(99,102,241,1)'
+                  ? 'rgba(6,213,207,1)'
                   : selected[i] !== undefined
                   ? 'rgba(34,197,94,0.7)'
                   : 'rgba(255,255,255,0.08)',
                 color: i === current || selected[i] !== undefined ? 'white' : 'rgba(255,255,255,0.4)',
-                border: i === current ? '2px solid #a5b4fc' : '2px solid transparent',
-                boxShadow: i === current ? '0 0 10px rgba(99,102,241,0.6)' : 'none',
+                border: i === current ? '2px solid #7FEAE6' : '2px solid transparent',
+                boxShadow: i === current ? '0 0 10px rgba(6,213,207,0.6)' : 'none',
                 transition: 'all 0.15s',
                 '&:hover': { transform: 'scale(1.15)' },
               }}

@@ -33,11 +33,11 @@ const categoryData = [
   { name: 'Geo', value: 10 },
 ];
 
-const PIE_COLORS = ['#5563DE', '#E91E8C', '#22c55e', '#f59e0b', '#3b82f6', '#8b5cf6'];
+const PIE_COLORS = ['#0AA8A3', '#3E5BA9', '#22c55e', '#f59e0b', '#3b82f6', '#8b5cf6'];
 
 const stats = [
-  { label: 'Total Users', value: '1,284', icon: People, color: '#5563DE', change: '+12%' },
-  { label: 'Total Quizzes', value: '248', icon: Quiz, color: '#E91E8C', change: '+5%' },
+  { label: 'Total Users', value: '1,284', icon: People, color: '#0AA8A3', change: '+12%' },
+  { label: 'Total Quizzes', value: '248', icon: Quiz, color: '#3E5BA9', change: '+5%' },
   { label: 'Quiz Attempts', value: '45.2K', icon: TrendingUp, color: '#22c55e', change: '+24%' },
   { label: 'Active Posts', value: '3,891', icon: Article, color: '#f59e0b', change: '+8%' },
 ];
@@ -93,20 +93,20 @@ export function AdminDashboard() {
                 <AreaChart data={usersOverTime}>
                   <defs>
                     <linearGradient id="colorUsers" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#5563DE" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#5563DE" stopOpacity={0} />
+                      <stop offset="5%" stopColor="#0AA8A3" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#0AA8A3" stopOpacity={0} />
                     </linearGradient>
                     <linearGradient id="colorQuizzes" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#E91E8C" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#E91E8C" stopOpacity={0} />
+                      <stop offset="5%" stopColor="#3E5BA9" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#3E5BA9" stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.05)" />
                   <XAxis dataKey="month" tick={{ fontSize: 12 }} />
                   <YAxis tick={{ fontSize: 12 }} />
                   <Tooltip />
-                  <Area type="monotone" dataKey="users" stroke="#5563DE" fill="url(#colorUsers)" strokeWidth={2} name="New Users" />
-                  <Area type="monotone" dataKey="quizzes" stroke="#E91E8C" fill="url(#colorQuizzes)" strokeWidth={2} name="Quiz Attempts" />
+                  <Area type="monotone" dataKey="users" stroke="#0AA8A3" fill="url(#colorUsers)" strokeWidth={2} name="New Users" />
+                  <Area type="monotone" dataKey="quizzes" stroke="#3E5BA9" fill="url(#colorQuizzes)" strokeWidth={2} name="Quiz Attempts" />
                 </AreaChart>
               </ResponsiveContainer>
             </CardContent>

@@ -1,10 +1,16 @@
 import { createTheme, type ThemeOptions } from '@mui/material/styles';
 import type { ThemeMode } from '../types';
 
+// Brand colours from the Meenzo logo
+export const brand = {
+  navy:      '#0F1B45',
+  navyLight: '#1E2F6E',
+  teal:      '#06D5CF',
+  tealDeep:  '#047E7A', // teal dark enough for white text (≈4.9:1)
+  ink:       '#0F0F0F',
+};
+
 const baseTokens = {
-  primary: '#5563DE',
-  primaryDark: '#3d4dcc',
-  secondary: '#E91E8C',
   success: '#22c55e',
   warning: '#f59e0b',
   error: '#ef4444',
@@ -14,19 +20,25 @@ const baseTokens = {
 const getDesignTokens = (mode: ThemeMode): ThemeOptions => ({
   palette: {
     mode,
-    primary: { main: baseTokens.primary, dark: baseTokens.primaryDark },
-    secondary: { main: baseTokens.secondary },
+    // Light: navy buttons with white text. Dark: navy would vanish on the background,
+    // so teal takes the lead with navy text.
+    primary: mode === 'light'
+      ? { main: brand.navy, light: brand.navyLight, dark: '#0A1230', contrastText: '#ffffff' }
+      : { main: brand.teal, light: '#5BE7E3', dark: '#04B5B0', contrastText: brand.navy },
+    secondary: mode === 'light'
+      ? { main: brand.teal, dark: brand.tealDeep, contrastText: brand.navy }
+      : { main: '#5BE7E3', dark: brand.teal, contrastText: brand.navy },
     success: { main: baseTokens.success },
     warning: { main: baseTokens.warning },
     error: { main: baseTokens.error },
     info: { main: baseTokens.info },
     background: {
-      default: mode === 'light' ? '#f0f2f5' : '#0d1117',
-      paper: mode === 'light' ? '#ffffff' : '#161b22',
+      default: mode === 'light' ? '#F8F9FD' : '#0A0F1F',
+      paper: mode === 'light' ? '#ffffff' : '#111936',
     },
     text: {
-      primary: mode === 'light' ? '#1a1a2e' : '#e6edf3',
-      secondary: mode === 'light' ? '#57606a' : '#8b949e',
+      primary: mode === 'light' ? brand.navy : '#E8ECF8',
+      secondary: mode === 'light' ? '#5A6385' : '#9AA4C0',
     },
     divider: mode === 'light' ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)',
   },
@@ -52,7 +64,9 @@ const getDesignTokens = (mode: ThemeMode): ThemeOptions => ({
           '&:hover': { boxShadow: 'none' },
         },
         containedPrimary: {
-          background: `linear-gradient(135deg, ${baseTokens.primary} 0%, ${baseTokens.primaryDark} 100%)`,
+          background: mode === 'light'
+            ? `linear-gradient(135deg, ${brand.navy} 0%, ${brand.navyLight} 100%)`
+            : `linear-gradient(135deg, ${brand.teal} 0%, #04B5B0 100%)`,
         },
       },
     },
@@ -83,7 +97,7 @@ const getDesignTokens = (mode: ThemeMode): ThemeOptions => ({
     MuiAvatar: {
       styleOverrides: {
         root: {
-          background: `linear-gradient(135deg, ${baseTokens.primary}, ${baseTokens.secondary})`,
+          background: `linear-gradient(135deg, ${brand.navy}, ${brand.tealDeep})`,
         },
       },
     },
@@ -92,9 +106,9 @@ const getDesignTokens = (mode: ThemeMode): ThemeOptions => ({
         root: {
           borderRadius: 10,
           '&.Mui-selected': {
-            backgroundColor: `${baseTokens.primary}18`,
-            color: baseTokens.primary,
-            '&:hover': { backgroundColor: `${baseTokens.primary}25` },
+            backgroundColor: mode === 'light' ? `${brand.navy}12` : `${brand.teal}1F`,
+            color: mode === 'light' ? brand.navy : brand.teal,
+            '&:hover': { backgroundColor: mode === 'light' ? `${brand.navy}1F` : `${brand.teal}2E` },
           },
         },
       },

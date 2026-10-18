@@ -91,7 +91,7 @@ function QuizCard({ quiz, loading, onPlay, onHistory, onTest }: {
       {quiz.thumbnail && !imgError ? (
         <CardMedia component="img" height="140" image={quiz.thumbnail} alt={quiz.title} sx={{ objectFit: 'cover' }} onError={() => setImgError(true)} />
       ) : (
-        <Box sx={{ height: 100, background: 'linear-gradient(135deg, #5563DE 0%, #a855f7 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Box sx={{ height: 100, background: 'linear-gradient(135deg, #0F1B45 0%, #047E7A 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <QuizIcon sx={{ fontSize: 40, color: 'white', opacity: 0.8 }} />
         </Box>
       )}

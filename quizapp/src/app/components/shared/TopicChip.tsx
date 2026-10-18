@@ -9,7 +9,7 @@ const topicColors: Record<string, string> = {
   'Mathematics': '#ef4444',
   'Physics': '#06b6d4',
   'Chemistry': '#ec4899',
-  'Technology': '#6366f1',
+  'Technology': '#0AA8A3',
 };
 
 interface Props {

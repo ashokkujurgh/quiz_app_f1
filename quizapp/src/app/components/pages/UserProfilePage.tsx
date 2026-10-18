@@ -111,7 +111,7 @@ export function UserProfilePage() {
           height: 180,
           background: profile.coverImage
             ? `url(${profile.coverImage}) center/cover no-repeat`
-            : 'linear-gradient(135deg, #5563DE 0%, #E91E8C 100%)',
+            : 'linear-gradient(135deg, #0F1B45 0%, #047E7A 100%)',
         }} />
 
         <CardContent sx={{ pt: 0 }}>

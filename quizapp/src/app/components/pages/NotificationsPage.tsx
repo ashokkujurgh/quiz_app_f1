@@ -12,7 +12,7 @@ import { Notifications as NotifIcon } from '@mui/icons-material';
 const typeLabels: Record<string, { emoji: string; label: string; color: string }> = {
   like: { emoji: '❤️', label: 'Like', color: '#ef4444' },
   comment: { emoji: '💬', label: 'Comment', color: '#3b82f6' },
-  friend_request: { emoji: '👥', label: 'Friend Request', color: '#5563DE' },
+  friend_request: { emoji: '👥', label: 'Friend Request', color: '#0AA8A3' },
   message: { emoji: '✉️', label: 'Message', color: '#22c55e' },
   quiz_challenge: { emoji: '🎯', label: 'Challenge', color: '#f59e0b' },
 };
@@ -46,7 +46,7 @@ export function NotificationsPage() {
                 sx={{
                   cursor: 'pointer',
                   bgcolor: n.read ? 'background.paper' : 'primary.main',
-                  background: n.read ? undefined : 'rgba(85,99,222,0.06)',
+                  background: n.read ? undefined : 'rgba(6,213,207,0.08)',
                   border: n.read ? undefined : '1px solid',
                   borderColor: n.read ? undefined : 'primary.main',
                   borderOpacity: 0.3,
