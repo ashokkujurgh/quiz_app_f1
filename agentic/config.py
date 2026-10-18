@@ -43,6 +43,8 @@ CA_SUBTOPIC           = "Current Affairs"
 CA_QUESTIONS_PER_DAY  = int(os.getenv("CA_QUESTIONS_PER_DAY", "10"))
 CA_MODEL              = os.getenv("CA_MODEL", "gpt-4.1")   # writes + verifies; accuracy matters most here
 CA_RUN_IST            = os.getenv("CA_RUN_IST", "18:00")   # after most of the day's releases
+# true: questions that pass both automatic checks go live at once; false: saved inactive for manual approval
+CA_AUTO_APPROVE       = os.getenv("CA_AUTO_APPROVE", "true").lower() == "true"
 # Topics the regular generator must never write from memory (they have their own grounded pipeline)
 EXCLUDED_TOPICS       = {CA_TOPIC.lower()}
 

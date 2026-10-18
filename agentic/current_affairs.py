@@ -6,8 +6,9 @@ Safety layers — a question is only saved if it passes all of them:
      quoted ("evidence"); rejected if that sentence is not actually in the source text.
   2. Verified: an independent model answers it from the source alone; rejected if it
      disagrees or finds more than one defensible option.
-  3. Approved: saved INACTIVE with the source link and date, so it is invisible to games
-     until an admin activates it (Admin → Questions → Pending approval).
+  3. Approved: with CA_AUTO_APPROVE (default) a question that passes 1 and 2 goes live at
+     once; otherwise it is saved INACTIVE until an admin activates it
+     (Admin → Questions → Pending approval). Either way it carries its source link and date.
 
 PIB's own site blocks this server, so releases are read through Google News restricted
 to site:pib.gov.in. The feed carries only PIB's official headline (no body text), so
@@ -26,7 +27,7 @@ import feedparser
 from openai import OpenAI
 
 from config import (
-    OPENAI_API_KEY, CA_QUESTIONS_PER_DAY, CA_MODEL, CA_TOPIC, CA_SUBTOPIC,
+    OPENAI_API_KEY, CA_QUESTIONS_PER_DAY, CA_MODEL, CA_TOPIC, CA_SUBTOPIC, CA_AUTO_APPROVE,
     MAIL_USER, MAIL_PASSWORD, SMTP_HOST, SMTP_PORT, APPROVAL_EMAIL_TO,
 )
 from question_client import save_question
@@ -135,14 +136,20 @@ def _notify(count: int) -> None:
     if not (count and APPROVAL_EMAIL_TO and MAIL_USER and MAIL_PASSWORD):
         return
     msg = EmailMessage()
-    msg["Subject"] = f"Reminder: {count} current-affairs question{'s' if count != 1 else ''} waiting for approval"
+    plural = "s" if count != 1 else ""
+    msg["Subject"] = (f"{count} current-affairs question{plural} published today" if CA_AUTO_APPROVE
+                      else f"Reminder: {count} current-affairs question{plural} waiting for approval")
     msg["From"] = f'"Meenzo" <{MAIL_USER}>'
     msg["To"] = APPROVAL_EMAIL_TO
-    msg.set_content(
-        f"{count} new current-affairs question(s) were generated from today's PIB releases and checked against "
-        "the source.\n\nPlease review them in the admin panel under Questions → Pending approval, and Activate the "
-        "ones that are correct. Only approved questions are used in the daily current-affairs game.\n"
-    )
+    if CA_AUTO_APPROVE:
+        body = (f"{count} new current-affairs question(s) were generated from today's PIB releases, checked against "
+                "the source and published automatically.\n\nTo spot-check them, open the admin panel → Questions and "
+                "filter by Current Affairs; each one has its PIB source link. Use Deactivate on any that are wrong.\n")
+    else:
+        body = (f"{count} new current-affairs question(s) were generated from today's PIB releases and checked against "
+                "the source.\n\nPlease review them in the admin panel under Questions → Pending approval, and Activate "
+                "the ones that are correct. Only approved questions are used in the daily current-affairs game.\n")
+    msg.set_content(body)
     try:
         with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, context=ssl.create_default_context(), timeout=30) as smtp:
             smtp.login(MAIL_USER, MAIL_PASSWORD)
@@ -180,17 +187,17 @@ def run_current_affairs() -> int:
             if question_exists(q["text"])[0]:
                 continue
             q["description"] = f"{q.get('explanation', '').strip()} Source: PIB press release, {r['date']} — {r['link']}".strip()
-            doc = save_question({**q, "isActive": False}, target["topicId"], target["_id"])
+            doc = save_question({**q, "isActive": CA_AUTO_APPROVE}, target["topicId"], target["_id"])
             if not doc:
                 continue
             upsert_question(question_id=doc["_id"], text=q["text"],
                             metadata={"question_id": doc["_id"], "topic": CA_TOPIC, "subtopic": CA_SUBTOPIC,
                                       "difficulty": q.get("difficulty", "medium")})
             saved += 1
-            logger.info("[CA] saved (pending approval): %s", q["text"][:90])
+            logger.info("[CA] saved (%s): %s", "published" if CA_AUTO_APPROVE else "pending approval", q["text"][:90])
         except Exception as exc:
             logger.error("[CA] failed for '%s': %s", r["title"][:60], exc)
 
-    logger.info("=== Current affairs: %d question(s) saved, pending approval ===", saved)
+    logger.info("=== Current affairs: %d question(s) saved, %s ===", saved, "published" if CA_AUTO_APPROVE else "pending approval")
     _notify(saved)
     return saved
