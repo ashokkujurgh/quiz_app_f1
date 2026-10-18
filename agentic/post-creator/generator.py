@@ -54,10 +54,10 @@ def pick_level() -> str:
 
 
 # ── region weights ─────────────────────────────────────────────────────────────
-# india (30%) — India-centred story and examples
-# world (70%) — international current affairs, non-Indian examples
+# india (60%) — India-centred story and examples
+# world (40%) — international current affairs, non-Indian examples
 REGIONS        = ["india", "world"]
-REGION_WEIGHTS = [0.30,    0.70]
+REGION_WEIGHTS = [0.60,    0.40]
 
 
 def pick_region() -> str:

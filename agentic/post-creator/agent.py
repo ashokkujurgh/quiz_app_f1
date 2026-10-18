@@ -48,7 +48,7 @@ def run_agent() -> None:
         topic_name    = subtopic["topicName"]
         subtopic_name = subtopic["name"]
 
-        # 4. Pick post mode + reading level + region (30% India / 70% world)
+        # 4. Pick post mode + reading level + region (60% India / 40% world)
         mode   = pick_post_mode()
         level  = pick_level()
         region = pick_region()
