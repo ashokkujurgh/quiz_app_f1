@@ -239,7 +239,7 @@ def fetch_trending_news(subtopic: dict, limit: int = 6, region: str = "india") -
 
 # ── public interface ──────────────────────────────────────────────────────────
 
-def fetch_web_context(subtopic: dict, region: str = "india") -> str:
+def fetch_web_context(subtopic: dict, region: str = "india", include_news: bool = True) -> str:
     subtopic_name   = subtopic["name"]
     topic_name      = subtopic.get("topicName", "")
     # India-weighted background only for India-region posts
@@ -249,7 +249,7 @@ def fetch_web_context(subtopic: dict, region: str = "india") -> str:
 
     sections: list[str] = []
 
-    if trending_biased:
+    if trending_biased and include_news:
         headlines = fetch_trending_news(subtopic, limit=6, region=region)
         if headlines:
             news_block = "\n".join(
@@ -297,7 +297,8 @@ def fetch_web_context(subtopic: dict, region: str = "india") -> str:
                 sections.append(f"[GLOBAL CONTEXT — 20% focus]\n[{title}]\n{summary[:300]}")
 
     elif region == "world":
-        for title in _wiki_search(f"{subtopic_name} {topic_name}", limit=5):
+        # Search the subject itself; adding the topic bucket name ("Engineering") pulls in odd articles
+        for title in _wiki_search(subtopic_name, limit=5):
             if _mentions_india(title):
                 continue
             summary = _wiki_summary(title)
@@ -305,7 +306,7 @@ def fetch_web_context(subtopic: dict, region: str = "india") -> str:
                 sections.append(f"[GLOBAL CONTEXT]\n[{title}]\n{summary[:600]}")
                 break
 
-    elif not trending_biased:
+    elif not (trending_biased and include_news):
         for query in [f"{subtopic_name} {topic_name}", subtopic_name]:
             titles = _wiki_search(query, limit=2)
             for title in titles[:1]:

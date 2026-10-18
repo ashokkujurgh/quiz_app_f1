@@ -2,9 +2,9 @@
 Post-creator agent:
 1. Fetch all subtopics
 2. Pick subtopics with topic-diversity priority
-3. Decide post mode (trending 40% / basic 40% / fun 10% / question 10%)
-4. Fetch live news (Google News RSS) + Wikipedia background context
-5. Generate human-like post content for the chosen mode
+3. Decide post mode (basic 70% / fun 15% / question 15%), reading level and region
+4. Fetch Wikipedia background context (reference articles only — no news)
+5. Generate a textbook-style post for the chosen mode
 6. Embed title+content → check Pinecone for duplicates
 7. Generate a cover image (Gemini) and upload it to Spaces — optional, skipped on failure
 8. Save post to MongoDB via post-service
@@ -13,7 +13,7 @@ Post-creator agent:
 """
 import logging
 from topic_client import fetch_all_subtopics, pick_subtopics_with_priority
-from trending import fetch_trending_news, fetch_web_context, fetch_wikipedia_trending, match_trending_to_subtopic
+from trending import fetch_web_context
 from generator import generate_post, pick_post_mode, pick_level, pick_region, embed_text, generate_image
 from auth_client import upload_image
 from pinecone_client import post_exists, upsert_post
@@ -43,9 +43,6 @@ def run_agent() -> None:
     selected = pick_subtopics_with_priority(subtopics, POSTS_PER_RUN)
     logger.info("Selected %d subtopics: %s", len(selected), [s["name"] for s in selected])
 
-    # 3. Fetch Wikipedia trending once (for trending_hint)
-    trending_titles = fetch_wikipedia_trending(limit=100)
-
     for subtopic in selected:
         topic_name    = subtopic["topicName"]
         subtopic_name = subtopic["name"]
@@ -56,20 +53,9 @@ def run_agent() -> None:
         region = pick_region()
         logger.info("Processing: %s > %s  [mode=%s, level=%s, region=%s]", topic_name, subtopic_name, mode, level, region)
 
-        # 5a. Fetch live trending news (always — used by trending + question modes)
-        trending_news = fetch_trending_news(subtopic, limit=6, region=region)
-        if trending_news:
-            logger.info("  Trending news: %d headlines fetched", len(trending_news))
-        else:
-            logger.info("  No trending news found, will rely on Wikipedia context")
-
-        # 5b. Wikipedia trending hint
-        trending_hint = match_trending_to_subtopic(subtopic, trending_titles)
-        if trending_hint:
-            logger.info("  Wikipedia trending hint: %s", trending_hint)
-
-        # 5c. Wikipedia + RSS background context
-        web_context = fetch_web_context(subtopic, region=region)
+        # 5. Background context from Wikipedia reference articles only — no news or trending
+        #    topics, so the post sticks to verifiable textbook knowledge
+        web_context = fetch_web_context(subtopic, region=region, include_news=False)
 
         # 6. Generate content
         generated = generate_post(
@@ -77,9 +63,7 @@ def run_agent() -> None:
             subtopic_name=subtopic_name,
             mode=mode,
             level=level,
-            trending_news=trending_news if trending_news else None,
             web_context=web_context or None,
-            trending_hint=trending_hint,
             region=region,
         )
         if not generated:
@@ -156,7 +140,6 @@ def run_agent() -> None:
                 "mode":     mode,
                 "level":    level,
                 "region":   region,
-                "trending": trending_hint or "",
             },
         )
 

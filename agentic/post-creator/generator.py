@@ -1,9 +1,9 @@
 """
-AI content generation with four human-like post modes:
-  trending  (30%) — news-hooked, current events angle
-  basic     (50%) — clear educational explainer, real-world examples
-  fun       (10%) — witty, light-hearted, meme-energy but still informative
-  question  (10%) — thought-provoking question that sparks debate/discussion
+AI content generation — textbook-style ("bookish") posts only, no current affairs,
+so every claim can be checked against a standard textbook or encyclopedia:
+  basic     (70%) — clear educational explainer, well-established examples
+  fun       (15%) — witty, light-hearted, meme-energy but still informative
+  question  (15%) — thought-provoking question rooted in the subject itself
 
 Each post also gets a reading level, independent of mode:
   foundation (70%) — high-school / job-seeker level, no jargon left unexplained
@@ -32,9 +32,10 @@ logger = logging.getLogger(__name__)
 _client = OpenAI(api_key=OPENAI_API_KEY)
 
 # ── post mode weights ─────────────────────────────────────────────────────────
-# trending = current-affairs-hooked posts (kept to 30% so the feed doesn't read like a news app)
-POST_MODES   = ["trending", "basic", "fun", "question"]
-MODE_WEIGHTS = [0.30,       0.50,   0.10, 0.10]
+# No "trending" (news-hooked) mode: current affairs are hard to verify, so posts
+# stick to established textbook knowledge.
+POST_MODES   = ["basic", "fun", "question"]
+MODE_WEIGHTS = [0.70,    0.15,  0.15]
 
 
 def pick_post_mode() -> str:
@@ -55,7 +56,7 @@ def pick_level() -> str:
 
 # ── region weights ─────────────────────────────────────────────────────────────
 # india (60%) — India-centred story and examples
-# world (40%) — international current affairs, non-Indian examples
+# world (40%) — world history/science and well-documented international examples
 REGIONS        = ["india", "world"]
 REGION_WEIGHTS = [0.60,    0.40]
 
@@ -103,6 +104,19 @@ Rules:
 - Length: 500-1000 words. Multiple flowing paragraphs. No lists or headers.
 """ + _QUALITY_BAR
 
+# Appended to every mode's system prompt
+_TEXTBOOK_RULES = """
+SOURCE RULES — TEXTBOOK KNOWLEDGE ONLY (most important rule):
+- Use only well-established, verifiable knowledge of the kind found in standard textbooks (e.g. NCERT,
+  standard university textbooks) and major encyclopedias: definitions, laws, principles, mechanisms,
+  classic experiments, and historical events with widely documented dates.
+- NO current affairs: no news, recent events, recent policies, live statistics, rankings, prices,
+  or anything from the last two years. No predictions, rumours, or contested/controversial claims.
+- Only state exact numbers, dates and names that are widely documented textbook facts. If you are not
+  certain of an exact figure, describe it qualitatively instead of guessing.
+- Never invent statistics, quotes, studies, people or sources.
+"""
+
 _SYSTEM_BASIC = """\
 You write posts for Meenzo, a quiz and learning app popular with Indian students and curious learners.
 Your job: write a DEEP, engaging educational post that thoroughly explains a core subject concept.
@@ -110,7 +124,7 @@ Your job: write a DEEP, engaging educational post that thoroughly explains a cor
 Voice: Like a really good teacher who actually makes class interesting — warm, direct, zero fluff.
 Tone: confident but approachable, like explaining to a smart 16-year-old who wants to truly understand.
 Rules:
-- Open with a surprising REAL fact, statistic, or a concrete real-world example that actually happened — never a definition, news hook, or a made-up hypothetical scenario.
+- Open with a surprising, well-documented REAL fact or a classic real-world example from textbooks or history — never a definition, news hook, or a made-up hypothetical scenario.
 - Build understanding layer by layer — start simple, go deeper, cover history/theory/application.
 - Include multiple real-world examples, drawn from the REGION FOCUS in the request.
 - Explain WHY the concept matters, not just WHAT it is.
@@ -175,15 +189,16 @@ def _level_clause(level: str) -> str:
 def _region_clause(subtopic_name: str, region: str) -> str:
     if region == "world":
         return (
-            "\nREGION FOCUS — WORLD: Draw the hook and the examples from international / world current affairs. "
-            "Use real events, countries, people, companies and institutions from outside India "
-            "(e.g. US, Europe, China, Middle East, Africa, Latin America, global bodies). "
+            "\nREGION FOCUS — WORLD: Draw the hook and the examples from world history, science and "
+            "well-documented international examples outside India (scientists, inventions, landmark events, "
+            "places and institutions found in standard textbooks). No current affairs. "
             "Do not make India the subject; mention India at most once, and only if genuinely essential."
         )
     if _is_india_50(subtopic_name) or not _is_india_biased(subtopic_name):
         return (
-            "\nREGION FOCUS — INDIA: Build this post around India — Indian events, places, people, "
-            "policies, companies and achievements. A brief global comparison is fine."
+            "\nREGION FOCUS — INDIA: Build this post around India — Indian history, geography, the "
+            "Constitution, science and well-documented Indian examples as taught in NCERT and standard "
+            "textbooks. No current affairs. A brief global comparison is fine."
         )
     return _india_clause(subtopic_name)
 
@@ -242,7 +257,7 @@ def generate_post(
         "fun":      _SYSTEM_FUN,
         "question": _SYSTEM_QUESTION,
     }
-    system_prompt = system_map.get(mode, _SYSTEM_BASIC) + _level_clause(level)
+    system_prompt = system_map.get(mode, _SYSTEM_BASIC) + _level_clause(level) + _TEXTBOOK_RULES
 
     india_note   = _region_clause(subtopic_name, region)
     context_note = _context_clause(web_context, trending_news, mode)
@@ -471,7 +486,7 @@ def generate_image(title: str | None, content: str, topic_name: str, subtopic_na
     any failure just means the post goes out without an image.
     """
     prompt = (
-        f"A photorealistic editorial news photograph to accompany a social post on a learning platform.\n"
+        f"A photorealistic educational documentary photograph to accompany a social post on a learning platform.\n"
         f"Post title: {title or subtopic_name}\n"
         f"Subject: {subtopic_name} ({topic_name})\n"
         f"What the post is about: {content[:500]}\n\n"
