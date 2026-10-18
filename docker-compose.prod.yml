@@ -58,6 +58,8 @@ services:
   post-creator:
     ports: !override
       - "127.0.0.1:5050:5050"
+    environment:
+      FILTER_API_URL: http://post-filter:5100
 
   admin:
     ports: !override
