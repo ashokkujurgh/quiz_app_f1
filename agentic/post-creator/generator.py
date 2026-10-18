@@ -366,7 +366,8 @@ def _generate_once(messages: list[dict]) -> dict:
         raw = raw.split("```")[1]
         if raw.startswith("json"):
             raw = raw[4:]
-    data = json.loads(raw)
+    # Parse the first JSON object only — the model sometimes appends extra text after it
+    data, _ = json.JSONDecoder().raw_decode(raw.strip())
     assert isinstance(data.get("content"), str) and len(data["content"].strip()) >= 200, \
         "Content too short or missing"
     return data
