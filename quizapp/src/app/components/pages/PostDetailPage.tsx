@@ -15,6 +15,7 @@ import { syncLike, toggleLike, incrementComments } from '../../store/slices/post
 import { useOnlineUsers } from '../../context/OnlineUsersContext';
 import { Navbar } from '../layout/Navbar';
 import { UserAvatar } from '../shared/UserAvatar';
+import { isOfficialPost, withOfficialAvatar } from '../shared/officialAvatar';
 import { TopicChip } from '../shared/TopicChip';
 import type { Post, QuizTopic } from '../../types';
 
@@ -96,7 +97,7 @@ function RelatedPostCard({ post }: { post: Post }) {
     >
       <CardContent sx={{ p: '12px !important' }}>
         <Stack direction="row" spacing={1} alignItems="center" mb={1}>
-          <Avatar src={post.author.avatar} sx={{ width: 28, height: 28, fontSize: 11 }}>
+          <Avatar src={withOfficialAvatar(post.author, isOfficialPost(post)).avatar} sx={{ width: 28, height: 28, fontSize: 11 }}>
             {post.author.name?.[0]}
           </Avatar>
           <Typography variant="caption" fontWeight={700} noWrap>{post.author.name}</Typography>
@@ -270,7 +271,7 @@ export function PostDetailPage() {
       <Card sx={{ mb: 2 }}>
         <CardContent>
           <Stack direction="row" spacing={1.5} alignItems="flex-start" mb={2}>
-            <UserAvatar user={{ ...post.author, isOnline: isOnline(post.author.id) }} size={48} showOnline />
+            <UserAvatar user={withOfficialAvatar({ ...post.author, isOnline: isOnline(post.author.id) }, isOfficialPost(post))} size={48} showOnline={!isOfficialPost(post)} />
             <Box flex={1}>
               <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap">
                 <Typography variant="subtitle2" fontWeight={700}>{post.author.name}</Typography>

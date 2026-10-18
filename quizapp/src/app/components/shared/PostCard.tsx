@@ -164,6 +164,7 @@ import { toggleLike, syncLike, incrementComments } from '../../store/slices/post
 import { useOnlineUsers } from '../../context/OnlineUsersContext';
 import { useBlockedUsers } from '../../hooks/useBlockedUsers';
 import { UserAvatar } from './UserAvatar';
+import { withOfficialAvatar } from './officialAvatar';
 import { TopicChip } from './TopicChip';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -335,7 +336,8 @@ export function PostCard({ post }: Props) {
       <CardContent sx={{ pb: 1 }}>
         {/* Header */}
         <Stack direction="row" spacing={1.5} alignItems="flex-start" mb={1.5}>
-          <UserAvatar user={{ ...post.author, isOnline: isOnline(post.author.id) }} size={44} showOnline />
+          {/* Official posts: Meenzo logo as avatar, no online/offline dot */}
+          <UserAvatar user={withOfficialAvatar({ ...post.author, isOnline: isOnline(post.author.id) }, isOfficial)} size={44} showOnline={!isOfficial} />
           <Box flex={1}>
             <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap">
               <Typography variant="subtitle2" fontWeight={700}>
