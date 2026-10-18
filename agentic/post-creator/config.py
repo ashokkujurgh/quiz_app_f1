@@ -27,6 +27,11 @@ CHAT_MODEL          = os.getenv("GEMINI_CHAT_MODEL", "gemini-3.8-flash")
 IMAGE_MODELS        = os.getenv("GEMINI_IMAGE_MODELS", "gemini-3.1-flash-image,gemini-2.5-flash-image").split(",")
 IMAGE_ENABLED       = os.getenv("IMAGE_GENERATION_ENABLED", "true").lower() == "true"
 
+# OpenArt CLI (tried first when the binary and a signed-in ~/.openart are present)
+OPENART_ENABLED       = os.getenv("OPENART_ENABLED", "true").lower() == "true"
+OPENART_IMAGE_MODEL   = os.getenv("OPENART_IMAGE_MODEL", "nano-banana-2")
+OPENART_TIMEOUT       = int(os.getenv("OPENART_TIMEOUT_SECONDS", "300"))
+
 # Kie.ai image API (tried first when a key is set; Gemini image models are the fallback)
 KIE_API_KEY         = os.getenv("KIE_API_KEY")
 KIE_API_URL         = os.getenv("KIE_API_URL",      "https://api.kie.ai")

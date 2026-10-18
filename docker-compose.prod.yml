@@ -60,6 +60,8 @@ services:
       - "127.0.0.1:5050:5050"
     environment:
       FILTER_API_URL: http://post-filter:5100
+    volumes:
+      - /root/.openart:/root/.openart   # OpenArt CLI sign-in (rw: the CLI refreshes its token)
 
   admin:
     ports: !override

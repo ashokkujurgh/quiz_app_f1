@@ -12,6 +12,10 @@ Each post also gets a reading level, independent of mode:
 import logging
 import json
 import random
+import os
+import shutil
+import subprocess
+import tempfile
 import time
 import requests
 from google import genai
@@ -19,6 +23,7 @@ from google.genai import types
 from config import (
     GEMINI_API_KEY, CHAT_MODEL, EMBED_MODEL, EMBED_DIM, IMAGE_MODELS,
     KIE_API_KEY, KIE_API_URL, KIE_IMAGE_MODEL, KIE_TIMEOUT_SECONDS,
+    OPENART_ENABLED, OPENART_IMAGE_MODEL, OPENART_TIMEOUT,
 )
 from trending import INDIA_BIASED_SUBTOPICS, INDIA_50_SUBTOPICS, TRENDING_BIASED_SUBTOPICS
 
@@ -364,6 +369,34 @@ def embed_text(text: str) -> list[float]:
     return resp.embeddings[0].values
 
 
+def _openart_available() -> bool:
+    creds = os.path.expanduser("~/.openart/cli-credentials.json")
+    return OPENART_ENABLED and shutil.which("openart") is not None and os.path.exists(creds)
+
+
+def _openart_generate_image(prompt: str) -> tuple[bytes, str] | None:
+    """Generate via the OpenArt CLI (uses the account signed in under ~/.openart) and read the downloaded file."""
+    with tempfile.TemporaryDirectory() as out_dir:
+        proc = subprocess.run(
+            ["openart", "generate", "image", prompt,
+             "--model", OPENART_IMAGE_MODEL, "-o", out_dir + "/",
+             "--json", "--no-input", "--quiet", "--timeout", f"{OPENART_TIMEOUT}s"],
+            capture_output=True, text=True, timeout=OPENART_TIMEOUT + 30,
+        )
+        if proc.returncode != 0:
+            raise RuntimeError(f"openart exit {proc.returncode}: {(proc.stderr or proc.stdout).strip()[:300]}")
+        files = sorted(f for f in os.listdir(out_dir) if not f.startswith("."))
+        if not files:
+            raise RuntimeError("openart finished but downloaded no file")
+        ext = files[0].rsplit(".", 1)[-1].lower()
+        mime = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "webp": "image/webp"}.get(ext, "image/png")
+        with open(os.path.join(out_dir, files[0]), "rb") as fh:
+            data = fh.read()
+    history_id = (json.loads(proc.stdout or "{}").get("history") or {}).get("id")
+    logger.info("Image generated via OpenArt %s (history %s)", OPENART_IMAGE_MODEL, history_id)
+    return data, mime
+
+
 def _kie_generate_image(prompt: str) -> tuple[bytes, str] | None:
     """Create a Kie.ai image task, poll until it finishes, and download the result."""
     headers = {"Authorization": f"Bearer {KIE_API_KEY}", "Content-Type": "application/json"}
@@ -411,7 +444,7 @@ def _kie_generate_image(prompt: str) -> tuple[bytes, str] | None:
 def generate_image(title: str | None, content: str, topic_name: str, subtopic_name: str) -> tuple[bytes, str] | None:
     """
     Generate one cover image for a post. Returns (image_bytes, mime_type) or None.
-    Tries Kie.ai first (when KIE_API_KEY is set), then each Gemini model in IMAGE_MODELS;
+    Tries OpenArt (when signed in), then Kie.ai (when KIE_API_KEY is set), then each Gemini model in IMAGE_MODELS;
     any failure just means the post goes out without an image.
     """
     prompt = (
@@ -422,6 +455,11 @@ def generate_image(title: str | None, content: str, topic_name: str, subtopic_na
         "Style: bright, flat or semi-realistic illustration, visually explains the core idea, "
         "suitable for all ages. Absolutely no text, letters, numbers, logos or watermarks in the image."
     )
+    if _openart_available():
+        try:
+            return _openart_generate_image(prompt)
+        except Exception as exc:
+            logger.warning("OpenArt image generation failed: %s", str(exc)[:200])
     if KIE_API_KEY:
         try:
             return _kie_generate_image(prompt)
