@@ -22,10 +22,12 @@ GAMES_PER_SUBTOPIC_TOPICS  = [t.strip().lower() for t in os.getenv("GAMES_PER_SU
 GAME_QUESTIONS             = int(os.getenv("GAME_QUESTIONS", "20"))
 # If a category has fewer than GAME_QUESTIONS questions, run a shorter game if at least this many exist
 GAME_MIN_QUESTIONS         = int(os.getenv("GAME_MIN_QUESTIONS", "10"))
-GAME_START_IST             = os.getenv("GAME_START_IST", "08:00")
-GAME_END_IST               = os.getenv("GAME_END_IST",   "20:00")
+GAME_START_IST             = os.getenv("GAME_START_IST", "00:00")
+GAME_END_IST               = os.getenv("GAME_END_IST",   "23:59")
 # Games for the day are prepared at this time (IST), before they open
-GAME_PREPARE_IST           = os.getenv("GAME_PREPARE_IST", "07:00")
+# Comma-separated IST times. 23:00 prepares the next day's games before they open at
+# midnight; 00:05 is a safety run that creates anything missed (never duplicates).
+GAME_PREPARE_IST           = [t.strip() for t in os.getenv("GAME_PREPARE_IST", "23:00,00:05").split(",") if t.strip()]
 
 # Approval email — sent after each generated post (leave APPROVAL_EMAIL_TO empty to disable)
 APPROVAL_EMAIL_TO   = os.getenv("APPROVAL_EMAIL_TO", "")

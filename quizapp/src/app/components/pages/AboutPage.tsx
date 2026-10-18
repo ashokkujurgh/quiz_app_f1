@@ -20,7 +20,7 @@ export function AboutPage() {
 
       <InfoSection title="What you can do on Meenzo">
         <ul>
-          <li><strong>Play daily games</strong> — new quiz games open every day from 8:00 AM to 8:00 PM IST across engineering subjects and general knowledge, with a live leaderboard.</li>
+          <li><strong>Play daily games</strong> — new quiz games every day, open all day from midnight to midnight IST, across engineering subjects and general knowledge, with a live leaderboard.</li>
           <li><strong>Practise any topic</strong> — take practice quizzes on the subjects you are preparing for, at your own pace.</li>
           <li><strong>Learn from short posts</strong> — read clear, textbook-style explainers on history, science, polity, economy, engineering and more.</li>
           <li><strong>Learn together</strong> — add friends, share posts, comment, message and compare scores.</li>

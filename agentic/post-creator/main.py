@@ -1,7 +1,7 @@
 """
 Post-creator entry point.
 - Scheduler: runs agent at 07:00 and 19:00 IST (01:30 and 13:30 UTC) every day.
-- Daily games: prepared at GAME_PREPARE_IST (07:00 IST), open 08:00–20:00 IST.
+- Daily games: prepared at 23:00 IST (safety run 00:05), open all day 00:00–23:59 IST.
 - HTTP server: POST /trigger        — manually trigger a post run
                POST /trigger-games  — manually create today's (or tomorrow's) games
                GET  /health         — liveness check
@@ -89,19 +89,21 @@ def main() -> None:
         )
 
     if DAILY_GAMES_ENABLED:
-        # GAME_PREPARE_IST (e.g. "07:00") → UTC
-        ist_h, ist_m = (int(x) for x in GAME_PREPARE_IST.split(":"))
-        total = (ist_h * 60 + ist_m - 330) % (24 * 60)
-        utc_h, utc_m = divmod(total, 60)
-        scheduler.add_job(
-            run_daily_games,
-            trigger=CronTrigger(hour=utc_h, minute=utc_m, timezone="UTC"),
-            id="daily_games",
-            name=f"Daily games @ {utc_h:02d}:{utc_m:02d} UTC ({GAME_PREPARE_IST} IST)",
-            replace_existing=True,
-            max_instances=1,
-        )
-        logger.info("Scheduled daily games @ %02d:%02d UTC  (%s IST)", utc_h, utc_m, GAME_PREPARE_IST)
+        # Each GAME_PREPARE_IST time (e.g. "23:00") → UTC cron job. run_daily_games()
+        # picks today or tomorrow itself and skips categories that already have a game.
+        for ist_time in GAME_PREPARE_IST:
+            ist_h, ist_m = (int(x) for x in ist_time.split(":"))
+            total = (ist_h * 60 + ist_m - 330) % (24 * 60)
+            utc_h, utc_m = divmod(total, 60)
+            scheduler.add_job(
+                run_daily_games,
+                trigger=CronTrigger(hour=utc_h, minute=utc_m, timezone="UTC"),
+                id=f"daily_games_{ist_h:02d}{ist_m:02d}",
+                name=f"Daily games @ {utc_h:02d}:{utc_m:02d} UTC ({ist_time} IST)",
+                replace_existing=True,
+                max_instances=1,
+            )
+            logger.info("Scheduled daily games @ %02d:%02d UTC  (%s IST)", utc_h, utc_m, ist_time)
 
     def _shutdown(signum, frame):
         logger.info("Shutting down…")

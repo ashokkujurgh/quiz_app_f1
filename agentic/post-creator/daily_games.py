@@ -114,7 +114,7 @@ Write:
   Style examples (do not copy): "Raj to Republic Rumble", "Volts, Watts & Wizards", "Silicon Sprint",
   "Rivers, Ranges & Rulers", "Bridges of Steel".
 - "description": 1–2 energetic sentences, max 200 characters, naming what players will be tested on and
-  daring them to top the leaderboard before {GAME_END_IST} IST.
+  daring them to top the leaderboard before {"midnight" if GAME_END_IST == "23:59" else GAME_END_IST + " IST"}.
 
 Return ONLY JSON: {{"title": "...", "description": "..."}}"""
     resp = _client.chat.completions.create(
