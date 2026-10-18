@@ -113,8 +113,32 @@ export function LeftSidebar({ open, onClose, variant = 'permanent' }: Props) {
 
       </List>
 
-      {/* Footer */}
+      {/* Footer — info pages */}
       <Box sx={{ px: 2, pb: 2 }}>
+        <Box component="nav" aria-label="About Meenzo" sx={{ display: 'flex', flexWrap: 'wrap', columnGap: 1.5, rowGap: 0.5, mb: 0.75 }}>
+          {[
+            { label: 'About Us',       path: '/about' },
+            { label: 'Privacy Policy', path: '/privacy-policy' },
+            { label: 'Contact Us',     path: '/contact' },
+          ].map(({ label, path }) => (
+            <Typography
+              key={path}
+              component="a"
+              href={path}
+              variant="caption"
+              onClick={(e) => { e.preventDefault(); handleNav(path, false); }}
+              sx={{
+                color: location.pathname === path ? 'primary.main' : 'text.secondary',
+                fontWeight: location.pathname === path ? 700 : 500,
+                textDecoration: 'none',
+                cursor: 'pointer',
+                '&:hover': { color: 'text.primary', textDecoration: 'underline' },
+              }}
+            >
+              {label}
+            </Typography>
+          ))}
+        </Box>
         <Typography variant="caption" color="text.secondary">
           © 2026 Meenzo
         </Typography>

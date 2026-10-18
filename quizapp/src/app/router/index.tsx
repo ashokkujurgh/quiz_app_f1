@@ -35,6 +35,9 @@ const SettingsPage           = lazyPage(() => import('../components/pages/Settin
 const AdminDashboard         = lazyPage(() => import('../components/pages/AdminDashboard'), 'AdminDashboard');
 const PostDetailPage         = lazyPage(() => import('../components/pages/PostDetailPage'), 'PostDetailPage');
 const PostsPage              = lazyPage(() => import('../components/pages/PostsPage'), 'PostsPage');
+const AboutPage              = lazyPage(() => import('../components/pages/AboutPage'), 'AboutPage');
+const PrivacyPolicyPage      = lazyPage(() => import('../components/pages/PrivacyPolicyPage'), 'PrivacyPolicyPage');
+const ContactPage            = lazyPage(() => import('../components/pages/ContactPage'), 'ContactPage');
 
 function PageLoader() {
   return (
@@ -84,6 +87,10 @@ export const router = createBrowserRouter([
     children: [
       { path: 'home',          element: page(<HomePage />) },
       { path: 'quizzes',       element: page(<QuizzesPage />) },
+      // Public info pages (linked from the bottom of the left menu)
+      { path: 'about',          element: page(<AboutPage />) },
+      { path: 'privacy-policy', element: page(<PrivacyPolicyPage />) },
+      { path: 'contact',        element: page(<ContactPage />) },
       { path: 'friends',       element: page(<RequireAuth><FriendsPage /></RequireAuth>) },
       { path: 'messages',      element: page(<RequireAuth><MessagesPage /></RequireAuth>) },
       { path: 'leaderboard',   element: page(<RequireAuth><LeaderboardPage /></RequireAuth>) },

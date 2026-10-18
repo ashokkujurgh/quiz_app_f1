@@ -143,6 +143,53 @@ export const renderPostPage: RequestHandler = async (req: Request, res: Response
   }
 };
 
+// ── Static info pages (About, Privacy Policy, Contact) ───────────────────────
+// Indexable, with their own title/description/canonical; same HTML for everyone.
+
+const STATIC_PAGES: Record<string, { title: string; description: string }> = {
+  'about': {
+    title: 'About Us — Meenzo',
+    description: 'Meenzo is a social quiz and learning platform for students and job-seekers — daily quiz games, live leaderboards and short learning posts.',
+  },
+  'privacy-policy': {
+    title: 'Privacy Policy — Meenzo',
+    description: 'How Meenzo collects, uses, shares and protects your information, and the choices you have.',
+  },
+  'contact': {
+    title: 'Contact Us — Meenzo',
+    description: 'Get in touch with the Meenzo team for help with your account, to report content, or for privacy requests.',
+  },
+};
+
+// GET /seo/pages/:name
+export const renderStaticPage: RequestHandler = async (req: Request, res: Response) => {
+  const page = STATIC_PAGES[req.params.name];
+  let shell: string;
+  try {
+    shell = await getShell();
+  } catch (err) {
+    console.error('[seo] could not load index.html:', err);
+    res.status(502).send('Bad gateway');
+    return;
+  }
+  res.set('Content-Type', 'text/html; charset=utf-8');
+  res.set('Cache-Control', 'no-cache');
+  if (!page) { res.status(404).send(shell); return; }
+  const url = `${SITE_URL}/${req.params.name}`;
+  const head = [
+    `<title>${escAttr(page.title)}</title>`,
+    `<meta name="description" content="${escAttr(page.description)}" />`,
+    `<meta name="robots" content="index, follow" />`,
+    `<link rel="canonical" href="${escAttr(url)}" />`,
+    `<meta property="og:type" content="website" />`,
+    `<meta property="og:site_name" content="Meenzo" />`,
+    `<meta property="og:url" content="${escAttr(url)}" />`,
+    `<meta property="og:title" content="${escAttr(page.title)}" />`,
+    `<meta property="og:description" content="${escAttr(page.description)}" />`,
+  ].join('\n    ');
+  res.send(injectHead(shell, head));
+};
+
 // GET /seo/sitemap.xml — every approved, active post
 export const sitemap: RequestHandler = async (_req: Request, res: Response) => {
   try {
@@ -154,9 +201,12 @@ export const sitemap: RequestHandler = async (_req: Request, res: Response) => {
       .limit(50_000) // sitemap protocol limit per file
       .lean();
 
-    const urls = posts
-      .map((p) => `  <url>\n    <loc>${escXml(postUrl(p.slug!))}</loc>\n    <lastmod>${p.updatedAt.toISOString()}</lastmod>\n  </url>`)
-      .join('\n');
+    const pageUrls = Object.keys(STATIC_PAGES)
+      .map((name) => `  <url>\n    <loc>${escXml(`${SITE_URL}/${name}`)}</loc>\n  </url>`);
+    const urls = [
+      ...pageUrls,
+      ...posts.map((p) => `  <url>\n    <loc>${escXml(postUrl(p.slug!))}</loc>\n    <lastmod>${p.updatedAt.toISOString()}</lastmod>\n  </url>`),
+    ].join('\n');
 
     res.set('Content-Type', 'application/xml; charset=utf-8');
     res.set('Cache-Control', 'public, max-age=300');

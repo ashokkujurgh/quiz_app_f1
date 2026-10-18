@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { renderPostPage, sitemap, indexNowKeyFile } from '../controllers/seoController';
+import { renderPostPage, renderStaticPage, sitemap, indexNowKeyFile } from '../controllers/seoController';
 
 // Public SEO endpoints, reached through the frontend nginx
 // (/posts/:slug, /sitemap.xml, /<key>.txt). Mounted before helmet() in server.ts,
@@ -7,6 +7,7 @@ import { renderPostPage, sitemap, indexNowKeyFile } from '../controllers/seoCont
 const router = Router();
 
 router.get('/posts/:slug',       renderPostPage);
+router.get('/pages/:name',       renderStaticPage);
 router.get('/sitemap.xml',       sitemap);
 router.get('/indexnow/:key.txt', indexNowKeyFile);
 
