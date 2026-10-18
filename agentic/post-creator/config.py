@@ -52,6 +52,9 @@ PINECONE_REGION     = os.getenv("PINECONE_REGION",  "us-east-1")
 # OpenAI models
 # gpt-4.1-mini writes noticeably more natural, varied prose than gpt-4o-mini for posts
 CHAT_MODEL          = os.getenv("OPENAI_CHAT_MODEL", "gpt-4.1-mini")
+# Independent fact-check of every post's specific claims. gpt-4.1 caught planted errors that
+# gpt-4.1-mini missed (e.g. "over 1,300 articles in the original Constitution").
+FACT_CHECK_MODEL    = os.getenv("OPENAI_FACT_CHECK_MODEL", "gpt-4.1")
 # Tried in order when CHAT_MODEL is rate-limited
 CHAT_FALLBACK_MODELS = [m.strip() for m in os.getenv(
     "OPENAI_CHAT_FALLBACK_MODELS", "gpt-4o-mini").split(",") if m.strip()]

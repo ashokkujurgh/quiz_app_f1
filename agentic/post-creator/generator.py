@@ -22,7 +22,7 @@ import requests
 import base64
 from openai import OpenAI, RateLimitError
 from config import (
-    OPENAI_API_KEY, CHAT_MODEL, CHAT_FALLBACK_MODELS, EMBED_MODEL, EMBED_DIM, IMAGE_MODELS,
+    OPENAI_API_KEY, CHAT_MODEL, CHAT_FALLBACK_MODELS, FACT_CHECK_MODEL, EMBED_MODEL, EMBED_DIM, IMAGE_MODELS,
     KIE_API_KEY, KIE_API_URL, KIE_IMAGE_MODEL, KIE_TIMEOUT_SECONDS,
     OPENART_ENABLED, OPENART_IMAGE_MODEL, OPENART_TIMEOUT,
 )
@@ -56,10 +56,11 @@ def pick_level() -> str:
 
 
 # ── region weights ─────────────────────────────────────────────────────────────
-# india (60%) — India-centred story and examples
-# world (40%) — world history/science and well-documented international examples
+# india (80%) — India-centred story and examples
+# world (20%) — world history/science and well-documented international examples
+# (only for General Studies and Engineering — see _EXAM_AUDIENCE)
 REGIONS        = ["india", "world"]
-REGION_WEIGHTS = [0.60,    0.40]
+REGION_WEIGHTS = [0.80,    0.20]
 
 
 def pick_region() -> str:
@@ -214,6 +215,71 @@ def _level_clause(level: str) -> str:
     return _LEVEL_ADVANCED if level == "advanced" else _LEVEL_FOUNDATION
 
 
+# Who each topic is written for. Exam names go into the SEO metadata, not as tags in the post.
+_EXAM_AUDIENCE = {
+    "engineering": {
+        "readers": "engineering students preparing for GATE and PSU recruitment (NTPC, BHEL, ONGC, IOCL and others "
+                   "that hire through GATE), and state AE/JE exams",
+        "exams": ["GATE", "PSU recruitment", "AE JE exam"],
+        "region": True,
+    },
+    "general studies": {
+        "readers": "aspirants preparing for SSC (CGL, CHSL, MTS), State SSC, banking (IBPS, SBI PO and Clerk), police "
+                   "constable and SI, and State and Central Government exams",
+        "exams": ["SSC CGL", "Banking exams", "Police exam", "State Government exams", "Central Government jobs"],
+        "region": True,
+    },
+    "aptitude & reasoning": {
+        "readers": "aspirants preparing for SSC, banking, police and PSU exams and private-company recruitment tests",
+        "exams": ["SSC", "Bank PO", "Police exam", "PSU exam", "Placement aptitude test"],
+        "region": False,
+    },
+    "programming": {
+        "readers": "Indian students and freshers preparing for campus placements, IT company tests (TCS NQT, Infosys, "
+                   "Wipro, Accenture) and technical interviews",
+        "exams": ["Campus placement", "TCS NQT", "Coding interview", "Private company jobs"],
+        "region": False,
+    },
+}
+
+
+def _audience(topic_name: str) -> dict | None:
+    return _EXAM_AUDIENCE.get(topic_name.strip().lower())
+
+
+def _audience_clause(topic_name: str, subtopic_name: str) -> str:
+    aud = _audience(topic_name)
+    if not aud:
+        return ""
+    clause = (
+        f"\nREADERS: {aud['readers']}. Teach what such an aspirant actually needs to understand and remember. "
+        "You may mention exam relevance once, naturally, in a sentence — never as a list of tags or hashtags."
+    )
+    if topic_name.strip().lower() == "programming":
+        clause += (
+            "\nTUTORIAL FORMAT: This is a short programming tutorial. Explain the concept step by step and include "
+            "one or two small, correct code examples, each on its own lines with normal indentation, as plain text — "
+            "no markdown fences or backticks. Explain what each example prints or does. Mention a common interview "
+            "or placement-test question on this concept."
+        )
+    if topic_name.strip().lower() == "aptitude & reasoning":
+        clause += (
+            "\nInclude one or two fully worked examples with clean numbers, showing each step, plus a quick shortcut "
+            "aspirants can use in the exam. Double-check every calculation."
+        )
+    return clause
+
+
+def _seo_clause(topic_name: str) -> str:
+    aud = _audience(topic_name)
+    if not aud:
+        return ""
+    return (
+        "\nSEO METADATA (not shown in the post): include 2-3 of these exam names in seo.keywords and mention the most "
+        f"relevant one naturally in seo.metaDescription: {', '.join(aud['exams'])}."
+    )
+
+
 def _region_clause(subtopic_name: str, region: str) -> str:
     if region == "world":
         return (
@@ -287,7 +353,11 @@ def generate_post(
     }
     system_prompt = system_map.get(mode, _SYSTEM_BASIC) + _level_clause(level) + _VOICE_RULES + _TEXTBOOK_RULES
 
-    india_note   = _region_clause(subtopic_name, region)
+    aud          = _audience(topic_name)
+    # Region focus only where it makes sense (not for Programming / Aptitude)
+    india_note   = (_region_clause(subtopic_name, region) if (aud is None or aud["region"]) else "") \
+                   + _audience_clause(topic_name, subtopic_name)
+    seo_note     = _seo_clause(topic_name)
     context_note = _context_clause(web_context, trending_news, mode)
 
     trend_note = ""
@@ -306,7 +376,7 @@ def generate_post(
 Subtopic: {subtopic_name}
 Post mode: {mode.upper()}{india_note}{trend_note}{context_note}
 
-Write a {mode} post about the CORE SUBJECT "{subtopic_name}" under the topic "{topic_name}".
+Write a {mode} post about the CORE SUBJECT "{subtopic_name}" under the topic "{topic_name}".{seo_note}
 The post must focus on teaching this subject deeply — not on current events or news.
 Title should be a {title_hint}.
 IMPORTANT: The content must be 500-1000 words. Do not write less than 500 words.
@@ -357,6 +427,23 @@ Return ONLY valid JSON — no markdown, no code fences:
             if remaining:
                 logger.warning("[%s] Still has issues after 2 rewrites (%s) — using it anyway.", mode, "; ".join(remaining))
 
+        # Fact-check pass: a strict, independent review of specific claims; fix anything wrong
+        issues = _fact_check(data.get("title") or "", data["content"])
+        if issues:
+            logger.warning("[%s] Fact-check flagged %d claim(s): %s — rewriting.", mode, len(issues),
+                           " | ".join(f"{i.get('claim', '')[:60]} → {i.get('correction', '')[:60]}" for i in issues))
+            messages.append({"role": "assistant", "content": json.dumps(data)})
+            messages.append({"role": "user", "content": (
+                "A fact-checker found these errors. Fix every one, using the correction given (or remove the claim "
+                "if you are not certain), and change nothing else. Keep the same JSON format:\n" +
+                "\n".join(f"- WRONG: {i.get('claim')}  CORRECT: {i.get('correction')}" for i in issues)
+            )})
+            data = _generate_once(messages)
+            still = _fact_check(data.get("title") or "", data["content"])
+            if still:
+                logger.error("[%s] Fact-check still flags %d claim(s) after the fix — not publishing.", mode, len(still))
+                return None
+
         word_count = len(data["content"].split())
         logger.info("[%s/%s] Generated %d words for content.", mode, level, word_count)
         data["mode"] = mode
@@ -405,6 +492,35 @@ def _quality_violations(content: str) -> list[str]:
     if analogy_count > 2:
         violations.append(f"stacks {analogy_count} separate analogies instead of using one central analogy")
     return violations
+
+
+def _fact_check(title: str, content: str) -> list[dict]:
+    """
+    Independent check of specific factual claims (numbers, dates, names, counts) against standard
+    textbook knowledge. Returns [{claim, correction}] for errors; [] if clean or if the check can't run.
+    """
+    try:
+        resp = _client.chat.completions.create(
+            model=FACT_CHECK_MODEL,
+            temperature=0,
+            response_format={"type": "json_object"},
+            messages=[
+                {"role": "system", "content": (
+                    "You are a strict fact-checker for Indian competitive-exam study material. Check every specific "
+                    "claim — numbers, dates, counts, names, firsts, superlatives — against standard references "
+                    "(NCERT, M. Laxmikanth, standard engineering and programming textbooks, official sources). "
+                    "Flag only claims that are wrong or seriously misleading; do not flag style or opinions. "
+                    'Return ONLY JSON: {"issues": [{"claim": "<exact wrong text>", "correction": "<correct fact>"}]} '
+                    '— an empty list if everything is correct.'
+                )},
+                {"role": "user", "content": f"TITLE: {title}\n\n{content}"},
+            ],
+        )
+        issues = json.loads(resp.choices[0].message.content).get("issues") or []
+        return [i for i in issues if isinstance(i, dict) and i.get("claim")]
+    except Exception as exc:
+        logger.warning("Fact-check could not run: %s", exc)
+        return []
 
 
 def _generate_once(messages: list[dict]) -> dict:

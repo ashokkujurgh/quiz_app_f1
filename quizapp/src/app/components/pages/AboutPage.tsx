@@ -8,12 +8,13 @@ export function AboutPage() {
     <InfoPage
       title="About Us"
       path="/about"
-      description="Meenzo is a social quiz and learning platform for students and job-seekers — daily quiz games, live leaderboards and short learning posts."
+      description="Meenzo helps Indian students and job seekers prepare for GATE, PSU, SSC, Banking, Police and Government exams and campus placements with daily quizzes and study posts."
     >
       <InfoSection title="What is Meenzo?">
         <p>
-          Meenzo is a social quiz and learning platform built for students, exam aspirants and curious
-          learners. We believe learning sticks best when it is short, regular and a little bit competitive —
+          Meenzo is a social quiz and learning platform built for Indian students and job seekers — whether
+          you are preparing for GATE and PSU jobs, SSC and State SSC, banking, police, State or Central
+          Government exams, or campus placements at private companies. We believe learning sticks best when it is short, regular and a little bit competitive —
           so Meenzo turns study into daily games you can play, share and win with friends.
         </p>
       </InfoSection>
@@ -21,7 +22,7 @@ export function AboutPage() {
       <InfoSection title="What you can do on Meenzo">
         <ul>
           <li><strong>Play daily games</strong> — new quiz games every day, open all day from midnight to midnight IST, across engineering subjects and general knowledge, with a live leaderboard.</li>
-          <li><strong>Practise any topic</strong> — take practice quizzes on the subjects you are preparing for, at your own pace.</li>
+          <li><strong>Practise any topic</strong> — engineering (GATE), Indian history, geography, polity and economy, general science and GK, aptitude, reasoning and English, and programming — at your own pace.</li>
           <li><strong>Learn from short posts</strong> — read clear, textbook-style explainers on history, science, polity, economy, engineering and more.</li>
           <li><strong>Learn together</strong> — add friends, share posts, comment, message and compare scores.</li>
           <li><strong>Track your progress</strong> — see your game history, scores and how you rank over time.</li>

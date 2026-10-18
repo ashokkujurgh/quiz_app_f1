@@ -149,7 +149,7 @@ export const renderPostPage: RequestHandler = async (req: Request, res: Response
 const STATIC_PAGES: Record<string, { title: string; description: string }> = {
   'about': {
     title: 'About Us — Meenzo',
-    description: 'Meenzo is a social quiz and learning platform for students and job-seekers — daily quiz games, live leaderboards and short learning posts.',
+    description: 'Meenzo helps Indian students and job seekers prepare for GATE, PSU, SSC, Banking, Police and Government exams and campus placements with daily quizzes and study posts.',
   },
   'privacy-policy': {
     title: 'Privacy Policy — Meenzo',

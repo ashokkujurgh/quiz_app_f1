@@ -95,8 +95,9 @@ def _existing_keys(day: date) -> set[str]:
 
 # ── AI content ────────────────────────────────────────────────────────────────
 
-def _title_and_description(cat: dict, day: date, sample_questions: list[str]) -> dict:
+def _title_and_description(cat: dict, day: date, sample_questions: list[str], used_titles: list[str] | None = None) -> dict:
     samples = "\n".join(f"- {t}" for t in sample_questions[:6])
+    used_titles = ", ".join(f'"{t}"' for t in (used_titles or [])) or "none"
     scope = (cat["subtopic_names"][0] if cat["subtopic_id"]
              else f"{cat['topic_name']} (mixed: {', '.join(cat['subtopic_names'])})")
     prompt = f"""You name daily quiz games for Meenzo, a quiz app for Indian students and job-seekers.
@@ -110,7 +111,8 @@ A few of today's questions (for flavour, do not quote them):
 Write:
 - "title": a vivid, memorable game name that evokes the actual subject matter (people, places, ideas, machines),
   max 50 characters. Use wordplay, alliteration or a bold image. Never use the words "Non Engineering",
-  "Non-Engineering", "Knowledge", "Quiz", "Test" or "Trivia", and no date, emojis or quotes.
+  "Non-Engineering", "General Studies", "Knowledge", "Quiz", "Test" or "Trivia", and no date, emojis or quotes.
+  It must clearly differ from these titles already used today: {used_titles}.
   Style examples (do not copy): "Raj to Republic Rumble", "Volts, Watts & Wizards", "Silicon Sprint",
   "Rivers, Ranges & Rulers", "Bridges of Steel".
 - "description": 1–2 energetic sentences, max 200 characters, naming what players will be tested on and
@@ -206,7 +208,7 @@ def run_daily_games(day: date | None = None) -> list[dict]:
                 logger.info("[%s] only %d questions available — running a %d-question game.",
                             label, len(questions), count)
 
-            text  = _title_and_description(cat, day, questions)
+            text  = _title_and_description(cat, day, questions, [c["title"] for c in created])
             image = _game_image(cat, text["title"])
 
             quiz = _quiz_request("POST", "/api/quizzes", {
