@@ -4,17 +4,36 @@ check Pinecone for duplicates → if new, save to backend + Pinecone.
 """
 import logging
 import random
+from datetime import datetime, timedelta, timezone
 from topic_client import fetch_all_subtopics
 from generator import generate_question
 from rag_store import question_exists, upsert_question
 from question_client import save_question
-from config import SUBTOPICS_PER_RUN
+from config import SUBTOPICS_PER_RUN, QUESTIONS_PER_RUN, QUESTIONS_PER_DAY
 
 logger = logging.getLogger(__name__)
+
+_IST = timezone(timedelta(hours=5, minutes=30))
+# In-memory daily counter — resets at IST midnight (and on container restart)
+_saved_today = {"date": None, "count": 0}
+
+
+def _today_count() -> int:
+    today = datetime.now(_IST).date()
+    if _saved_today["date"] != today:
+        _saved_today["date"], _saved_today["count"] = today, 0
+    return _saved_today["count"]
 
 
 def run_agent() -> None:
     logger.info("=== Agent job started ===")
+
+    done_today = _today_count()
+    if done_today >= QUESTIONS_PER_DAY:
+        logger.info("Daily target reached (%d/%d questions today, IST). Skipping.", done_today, QUESTIONS_PER_DAY)
+        return
+    to_save = min(QUESTIONS_PER_RUN, QUESTIONS_PER_DAY - done_today)
+    saved_this_run = 0
 
     try:
         subtopics = fetch_all_subtopics()
@@ -31,6 +50,8 @@ def run_agent() -> None:
     logger.info("Processing %d subtopics: %s", len(selected), [s["name"] for s in selected])
 
     for subtopic in selected:
+        if saved_this_run >= to_save:
+            break
         topic_name   = subtopic["topicName"]
         subtopic_name = subtopic["name"]
         topic_id     = subtopic["topicId"]
@@ -68,9 +89,12 @@ def run_agent() -> None:
                 "difficulty":  question.get("difficulty", "medium"),
             },
         )
+        saved_this_run += 1
+        _saved_today["count"] += 1
         logger.info(
-            "Question '%s…' saved for '%s > %s'.",
-            question["text"][:60], topic_name, subtopic_name,
+            "Question '%s…' saved for '%s > %s'. (%d/%d today)",
+            question["text"][:60], topic_name, subtopic_name, _saved_today["count"], QUESTIONS_PER_DAY,
         )
 
-    logger.info("=== Agent job finished ===")
+    logger.info("=== Agent job finished (saved %d this run, %d/%d today) ===",
+                saved_this_run, _saved_today["count"], QUESTIONS_PER_DAY)

@@ -17,6 +17,8 @@ ADMIN_PASSWORD   = os.getenv("ADMIN_PASSWORD",   "Admin@123")
 PINECONE_INDEX   = os.getenv("PINECONE_INDEX",   "quizhub-questions")
 PINECONE_CLOUD   = os.getenv("PINECONE_CLOUD",   "aws")
 PINECONE_REGION  = os.getenv("PINECONE_REGION",  "us-east-1")
+# Namespace per database, so duplicate checks only see questions that exist in the current DB
+PINECONE_NAMESPACE = os.getenv("PINECONE_NAMESPACE", "db_meenzo")
 
 # Embedding model (1536-dim)
 EMBED_MODEL      = "text-embedding-3-small"
@@ -25,10 +27,14 @@ EMBED_DIM        = 1536
 # Similarity threshold — cosine score above this means "already exists"
 SIMILARITY_THRESHOLD = 0.97
 
-# Cron: every 1 minute
-CRON_INTERVAL_MINUTES = 1
+# Daily target: stop saving new questions once this many were saved today (IST)
+QUESTIONS_PER_DAY = int(os.getenv("QUESTIONS_PER_DAY", "100"))
 
-# How many subtopics to pick per run
+# Cron: every 14 minutes ≈ 103 runs/day, 1 saved question per run → spreads 100/day evenly
+CRON_INTERVAL_MINUTES = int(os.getenv("CRON_INTERVAL_MINUTES", "14"))
+
+# Questions to save per run, and how many subtopics to try (duplicates/failures move on to the next)
+QUESTIONS_PER_RUN = int(os.getenv("QUESTIONS_PER_RUN", "1"))
 SUBTOPICS_PER_RUN = 3
 
 # How many existing questions to pass as RAG context (more = less repetition)

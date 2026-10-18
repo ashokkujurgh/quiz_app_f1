@@ -1,5 +1,5 @@
 """
-Entry point — schedules the agent job every 20 minutes via APScheduler.
+Entry point — schedules the agent job every CRON_INTERVAL_MINUTES (default 14) via APScheduler.
 Run: python main.py
 
 Set AGENT_ENABLED=false to disable without removing the service.

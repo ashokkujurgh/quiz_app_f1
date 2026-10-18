@@ -8,7 +8,7 @@ from langchain_pinecone import PineconeVectorStore
 from langchain_openai import OpenAIEmbeddings
 from config import (
     OPENAI_API_KEY, PINECONE_API_KEY, PINECONE_INDEX,
-    PINECONE_CLOUD, PINECONE_REGION, EMBED_MODEL, EMBED_DIM,
+    PINECONE_CLOUD, PINECONE_REGION, PINECONE_NAMESPACE, EMBED_MODEL, EMBED_DIM,
     SIMILARITY_THRESHOLD, RAG_CONTEXT_SIZE,
 )
 
@@ -39,8 +39,9 @@ def _get_store() -> PineconeVectorStore:
         index=pc.Index(PINECONE_INDEX),
         embedding=embeddings,
         text_key="text",
+        namespace=PINECONE_NAMESPACE,
     )
-    logger.info("Pinecone vector store ready: %s", PINECONE_INDEX)
+    logger.info("Pinecone vector store ready: %s (namespace=%s)", PINECONE_INDEX, PINECONE_NAMESPACE)
     return _store
 
 
