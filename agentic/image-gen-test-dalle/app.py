@@ -1,12 +1,15 @@
 from flask import Flask, request, jsonify
-from openai import OpenAI
+import base64
+from google import genai
+from google.genai import types
 import os
 from dotenv import load_dotenv
 
 load_dotenv()
 
 app = Flask(__name__)
-client = OpenAI(api_key=os.getenv("OPENAI_DALLE_E_API_KEY") or os.getenv("OPENAI_API_KEY"))
+client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+IMAGE_MODEL = "gemini-3.1-flash-image"
 
 
 @app.post("/generate-image")
@@ -17,17 +20,19 @@ def generate_image():
         return jsonify({"error": "prompt is required"}), 400
 
     try:
-        resp = client.images.generate(
-            model="gpt-image-1",
-            prompt=prompt,
-            size="1024x1024",
-            n=1,
+        resp = client.models.generate_content(
+            model=IMAGE_MODEL,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                response_modalities=["IMAGE"],
+                image_config=types.ImageConfig(aspect_ratio="1:1"),
+            ),
         )
-        item = resp.data[0] if resp.data else None
-        if item and item.b64_json:
-            return jsonify({"model": "gpt-image-1", "url": f"data:image/png;base64,{item.b64_json}"})
-        if item and item.url:
-            return jsonify({"model": "gpt-image-1", "url": item.url})
+        for part in resp.parts or []:
+            if part.inline_data and part.inline_data.data:
+                b64 = base64.b64encode(part.inline_data.data).decode()
+                mime = part.inline_data.mime_type or "image/png"
+                return jsonify({"model": IMAGE_MODEL, "url": f"data:{mime};base64,{b64}"})
         return jsonify({"error": "No image returned"}), 500
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500

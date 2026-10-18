@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-OPENAI_API_KEY   = os.getenv("OPENAI_API_KEY")
+GEMINI_API_KEY   = os.getenv("GEMINI_API_KEY")
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
 
 # Backend service URLs
@@ -18,8 +18,11 @@ PINECONE_INDEX   = os.getenv("PINECONE_INDEX",   "quizhub-questions")
 PINECONE_CLOUD   = os.getenv("PINECONE_CLOUD",   "aws")
 PINECONE_REGION  = os.getenv("PINECONE_REGION",  "us-east-1")
 
-# Embedding model (1536-dim)
-EMBED_MODEL      = "text-embedding-3-small"
+# Gemini models
+CHAT_MODEL       = os.getenv("GEMINI_CHAT_MODEL", "gemini-3.8-flash")
+
+# Embedding model (truncated to 1536-dim to match the Pinecone index)
+EMBED_MODEL      = "gemini-embedding-001"
 EMBED_DIM        = 1536
 
 # Similarity threshold — cosine score above this means "already exists"

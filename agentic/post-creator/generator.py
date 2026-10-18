@@ -12,13 +12,14 @@ Each post also gets a reading level, independent of mode:
 import logging
 import json
 import random
-from openai import OpenAI
-from config import OPENAI_API_KEY, EMBED_MODEL
+from google import genai
+from google.genai import types
+from config import GEMINI_API_KEY, CHAT_MODEL, EMBED_MODEL, EMBED_DIM
 from trending import INDIA_BIASED_SUBTOPICS, INDIA_50_SUBTOPICS, TRENDING_BIASED_SUBTOPICS
 
 logger = logging.getLogger(__name__)
 
-_client = OpenAI(api_key=OPENAI_API_KEY)
+_client = genai.Client(api_key=GEMINI_API_KEY)
 
 # ── post mode weights ─────────────────────────────────────────────────────────
 # trending = current-affairs-hooked posts (kept to 30% so the feed doesn't read like a news app)
@@ -304,13 +305,25 @@ def _quality_violations(content: str) -> list[str]:
 
 
 def _generate_once(messages: list[dict]) -> dict:
-    resp = _client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=messages,
-        temperature=0.85,
-        max_tokens=4096,
+    # Gemini takes the system prompt separately and calls the assistant role "model"
+    system = "\n\n".join(m["content"] for m in messages if m["role"] == "system")
+    contents = [
+        types.Content(
+            role="model" if m["role"] == "assistant" else "user",
+            parts=[types.Part(text=m["content"])],
+        )
+        for m in messages if m["role"] != "system"
+    ]
+    resp = _client.models.generate_content(
+        model=CHAT_MODEL,
+        contents=contents,
+        config=types.GenerateContentConfig(
+            system_instruction=system or None,
+            temperature=0.85,
+            response_mime_type="application/json",
+        ),
     )
-    raw = resp.choices[0].message.content.strip()
+    raw = resp.text.strip()
     if raw.startswith("```"):
         raw = raw.split("```")[1]
         if raw.startswith("json"):
@@ -338,8 +351,12 @@ def generate_title_and_content(
 
 
 def embed_text(text: str) -> list[float]:
-    resp = _client.embeddings.create(model=EMBED_MODEL, input=text[:8000])
-    return resp.data[0].embedding
+    resp = _client.models.embed_content(
+        model=EMBED_MODEL,
+        contents=text[:8000],
+        config=types.EmbedContentConfig(output_dimensionality=EMBED_DIM),
+    )
+    return resp.embeddings[0].values
 
 
 def generate_image(*args, **kwargs) -> None:
