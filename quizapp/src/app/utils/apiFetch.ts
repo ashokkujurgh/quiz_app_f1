@@ -1,6 +1,8 @@
 /**
- * Wrapper around fetch that automatically refreshes the JWT access token
- * on 401 responses using the HTTP-only refresh cookie, then retries once.
+ * Wrapper around fetch that keeps the JWT access token fresh:
+ * - refreshes it *before* the request if it has already expired (endpoints with
+ *   optional auth silently treat an expired token as a guest, so a 401 never comes);
+ * - on a 401, refreshes using the HTTP-only refresh cookie and retries once.
  */
 
 const API = import.meta.env.VITE_API_URL ?? '';
@@ -42,6 +44,16 @@ async function doRefresh(): Promise<string | null> {
   }
 }
 
+/** True if the JWT's `exp` is in the past (or within 30 s). Unreadable tokens count as not expired. */
+function isExpired(token: string): boolean {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+    return typeof payload.exp === 'number' && payload.exp * 1000 < Date.now() + 30_000;
+  } catch {
+    return false;
+  }
+}
+
 /** Deduplicated refresh — concurrent calls share one in-flight request. */
 function refreshToken(): Promise<string | null> {
   if (!refreshPromise) {
@@ -54,7 +66,11 @@ export async function apiFetch(
   input: RequestInfo,
   init: RequestInit = {},
 ): Promise<Response> {
-  const token = _getToken?.();
+  let token = _getToken?.() ?? null;
+  if (token && isExpired(token)) {
+    token = await refreshToken();
+    if (!token) _onLogout?.(); // refresh cookie gone too — session is over
+  }
 
   const headers = new Headers(init.headers);
   if (token) headers.set('Authorization', `Bearer ${token}`);

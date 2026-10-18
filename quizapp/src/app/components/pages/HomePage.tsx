@@ -15,6 +15,7 @@ import { EmptyState } from '../shared/EmptyState';
 import { Inbox } from '@mui/icons-material';
 import type { Post, QuizTopic } from '../../types';
 import { loadTopicsWithSubtopics } from '../../utils/topicsCache';
+import { apiFetch } from '../../utils/apiFetch';
 
 const API = import.meta.env.VITE_API_URL ?? '';
 
@@ -57,17 +58,18 @@ export function HomePage() {
   }, []);
 
   // ── Posts from API ────────────────────────────────────────────────────────────
-  // Depends on the selected subtopic's *name*, not the whole subtopic list — otherwise
-  // the feed was fetched twice on every visit (once at mount, again when topics arrived).
+  // Re-fetch only when the selected subtopic or the login state changes. Depending on
+  // plain values (a name, a boolean) — not the subtopic list or the token string —
+  // keeps topics loading or a token refresh from fetching the same feed twice.
+  // apiFetch refreshes an expired token *before* the request, so the first
+  // response already carries this user's likes/saves.
   const activeSubName = allSubTopics.find((s) => s._id === activeSubTopicId)?.name;
+  const isLoggedIn = !!accessToken;
   useEffect(() => {
     dispatch(setLoading(true));
     const params = new URLSearchParams({ page: '1', limit: '20' });
     if (activeSubName) params.set('subTopic', activeSubName);
-    fetch(`${API}/api/posts?${params}`, {
-      credentials: 'include',
-      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
-    })
+    apiFetch(`${API}/api/posts?${params}`)
       .then((r) => r.json())
       .then((d) => {
         if (!d.success) return;
@@ -123,7 +125,7 @@ export function HomePage() {
       })
       .catch(() => {})
       .finally(() => dispatch(setLoading(false)));
-  }, [activeSubName, accessToken]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [activeSubName, isLoggedIn]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Create post dialog ────────────────────────────────────────────────────────
   const [open, setOpen]               = useState(false);
