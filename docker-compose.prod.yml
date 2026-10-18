@@ -24,7 +24,9 @@ services:
   topic-service:
     ports: !override
       - "127.0.0.1:7205:4002"
-    environment: *origins
+    environment:
+      <<: *origins
+      PORT: "4002"   # .env says 4004; compose + nginx expect 4002
 
   post-filter:
     ports: !override
@@ -38,12 +40,16 @@ services:
   question-service:
     ports: !override
       - "127.0.0.1:7206:4003"
-    environment: *origins
+    environment:
+      <<: *origins
+      PORT: "4003"   # .env says 4004; compose + nginx expect 4003
 
   quiz-service:
     ports: !override
       - "127.0.0.1:7208:4005"
-    environment: *origins
+    environment:
+      <<: *origins
+      PORT: "4005"   # .env says 4004; compose + nginx expect 4005
 
   post-creator:
     ports: !override
