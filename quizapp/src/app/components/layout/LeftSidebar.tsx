@@ -6,7 +6,7 @@ import {
 } from '@mui/material';
 import {
   Home, Quiz, People, Message, EmojiEvents, History,
-  Person, AdminPanelSettings, Lock, Article,
+  Person, Lock, Article,
 } from '@mui/icons-material';
 import { useState, useEffect } from 'react';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
@@ -111,24 +111,6 @@ export function LeftSidebar({ open, onClose, variant = 'permanent' }: Props) {
           );
         })}
 
-        {user?.role === 'admin' && (
-          <>
-            <Divider sx={{ my: 1 }} />
-            <ListItemButton
-              selected={location.pathname === '/admin'}
-              onClick={() => handleNav('/admin', true)}
-              sx={{ mb: 0.25, borderRadius: 2, py: 1 }}
-            >
-              <ListItemIcon sx={{ minWidth: 40, color: location.pathname === '/admin' ? 'primary.main' : 'text.secondary' }}>
-                <AdminPanelSettings fontSize="small" />
-              </ListItemIcon>
-              <ListItemText
-                primary="Admin"
-                primaryTypographyProps={{ variant: 'body2', fontWeight: 600 }}
-              />
-            </ListItemButton>
-          </>
-        )}
       </List>
 
       {/* Footer */}
