@@ -102,8 +102,16 @@ export function Navbar({ onMenuToggle }: Props) {
         left: 0, right: 0,
       }}
     >
-      <Toolbar sx={{ gap: 1, minHeight: '64px !important' }}>
+      {/* Three columns — equal side columns keep the search centred on the page */}
+      <Toolbar sx={{
+        display: 'grid',
+        gridTemplateColumns: { xs: '1fr auto', sm: '1fr auto 1fr' },
+        alignItems: 'center',
+        columnGap: 2,
+        minHeight: '64px !important',
+      }}>
         {/* Hamburger + Logo */}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
         <IconButton onClick={onMenuToggle} sx={{ display: { md: 'none' } }}>
           <MenuIcon />
         </IconButton>
@@ -115,10 +123,11 @@ export function Navbar({ onMenuToggle }: Props) {
             ...(t.palette.mode === 'dark' && { bgcolor: '#fff', borderRadius: 2, p: 0.5 }) })}
           onClick={() => navigate('/home')}
         />
+        </Box>
 
-        {/* Search */}
+        {/* Search — centre column */}
         <Box ref={searchRef}
-          sx={{ flex: 1, maxWidth: 420, mx: 2, display: { xs: 'none', sm: 'block' }, position: 'relative' }}>
+          sx={{ width: { sm: 320, md: 440, lg: 520 }, display: { xs: 'none', sm: 'block' }, position: 'relative' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', bgcolor: alpha(muiTheme.palette.text.primary, 0.06), borderRadius: 3, px: 2, py: 0.5, gap: 1 }}>
             {searching
               ? <CircularProgress size={16} sx={{ color: 'text.secondary' }} />
@@ -206,10 +215,8 @@ export function Navbar({ onMenuToggle }: Props) {
           )}
         </Box>
 
-        <Box flex={1} />
-
-        {/* Actions */}
-        <Stack direction="row" spacing={0.5} alignItems="center">
+        {/* Actions — right column */}
+        <Stack direction="row" spacing={0.5} alignItems="center" sx={{ justifySelf: 'end' }}>
           <Tooltip title={themeMode === 'dark' ? 'Light mode' : 'Dark mode'}>
             <IconButton onClick={() => dispatch(toggleTheme())} size="small">
               {themeMode === 'dark' ? <LightMode /> : <DarkMode />}
