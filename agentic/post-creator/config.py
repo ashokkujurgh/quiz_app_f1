@@ -23,6 +23,9 @@ PINECONE_REGION     = os.getenv("PINECONE_REGION",  "us-east-1")
 
 # Gemini models
 CHAT_MODEL          = os.getenv("GEMINI_CHAT_MODEL", "gemini-3.8-flash")
+# Tried in order when CHAT_MODEL is out of quota (free tier limits each model separately)
+CHAT_FALLBACK_MODELS = [m.strip() for m in os.getenv(
+    "GEMINI_CHAT_FALLBACK_MODELS", "gemini-3.7-flash,gemini-3.6-flash,gemini-3.5-flash").split(",") if m.strip()]
 # Image models, tried in order (needs a billed Gemini API project — free tier has no image quota)
 IMAGE_MODELS        = os.getenv("GEMINI_IMAGE_MODELS", "gemini-3.1-flash-image,gemini-2.5-flash-image").split(",")
 IMAGE_ENABLED       = os.getenv("IMAGE_GENERATION_ENABLED", "true").lower() == "true"
@@ -45,15 +48,13 @@ EMBED_DIM           = 1536
 # Duplicate threshold — cosine similarity above this = already exists
 SIMILARITY_THRESHOLD = 0.90
 
-# 2 posts per run × 3 runs = 6 posts per day
-POSTS_PER_RUN       = 2
+# 1 post per run × 2 runs = 2 posts per day
+POSTS_PER_RUN       = int(os.getenv("POSTS_PER_RUN", "1"))
 
 # Schedule (IST → UTC, IST = UTC+5:30):
 #   08:00 IST = 02:30 UTC  (morning)
-#   13:00 IST = 07:30 UTC  (afternoon)
 #   19:00 IST = 13:30 UTC  (evening)
 CRON_SCHEDULE_UTC = [
     (2,  30),   # 08:00 IST — morning
-    (7,  30),   # 13:00 IST — afternoon
     (13, 30),   # 19:00 IST — evening
 ]

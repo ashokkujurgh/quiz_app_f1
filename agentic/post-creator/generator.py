@@ -20,8 +20,9 @@ import time
 import requests
 from google import genai
 from google.genai import types
+from google.genai import errors as genai_errors
 from config import (
-    GEMINI_API_KEY, CHAT_MODEL, EMBED_MODEL, EMBED_DIM, IMAGE_MODELS,
+    GEMINI_API_KEY, CHAT_MODEL, CHAT_FALLBACK_MODELS, EMBED_MODEL, EMBED_DIM, IMAGE_MODELS,
     KIE_API_KEY, KIE_API_URL, KIE_IMAGE_MODEL, KIE_TIMEOUT_SECONDS,
     OPENART_ENABLED, OPENART_IMAGE_MODEL, OPENART_TIMEOUT,
 )
@@ -352,15 +353,21 @@ def _generate_once(messages: list[dict]) -> dict:
         )
         for m in messages if m["role"] != "system"
     ]
-    resp = _client.models.generate_content(
-        model=CHAT_MODEL,
-        contents=contents,
-        config=types.GenerateContentConfig(
-            system_instruction=system or None,
-            temperature=0.85,
-            response_mime_type="application/json",
-        ),
+    gen_config = types.GenerateContentConfig(
+        system_instruction=system or None,
+        temperature=0.85,
+        response_mime_type="application/json",
     )
+    models = [CHAT_MODEL] + [m for m in CHAT_FALLBACK_MODELS if m != CHAT_MODEL]
+    for i, model in enumerate(models):
+        try:
+            resp = _client.models.generate_content(model=model, contents=contents, config=gen_config)
+            break
+        except genai_errors.APIError as exc:
+            # 429 = this model's quota is used up — try the next one
+            if exc.code != 429 or i == len(models) - 1:
+                raise
+            logger.warning("Model %s out of quota — falling back to %s", model, models[i + 1])
     raw = resp.text.strip()
     if raw.startswith("```"):
         raw = raw.split("```")[1]
