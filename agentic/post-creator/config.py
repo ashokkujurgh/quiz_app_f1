@@ -50,10 +50,11 @@ PINECONE_CLOUD      = os.getenv("PINECONE_CLOUD",   "aws")
 PINECONE_REGION     = os.getenv("PINECONE_REGION",  "us-east-1")
 
 # OpenAI models
-CHAT_MODEL          = os.getenv("OPENAI_CHAT_MODEL", "gpt-4o-mini")
+# gpt-4.1-mini writes noticeably more natural, varied prose than gpt-4o-mini for posts
+CHAT_MODEL          = os.getenv("OPENAI_CHAT_MODEL", "gpt-4.1-mini")
 # Tried in order when CHAT_MODEL is rate-limited
 CHAT_FALLBACK_MODELS = [m.strip() for m in os.getenv(
-    "OPENAI_CHAT_FALLBACK_MODELS", "gpt-4.1-mini").split(",") if m.strip()]
+    "OPENAI_CHAT_FALLBACK_MODELS", "gpt-4o-mini").split(",") if m.strip()]
 # Last-resort image models (after OpenArt and Kie.ai), tried in order
 IMAGE_MODELS        = [m.strip() for m in os.getenv("OPENAI_IMAGE_MODELS", "gpt-image-1").split(",") if m.strip()]
 IMAGE_ENABLED       = os.getenv("IMAGE_GENERATION_ENABLED", "true").lower() == "true"

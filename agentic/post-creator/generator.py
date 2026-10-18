@@ -12,6 +12,7 @@ Each post also gets a reading level, independent of mode:
 import logging
 import json
 import random
+import re
 import os
 import shutil
 import subprocess
@@ -103,6 +104,33 @@ Rules:
 - End with one sentence that makes the reader feel smarter for reading this.
 - Length: 500-1000 words. Multiple flowing paragraphs. No lists or headers.
 """ + _QUALITY_BAR
+
+# Appended to every mode's system prompt — how the writing should *sound*
+_VOICE_RULES = """
+VOICE — NATURAL INDIAN ENGLISH, WRITTEN LIKE A GOOD TEACHER (very important):
+- Write the way an experienced Indian teacher explains things to students: warm, clear, a little
+  conversational, confident. Plain words over fancy ones.
+- Indian English conventions: British spelling (colour, centre, analyse, organisation, programme,
+  behaviour, favourite, metre, labour); lakh and crore for Indian figures (e.g. "about 2 lakh students");
+  ₹ for rupees; metric units; dates like "26 January 1950".
+- Vary the rhythm the way people really write: mix short sentences with longer ones, vary paragraph
+  length (a one- or two-line paragraph now and then is fine), and use contractions (it's, don't, that's).
+- Speak to the reader as "you" where it helps. Do NOT invent personal stories, experiences, students,
+  quotes or anecdotes ("I remember…", "a student once asked me…") — no fake first-person claims.
+- Avoid words and phrases that make writing sound machine-made: "delve", "tapestry", "testament to",
+  "in today's fast-paced world", "it's important to note", "it is worth noting", "navigate the
+  complexities", "plays a pivotal/crucial/vital role", "embark on", "unlock the", "ever-evolving",
+  "game-changer", "in the realm of", "a beacon of", "stands as a", "nestled", "bustling", "intricate",
+  "multifaceted", "moreover", "furthermore", "additionally", and "not only… but also" used repeatedly.
+- Paragraphs must clearly differ in length: include at least two short paragraphs (one to three
+  sentences) among the longer ones. Never make every paragraph the same size.
+- Avoid the "X is not just A; it's B" / "not only… but also" construction (at most once per post).
+- No list-of-three padding in every sentence, no dramatic one-word sentences ("Revolutionary."),
+  and no neat moral summary at the end. Finish on a specific, memorable point instead.
+- When unsure of an exact count, date or figure, describe it in words rather than state a number.
+- Light Indian context is welcome where it fits naturally (board exams, competitive exam prep,
+  everyday Indian examples) — never forced, never stereotyped.
+"""
 
 # Appended to every mode's system prompt
 _TEXTBOOK_RULES = """
@@ -257,7 +285,7 @@ def generate_post(
         "fun":      _SYSTEM_FUN,
         "question": _SYSTEM_QUESTION,
     }
-    system_prompt = system_map.get(mode, _SYSTEM_BASIC) + _level_clause(level) + _TEXTBOOK_RULES
+    system_prompt = system_map.get(mode, _SYSTEM_BASIC) + _level_clause(level) + _VOICE_RULES + _TEXTBOOK_RULES
 
     india_note   = _region_clause(subtopic_name, region)
     context_note = _context_clause(web_context, trending_news, mode)
@@ -318,8 +346,10 @@ Return ONLY valid JSON — no markdown, no code fences:
                 "(and optionally a one-line callback at the very end) — every paragraph in between must have "
                 "ZERO comparison language and contain only facts, examples, and explanation. If it opened with a "
                 "made-up hypothetical scene, replace that opener with a real, specific, verifiable fact, event, "
-                "or statistic instead. Remove any banned phrase entirely. Make the title reference a specific "
-                "fact/name from the content, not a generic template. Keep the same length and JSON format."
+                "or statistic instead. Remove any banned phrase entirely and reword naturally, the way a good "
+                "Indian teacher would say it. Fix any US spellings to British/Indian English. Make the title "
+                "reference a specific fact/name from the content, not a generic template. Keep the same length "
+                "and JSON format."
             )})
             data = _generate_once(messages)
         else:
@@ -338,7 +368,18 @@ Return ONLY valid JSON — no markdown, no code fences:
 
 
 _ANALOGY_MARKERS  = ["like a ", "like the ", "similar to", "akin to", "just like", "think of it as"]
-_BANNED_PHRASES   = ["in conclusion", "in summary", "to conclude", "in today's world", "did you know"]
+_BANNED_PHRASES   = ["in conclusion", "in summary", "to conclude", "in today's world", "did you know",
+                     # phrases that make text read as machine-written
+                     "delve", "tapestry", "testament to", "fast-paced world", "it's important to note",
+                     "it is important to note", "it is worth noting", "it's worth noting", "navigate the complexities",
+                     "plays a pivotal role", "plays a crucial role", "plays a vital role", "embark on", "unlock the",
+                     "ever-evolving", "game-changer", "in the realm of", "a beacon of", "multifaceted", "moreover,",
+                     "furthermore,"]
+# Indian English uses British spelling; flag the common US forms (whole words only)
+_US_SPELLINGS     = {"color": "colour", "colors": "colours", "favorite": "favourite", "behavior": "behaviour",
+                     "analyze": "analyse", "analyzed": "analysed", "organization": "organisation",
+                     "organizations": "organisations", "center": "centre", "centers": "centres",
+                     "labor": "labour", "meter": "metre", "meters": "metres", "neighbor": "neighbour"}
 _HYPOTHETICAL_OPENERS = ["imagine you", "imagine standing", "imagine a world", "imagine a", "picture yourself", "picture this"]
 
 
@@ -351,6 +392,15 @@ def _quality_violations(content: str) -> list[str]:
     for phrase in _BANNED_PHRASES:
         if phrase in text:
             violations.append(f'contains banned phrase "{phrase}"')
+    paras = [len(p.split()) for p in content.split("\n") if p.strip()]
+    if len(paras) >= 4 and sum(1 for n in paras if n <= 50) < 2:
+        violations.append("every paragraph is a similar, long block — add at least two short paragraphs (1–3 sentences) so the rhythm varies")
+    not_just = text.count("not just") + text.count("not only")
+    if not_just > 1:
+        violations.append(f'uses the "not just… / not only…" construction {not_just} times (max once)')
+    us = sorted({w for w in re.findall(r"[a-z]+", text) if w in _US_SPELLINGS})
+    if us:
+        violations.append("uses US spelling (" + ", ".join(f"{w}→{_US_SPELLINGS[w]}" for w in us) + ") — use Indian/British English")
     analogy_count = sum(text.count(marker) for marker in _ANALOGY_MARKERS)
     if analogy_count > 2:
         violations.append(f"stacks {analogy_count} separate analogies instead of using one central analogy")
