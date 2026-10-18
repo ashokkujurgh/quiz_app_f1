@@ -53,6 +53,17 @@ def pick_level() -> str:
     return random.choices(LEVELS, weights=LEVEL_WEIGHTS, k=1)[0]
 
 
+# ── region weights ─────────────────────────────────────────────────────────────
+# india (30%) — India-centred story and examples
+# world (70%) — international current affairs, non-Indian examples
+REGIONS        = ["india", "world"]
+REGION_WEIGHTS = [0.30,    0.70]
+
+
+def pick_region() -> str:
+    return random.choices(REGIONS, weights=REGION_WEIGHTS, k=1)[0]
+
+
 def _is_india_biased(subtopic_name: str) -> bool:
     return any(kw in subtopic_name.lower() for kw in INDIA_BIASED_SUBTOPICS)
 
@@ -85,7 +96,7 @@ Rules:
 - Start with the news hook in ONE sentence only, then pivot immediately to teaching the underlying concept.
 - Spend at least 90% of the post teaching the core subject in depth (theory, principles, history, how it works, real examples) — this must read like solid textbook/exam-prep knowledge, not a news summary.
 - Do not recap, analyse, or editorialise the news event itself beyond that opening sentence — it is only a doorway in.
-- Use analogies, examples, and India-relevant context to make it vivid.
+- Use analogies and examples that fit the REGION FOCUS in the request to make it vivid.
 - Never say "Did you know", "In today's world", "In conclusion", or use bullet points.
 - Active voice. No jargon without explanation.
 - End with one sentence that makes the reader feel smarter for reading this.
@@ -101,7 +112,7 @@ Tone: confident but approachable, like explaining to a smart 16-year-old who wan
 Rules:
 - Open with a surprising REAL fact, statistic, or a concrete real-world example that actually happened — never a definition, news hook, or a made-up hypothetical scenario.
 - Build understanding layer by layer — start simple, go deeper, cover history/theory/application.
-- Include multiple real-world examples (India-relevant where possible).
+- Include multiple real-world examples, drawn from the REGION FOCUS in the request.
 - Explain WHY the concept matters, not just WHAT it is.
 - Never say "Did you know", "In conclusion", or use bullet points or headers.
 - Active voice. Write like a human, not a Wikipedia article or news report.
@@ -119,7 +130,7 @@ Rules:
 - Open with ONE funny observation, absurd comparison, or relatable student struggle related to the SUBJECT (not news) — then let it go. Do not keep reusing the same joke/analogy as a callback in every paragraph; that reads as padding, not wit.
 - The humour must come from a genuinely clever insight about the subject itself, not from stacking unrelated pop-culture references or forced puns.
 - Build up to explaining the full concept through real substance — facts, history, principles, concrete examples — humour is the seasoning, not the meal.
-- At most one light India-specific cultural touch (exams, traffic, cricket) for the whole post — don't repeat it as a running gag.
+- At most one light cultural touch from the REGION FOCUS for the whole post — don't repeat it as a running gag.
 - Never lecture. Never be cringe. No "haha" or "lol", no rhetorical "spoiler:" asides — let the writing be the funny part.
 - End with a punchline or playful twist that still leaves the reader having learned something real.
 - Length: 500-1000 words. Punchy paragraphs but substantial depth. No bullet points.
@@ -134,7 +145,7 @@ Tone: honest, slightly provocative, deeply educational.
 Rules:
 - Open by framing an interesting dilemma, paradox, or surprising question rooted in the SUBJECT ITSELF (not current events).
 - Explore 3-4 angles or perspectives in depth — explain the theory, the debate, the history behind each view.
-- Use India-relevant context where natural (but don't force it).
+- Use context from the REGION FOCUS in the request (but don't force it).
 - End with the question directed at the reader — make them WANT to think, discuss, and learn more.
 - Never say "In conclusion", never be preachy, never use news as the main frame.
 - Active voice. Substantial paragraphs. 500-1000 words. No bullet points.
@@ -159,6 +170,22 @@ READING LEVEL: ADVANCED (reader already knows the fundamentals of this subject).
 
 def _level_clause(level: str) -> str:
     return _LEVEL_ADVANCED if level == "advanced" else _LEVEL_FOUNDATION
+
+
+def _region_clause(subtopic_name: str, region: str) -> str:
+    if region == "world":
+        return (
+            "\nREGION FOCUS — WORLD: Draw the hook and the examples from international / world current affairs. "
+            "Use real events, countries, people, companies and institutions from outside India "
+            "(e.g. US, Europe, China, Middle East, Africa, Latin America, global bodies). "
+            "Do not make India the subject; mention India at most once, and only if genuinely essential."
+        )
+    if _is_india_50(subtopic_name) or not _is_india_biased(subtopic_name):
+        return (
+            "\nREGION FOCUS — INDIA: Build this post around India — Indian events, places, people, "
+            "policies, companies and achievements. A brief global comparison is fine."
+        )
+    return _india_clause(subtopic_name)
 
 
 def _india_clause(subtopic_name: str) -> str:
@@ -203,9 +230,10 @@ def generate_post(
     trending_news: list[dict] | None = None,
     web_context: str | None = None,
     trending_hint: str | None = None,
+    region: str = "world",
 ) -> dict | None:
     """
-    Generate a post with the given mode and reading level.
+    Generate a post with the given mode, reading level and region ("india" / "world").
     Returns { title, content, seo, mode, level } or None on failure.
     """
     system_map = {
@@ -216,7 +244,7 @@ def generate_post(
     }
     system_prompt = system_map.get(mode, _SYSTEM_BASIC) + _level_clause(level)
 
-    india_note   = _india_clause(subtopic_name)
+    india_note   = _region_clause(subtopic_name, region)
     context_note = _context_clause(web_context, trending_news, mode)
 
     trend_note = ""

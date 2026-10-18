@@ -74,6 +74,23 @@ RSS_FEEDS = {
     ],
 }
 
+# Google News edition per region: India posts read the India edition; world posts
+# read the international (US) edition and drop India-centric headlines.
+_GNEWS_INDIA = "hl=en-IN&gl=IN&ceid=IN:en"
+_GNEWS_WORLD = "hl=en-US&gl=US&ceid=US:en"
+
+
+def _mentions_india(text: str) -> bool:
+    t = text.lower()
+    return "india" in t or "indian" in t
+
+
+def _regionalise(feed_url: str, region: str) -> str:
+    if region != "world":
+        return feed_url
+    return feed_url.replace(_GNEWS_INDIA, _GNEWS_WORLD).replace("+india", "+world")
+
+
 WIKI_SEARCH_API  = "https://en.wikipedia.org/w/api.php"
 WIKI_SUMMARY_URL = "https://en.wikipedia.org/api/rest_v1/page/summary/"
 
@@ -140,7 +157,7 @@ def _rss_feed_key(subtopic_name: str) -> str:
     return "general"
 
 
-def _fetch_rss_headlines(subtopic_name: str, limit: int = 8) -> list[dict]:
+def _fetch_rss_headlines(subtopic_name: str, limit: int = 8, region: str = "india") -> list[dict]:
     """Fetch recent headlines from RSS feeds (includes Google News)."""
     key   = _rss_feed_key(subtopic_name)
     feeds = RSS_FEEDS.get(key, RSS_FEEDS["general"])
@@ -148,11 +165,13 @@ def _fetch_rss_headlines(subtopic_name: str, limit: int = 8) -> list[dict]:
 
     for feed_url in feeds:
         try:
-            feed = feedparser.parse(feed_url)
+            feed = feedparser.parse(_regionalise(feed_url, region))
             for entry in feed.entries[:limit]:
                 title   = entry.get("title", "")
                 summary = entry.get("summary", entry.get("description", ""))[:400]
                 published = entry.get("published", "")
+                if region == "world" and _mentions_india(f"{title} {summary}"):
+                    continue
                 if title:
                     headlines.append({"title": title, "summary": summary, "published": published})
             if len(headlines) >= limit:
@@ -172,24 +191,35 @@ def _filter_headlines_by_subtopic(headlines: list[dict], subtopic_name: str) -> 
     return filtered if filtered else headlines
 
 
-def fetch_trending_news(subtopic: dict, limit: int = 6) -> list[dict]:
+def fetch_trending_news(subtopic: dict, limit: int = 6, region: str = "india") -> list[dict]:
     """
     Fetch fresh trending news headlines for the given subtopic.
+    region="india" reads the India edition; region="world" reads international news without India stories.
     Returns list of {title, summary, published} dicts.
     """
     subtopic_name = subtopic["name"]
     topic_name    = subtopic.get("topicName", "")
 
-    # Try Google News first with a targeted query
+    # Try Google News first with a targeted query. "Non Engineering" is a bucket name, not a
+    # subject — searching it literally pulls in "non-engineer" job stories.
+    if topic_name.strip().lower() in ("non engineering", "non-engineering"):
+        topic_name = ""
     query = f"{subtopic_name} {topic_name}".strip()
-    google_url = f"https://news.google.com/rss/search?q={requests.utils.quote(query)}&hl=en-IN&gl=IN&ceid=IN:en"
+    if region == "world":
+        query += " -India"
+    edition = _GNEWS_WORLD if region == "world" else _GNEWS_INDIA
+    google_url = f"https://news.google.com/rss/search?q={requests.utils.quote(query)}&{edition}"
     headlines: list[dict] = []
     try:
         feed = feedparser.parse(google_url)
-        for entry in feed.entries[:limit]:
+        for entry in feed.entries[:limit * 2]:
             title   = entry.get("title", "")
             summary = entry.get("summary", "")[:400]
             published = entry.get("published", "")
+            if region == "world" and _mentions_india(f"{title} {summary}"):
+                continue
+            if len(headlines) >= limit:
+                break
             if title:
                 headlines.append({"title": title, "summary": summary, "published": published})
     except Exception as exc:
@@ -197,7 +227,7 @@ def fetch_trending_news(subtopic: dict, limit: int = 6) -> list[dict]:
 
     # Supplement with RSS if needed
     if len(headlines) < 3:
-        rss = _fetch_rss_headlines(subtopic_name, limit=limit)
+        rss = _fetch_rss_headlines(subtopic_name, limit=limit, region=region)
         rss = _filter_headlines_by_subtopic(rss, subtopic_name)
         seen = {h["title"] for h in headlines}
         for h in rss:
@@ -209,17 +239,18 @@ def fetch_trending_news(subtopic: dict, limit: int = 6) -> list[dict]:
 
 # ── public interface ──────────────────────────────────────────────────────────
 
-def fetch_web_context(subtopic: dict) -> str:
+def fetch_web_context(subtopic: dict, region: str = "india") -> str:
     subtopic_name   = subtopic["name"]
     topic_name      = subtopic.get("topicName", "")
-    india_80        = _is_india_biased(subtopic_name)
-    india_50        = _is_india_50(subtopic_name)
+    # India-weighted background only for India-region posts
+    india_80        = region == "india" and _is_india_biased(subtopic_name)
+    india_50        = region == "india" and _is_india_50(subtopic_name)
     trending_biased = _is_trending_biased(subtopic_name)
 
     sections: list[str] = []
 
     if trending_biased:
-        headlines = fetch_trending_news(subtopic, limit=6)
+        headlines = fetch_trending_news(subtopic, limit=6, region=region)
         if headlines:
             news_block = "\n".join(
                 f"• {h['title']}" + (f": {h['summary'][:200]}" if h['summary'] else "")
@@ -264,6 +295,15 @@ def fetch_web_context(subtopic: dict) -> str:
             summary = _wiki_summary(title)
             if summary:
                 sections.append(f"[GLOBAL CONTEXT — 20% focus]\n[{title}]\n{summary[:300]}")
+
+    elif region == "world":
+        for title in _wiki_search(f"{subtopic_name} {topic_name}", limit=5):
+            if _mentions_india(title):
+                continue
+            summary = _wiki_summary(title)
+            if summary and len(summary) > 100:
+                sections.append(f"[GLOBAL CONTEXT]\n[{title}]\n{summary[:600]}")
+                break
 
     elif not trending_biased:
         for query in [f"{subtopic_name} {topic_name}", subtopic_name]:

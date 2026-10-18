@@ -13,7 +13,7 @@ Post-creator agent:
 import logging
 from topic_client import fetch_all_subtopics, pick_subtopics_with_priority
 from trending import fetch_trending_news, fetch_web_context, fetch_wikipedia_trending, match_trending_to_subtopic
-from generator import generate_post, pick_post_mode, pick_level, embed_text, generate_image
+from generator import generate_post, pick_post_mode, pick_level, pick_region, embed_text, generate_image
 from auth_client import upload_image
 from pinecone_client import post_exists, upsert_post
 from post_client import save_post
@@ -48,13 +48,14 @@ def run_agent() -> None:
         topic_name    = subtopic["topicName"]
         subtopic_name = subtopic["name"]
 
-        # 4. Pick post mode + reading level
-        mode  = pick_post_mode()
-        level = pick_level()
-        logger.info("Processing: %s > %s  [mode=%s, level=%s]", topic_name, subtopic_name, mode, level)
+        # 4. Pick post mode + reading level + region (30% India / 70% world)
+        mode   = pick_post_mode()
+        level  = pick_level()
+        region = pick_region()
+        logger.info("Processing: %s > %s  [mode=%s, level=%s, region=%s]", topic_name, subtopic_name, mode, level, region)
 
         # 5a. Fetch live trending news (always — used by trending + question modes)
-        trending_news = fetch_trending_news(subtopic, limit=6)
+        trending_news = fetch_trending_news(subtopic, limit=6, region=region)
         if trending_news:
             logger.info("  Trending news: %d headlines fetched", len(trending_news))
         else:
@@ -66,7 +67,7 @@ def run_agent() -> None:
             logger.info("  Wikipedia trending hint: %s", trending_hint)
 
         # 5c. Wikipedia + RSS background context
-        web_context = fetch_web_context(subtopic)
+        web_context = fetch_web_context(subtopic, region=region)
 
         # 6. Generate content
         generated = generate_post(
@@ -77,6 +78,7 @@ def run_agent() -> None:
             trending_news=trending_news if trending_news else None,
             web_context=web_context or None,
             trending_hint=trending_hint,
+            region=region,
         )
         if not generated:
             logger.warning("Content generation failed for '%s'. Skipping.", subtopic_name)
@@ -144,6 +146,7 @@ def run_agent() -> None:
                 "subtopic": subtopic_name,
                 "mode":     mode,
                 "level":    level,
+                "region":   region,
                 "trending": trending_hint or "",
             },
         )
