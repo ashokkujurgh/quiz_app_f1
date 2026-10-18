@@ -31,7 +31,7 @@ export function Navbar({ onMenuToggle }: Props) {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const muiTheme = useTheme();
-  const { user } = useAppSelector((s) => s.auth);
+  const user = useAppSelector((s) => s.auth.user);
   const themeMode = useAppSelector((s) => s.theme.mode);
   const unreadMessages = useAppSelector((s) =>
     Object.values(s.messages.unreadByConv).reduce((a, c) => a + c, 0)

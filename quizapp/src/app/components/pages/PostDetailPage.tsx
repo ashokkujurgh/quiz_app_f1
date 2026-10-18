@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router';
 import { Helmet } from 'react-helmet-async';
 import {
   Box, Card, CardContent, Typography, Stack, Avatar, IconButton,
-  Divider, CircularProgress, Badge, TextField, Button, Alert,
+  Divider, CircularProgress, TextField, Button, Alert,
   useTheme, useMediaQuery,
 } from '@mui/material';
 import {
@@ -12,7 +12,8 @@ import {
 import { formatDistanceToNow } from 'date-fns';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import { syncLike, toggleLike, incrementComments } from '../../store/slices/postsSlice';
-import { useOnlineUsers } from '../../context/OnlineUsersContext';
+import { useIsOnline } from '../../context/OnlineUsersContext';
+import { OnlineBadge } from '../shared/OnlineBadge';
 import { Navbar } from '../layout/Navbar';
 import { UserAvatar } from '../shared/UserAvatar';
 import { isOfficialPost, withOfficialAvatar } from '../shared/officialAvatar';
@@ -42,14 +43,6 @@ interface ApiComment {
   createdAt: string;
   likes: number;
 }
-
-const onlineDotSx = (online: boolean) => ({
-  '& .MuiBadge-badge': {
-    backgroundColor: online ? '#44b700' : 'transparent',
-    boxShadow: online ? '0 0 0 2px white' : 'none',
-    width: 10, height: 10, borderRadius: '50%', minWidth: 'unset',
-  },
-});
 
 function mapPost(p: Record<string, unknown>): PostWithSeo {
   const author = (p['author'] as Record<string, unknown>) ?? {};
@@ -137,10 +130,11 @@ export function PostDetailPage() {
   const dispatch = useAppDispatch();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-  const { user, accessToken } = useAppSelector((s) => s.auth);
-  const { isOnline } = useOnlineUsers();
+  const user        = useAppSelector((s) => s.auth.user);
+  const accessToken = useAppSelector((s) => s.auth.accessToken);
 
   const [post, setPost] = useState<PostWithSeo | null>(null);
+  const authorOnline = useIsOnline(post?.author.id);
   const [loading, setLoading] = useState(true);
   const [comments, setComments] = useState<ApiComment[]>([]);
   const [commentsLoading, setCommentsLoading] = useState(true);
@@ -163,11 +157,13 @@ export function PostDetailPage() {
       .finally(() => setLoading(false));
   }, [id, accessToken]);
 
-  // Fetch comments
+  // Fetch comments — by the post's id once loaded: the URL param is a slug, and the
+  // comments endpoint only accepts ids (it returned 400 for slugs)
+  const postId = post?.id;
   useLayoutEffect(() => {
-    if (!id) return;
+    if (!postId) return;
     setCommentsLoading(true);
-    fetch(`${API}/api/posts/${id}/comments`, {
+    fetch(`${API}/api/posts/${postId}/comments`, {
       credentials: 'include',
       headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
     })
@@ -175,7 +171,7 @@ export function PostDetailPage() {
       .then((d) => { if (d.success) setComments(d.comments); })
       .catch(() => {})
       .finally(() => setCommentsLoading(false));
-  }, [id, accessToken]);
+  }, [postId, accessToken]);
 
   // Fetch related posts (same topic, different id)
   useLayoutEffect(() => {
@@ -271,7 +267,7 @@ export function PostDetailPage() {
       <Card sx={{ mb: 2 }}>
         <CardContent>
           <Stack direction="row" spacing={1.5} alignItems="flex-start" mb={2}>
-            <UserAvatar user={withOfficialAvatar({ ...post.author, isOnline: isOnline(post.author.id) }, isOfficialPost(post))} size={48} showOnline={!isOfficialPost(post)} />
+            <UserAvatar user={withOfficialAvatar({ ...post.author, isOnline: authorOnline }, isOfficialPost(post))} size={48} showOnline={!isOfficialPost(post)} />
             <Box flex={1}>
               <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap">
                 <Typography variant="subtitle2" fontWeight={700}>{post.author.name}</Typography>
@@ -338,12 +334,11 @@ export function PostDetailPage() {
             <Stack spacing={2} mb={2}>
               {comments.map((c) => (
                 <Stack key={c._id} direction="row" spacing={1.5} alignItems="flex-start">
-                  <Badge overlap="circular" anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-                    variant="dot" sx={onlineDotSx(isOnline(c.author.userId ?? ''))}>
+                  <OnlineBadge userId={c.author.userId}>
                     <Avatar src={c.author.avatar} sx={{ width: 36, height: 36, fontSize: 14 }}>
                       {c.author.name?.[0]}
                     </Avatar>
-                  </Badge>
+                  </OnlineBadge>
                   <Box sx={{ bgcolor: 'action.hover', borderRadius: 2, px: 2, py: 1.25, flex: 1 }}>
                     <Stack direction="row" spacing={1} alignItems="center" mb={0.5}>
                       <Typography variant="caption" fontWeight={700}>{c.author.name}</Typography>

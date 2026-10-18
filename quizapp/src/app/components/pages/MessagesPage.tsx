@@ -12,7 +12,7 @@ import {
   type Conversation,
 } from '../../store/slices/messagesSlice';
 import { EmptyState } from '../shared/EmptyState';
-import { useOnlineUsers } from '../../context/OnlineUsersContext';
+import { useIsOnline } from '../../context/OnlineUsersContext';
 import { apiFetch } from '../../utils/apiFetch';
 import { formatDistanceToNow } from 'date-fns';
 import { Circle } from '@mui/icons-material';
@@ -20,8 +20,7 @@ import { Circle } from '@mui/icons-material';
 const SOCKET_URL = import.meta.env.VITE_API_URL || window.location.origin;
 
 function OnlineAvatar({ src, username, userId, size = 44 }: { src?: string; username: string; userId: string; size?: number }) {
-  const { isOnline } = useOnlineUsers();
-  const online = isOnline(userId);
+  const online = useIsOnline(userId);
   return (
     <Box sx={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
       <Avatar src={src} sx={{ width: size, height: size }}>
@@ -67,7 +66,6 @@ export function MessagesPage() {
   const theme    = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const dispatch = useAppDispatch();
-  const { isOnline } = useOnlineUsers();
   const { conversations, activeConvId, messages, loadingConvs, loadingMsgs, typingUsers } = useAppSelector((s) => s.messages);
   const token = useAppSelector((s) => s.auth.accessToken);
   const myId  = useAppSelector((s) => s.auth.user?.id);
@@ -85,7 +83,7 @@ export function MessagesPage() {
 
   const activeConv  = conversations.find((c) => c._id === activeConvId) ?? null;
   const otherUser   = activeConv?.otherUser ?? null;
-  const otherOnline = otherUser ? isOnline(otherUser._id) : false;
+  const otherOnline = useIsOnline(otherUser?._id);
 
   useEffect(() => { dispatch(fetchConversations()); }, [dispatch]);
 

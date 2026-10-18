@@ -10,7 +10,6 @@ import {
 } from '@mui/icons-material';
 import { useState, useEffect } from 'react';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
-import { useOnlineUsers } from '../../context/OnlineUsersContext';
 import { UserAvatar } from '../shared/UserAvatar';
 import { fetchIncoming } from '../../store/slices/friendsSlice';
 
@@ -38,12 +37,12 @@ export function LeftSidebar({ open, onClose, variant = 'permanent' }: Props) {
   const location = useLocation();
   const theme = useTheme();
   const dispatch = useAppDispatch();
-  const { user, accessToken } = useAppSelector((s) => s.auth);
+  const user = useAppSelector((s) => s.auth.user);
+  const accessToken = useAppSelector((s) => s.auth.accessToken);
 
   useEffect(() => {
     if (accessToken) dispatch(fetchIncoming());
   }, [accessToken, dispatch]);
-  const { isOnline } = useOnlineUsers();
   const unreadMessages = useAppSelector((s) =>
     Object.values(s.messages.unreadByConv).reduce((a, c) => a + c, 0)
   );

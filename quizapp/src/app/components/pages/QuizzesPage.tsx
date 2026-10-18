@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { memo, useCallback, useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router';
 import {
   Box, Grid, Typography, TextField, InputAdornment,
@@ -74,12 +74,14 @@ function mapQuestion(q: ApiQuestion): QuizQuestion {
 
 
 // ── Quiz Card ─────────────────────────────────────────────────────────────────
-function QuizCard({ quiz, loading, onPlay, onHistory, onTest }: {
+// Handlers receive the quiz, so the grid can pass them straight through (no
+// per-render arrow functions) and the memoized card skips re-rendering while typing a search.
+function QuizCardImpl({ quiz, loading, onPlay, onHistory, onTest }: {
   quiz: ReturnType<typeof mapQuiz>;
   loading: boolean;
-  onPlay: () => void;
-  onHistory?: () => void;
-  onTest?: () => void;
+  onPlay: (q: ReturnType<typeof mapQuiz>) => void;
+  onHistory?: (q: ReturnType<typeof mapQuiz>) => void;
+  onTest?: (q: ReturnType<typeof mapQuiz>) => void;
 }) {
   const [imgError, setImgError] = useState(false);
   const mins = Math.floor(quiz.duration / 60);
@@ -150,14 +152,14 @@ function QuizCard({ quiz, loading, onPlay, onHistory, onTest }: {
           <Stack spacing={1}>
             <Button
               variant="outlined" fullWidth startIcon={<History />}
-              onClick={onHistory}
+              onClick={() => onHistory?.(quiz)}
               sx={{ borderRadius: 2, fontWeight: 700 }}
             >
               Game History
             </Button>
             <Button
               variant="contained" fullWidth startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <PlayArrow />}
-              onClick={onTest} disabled={loading}
+              onClick={() => onTest?.(quiz)} disabled={loading}
               sx={{ borderRadius: 2, fontWeight: 700, color: 'white !important' }}
             >
               {loading ? 'Loading…' : 'Play as Test'}
@@ -165,7 +167,7 @@ function QuizCard({ quiz, loading, onPlay, onHistory, onTest }: {
           </Stack>
         ) : (
           <Button
-            variant="contained" fullWidth onClick={onPlay}
+            variant="contained" fullWidth onClick={() => onPlay(quiz)}
             disabled={loading || quiz.status === 'cancelled' || quiz.status === 'draft'}
             startIcon={loading ? <CircularProgress size={16} color="inherit" /> : undefined}
             color={quiz.status === 'active' ? 'success' : 'primary'}
@@ -178,6 +180,8 @@ function QuizCard({ quiz, loading, onPlay, onHistory, onTest }: {
     </Card>
   );
 }
+
+const QuizCard = memo(QuizCardImpl);
 
 // ── Shared quiz grid ──────────────────────────────────────────────────────────
 function QuizGrid({
@@ -216,9 +220,7 @@ function QuizGrid({
             <Grid key={q.id} size={{ xs: 12, sm: 6, md: 4 }}>
               <QuizCard
                 quiz={q} loading={playingId === q.id}
-                onPlay={() => onPlay(q)}
-                onHistory={onHistory ? () => onHistory(q) : undefined}
-                onTest={onTest ? () => onTest(q) : undefined}
+                onPlay={onPlay} onHistory={onHistory} onTest={onTest}
               />
             </Grid>
           ))}
@@ -322,7 +324,8 @@ export function QuizzesPage() {
       .finally(() => setPastLoading(false));
   }, [mainTab, accessToken]);
 
-  const handlePlay = async (q: ReturnType<typeof mapQuiz>) => {
+  // Stable identities: passed through QuizGrid to the memoized QuizCard
+  const handlePlay = useCallback(async (q: ReturnType<typeof mapQuiz>) => {
     if (!accessToken) { navigate('/login'); return; }
     setPlayingId(q.id);
     try {
@@ -338,13 +341,13 @@ export function QuizzesPage() {
     } finally {
       setPlayingId(null);
     }
-  };
+  }, [accessToken, navigate, dispatch]);
 
-  const handleHistory = (q: ReturnType<typeof mapQuiz>) => {
+  const handleHistory = useCallback((q: ReturnType<typeof mapQuiz>) => {
     navigate('/history', { state: { highlightQuizId: q.id } });
-  };
+  }, [navigate]);
 
-  const handleTest = async (q: ReturnType<typeof mapQuiz>) => {
+  const handleTest = useCallback(async (q: ReturnType<typeof mapQuiz>) => {
     if (!accessToken) { navigate('/login'); return; }
     setPlayingId(q.id);
     try {
@@ -366,7 +369,7 @@ export function QuizzesPage() {
     } finally {
       setPlayingId(null);
     }
-  };
+  }, [accessToken, navigate]);
 
   return (
     <Box>

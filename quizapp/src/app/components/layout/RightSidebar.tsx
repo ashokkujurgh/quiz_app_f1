@@ -7,6 +7,7 @@ import {
 import { SportsEsports, FiberManualRecord, Quiz as QuizIcon, PlayArrow } from '@mui/icons-material';
 import { useAppSelector } from '../../store/hooks';
 import { apiFetch } from '../../utils/apiFetch';
+import { loadTopicsWithSubtopics } from '../../utils/topicsCache';
 
 const API = import.meta.env.VITE_API_URL ?? '';
 
@@ -18,13 +19,12 @@ interface ApiQuiz {
   questionCount: number;
 }
 
-interface ApiTopic    { _id: string; name: string }
 interface ApiSubTopic { _id: string; name: string; topic: string }
 
 // ── Live / Active Games ───────────────────────────────────────────────────────
 function LiveGamesSection() {
   const navigate = useNavigate();
-  const { accessToken } = useAppSelector((s) => s.auth);
+  const accessToken = useAppSelector((s) => s.auth.accessToken);
   const [games, setGames]     = useState<ApiQuiz[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -91,7 +91,7 @@ function LiveGamesSection() {
 // ── Practice Quiz ─────────────────────────────────────────────────────────────
 function PracticeQuizSection() {
   const navigate = useNavigate();
-  const { accessToken } = useAppSelector((s) => s.auth);
+  const accessToken = useAppSelector((s) => s.auth.accessToken);
 
   const [subTopics, setSubTopics]   = useState<ApiSubTopic[]>([]);
   const [subTopicId, setSubTopicId] = useState('');
@@ -99,21 +99,9 @@ function PracticeQuizSection() {
   const [loading, setLoading]       = useState(true);
 
   useEffect(() => {
-    fetch(`${API}/api/topics`)
-      .then((r) => r.json())
-      .then(async (d) => {
-        if (!d.success || !d.topics?.length) return;
-        const active = (d.topics as (ApiTopic & { isActive?: boolean })[]).filter((t) => t.isActive !== false);
-        const results = await Promise.all(
-          active.map((t) =>
-            fetch(`${API}/api/topics/${t._id}/subtopics`)
-              .then((r) => r.json())
-              .then((sd) => ((sd.subtopics ?? []) as (ApiSubTopic & { isActive?: boolean })[]).filter((s) => s.isActive !== false))
-              .catch(() => [] as ApiSubTopic[])
-          )
-        );
-        setSubTopics(results.flat());
-      })
+    // Shared with HomePage — one set of requests for both
+    loadTopicsWithSubtopics()
+      .then(({ subTopics }) => setSubTopics(subTopics))
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);

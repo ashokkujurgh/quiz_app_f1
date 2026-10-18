@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { memo, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import {
   Card, CardContent, CardActions, Box, Typography, IconButton,
-  Button, Stack, Divider, Tooltip, Avatar, TextField, CircularProgress, Badge,
+  Button, Stack, Divider, Tooltip, Avatar, TextField, CircularProgress,
   Menu, MenuItem, ListItemIcon, ListItemText, Snackbar, Alert, Dialog,
   DialogTitle, DialogContent, DialogActions, LinearProgress,
 } from '@mui/material';
@@ -161,7 +161,8 @@ function QuizResultCard({ result, isAdmin }: { result: QuizResult; isAdmin: bool
 }
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { toggleLike, syncLike, incrementComments } from '../../store/slices/postsSlice';
-import { useOnlineUsers } from '../../context/OnlineUsersContext';
+import { useIsOnline } from '../../context/OnlineUsersContext';
+import { OnlineBadge } from './OnlineBadge';
 import { useBlockedUsers } from '../../hooks/useBlockedUsers';
 import { UserAvatar } from './UserAvatar';
 import { withOfficialAvatar } from './officialAvatar';
@@ -176,25 +177,19 @@ interface ApiComment {
   likes: number;
 }
 
-const onlineDotSx = (online: boolean) => ({
-  '& .MuiBadge-badge': {
-    backgroundColor: online ? '#44b700' : 'transparent',
-    boxShadow: online ? '0 0 0 2px white' : 'none',
-    width: 10, height: 10, borderRadius: '50%', minWidth: 'unset',
-  },
-});
-
 interface Props {
   post: Post;
 }
 
 const API = import.meta.env.VITE_API_URL ?? '';
 
-export function PostCard({ post }: Props) {
+function PostCardImpl({ post }: Props) {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
-  const { user, accessToken } = useAppSelector((s) => s.auth);
-  const { isOnline } = useOnlineUsers();
+  // Narrow selectors: re-render on the user/token changing, not on any auth-slice update
+  const user        = useAppSelector((s) => s.auth.user);
+  const accessToken = useAppSelector((s) => s.auth.accessToken);
+  const authorOnline = useIsOnline(post.author.id);
 
   const timeAgo = formatDistanceToNow(new Date(post.timestamp), { addSuffix: true });
 
@@ -337,7 +332,7 @@ export function PostCard({ post }: Props) {
         {/* Header */}
         <Stack direction="row" spacing={1.5} alignItems="flex-start" mb={1.5}>
           {/* Official posts: Meenzo logo as avatar, no online/offline dot */}
-          <UserAvatar user={withOfficialAvatar({ ...post.author, isOnline: isOnline(post.author.id) }, isOfficial)} size={44} showOnline={!isOfficial} />
+          <UserAvatar user={withOfficialAvatar({ ...post.author, isOnline: authorOnline }, isOfficial)} size={44} showOnline={!isOfficial} />
           <Box flex={1}>
             <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap">
               <Typography variant="subtitle2" fontWeight={700}>
@@ -517,15 +512,14 @@ export function PostCard({ post }: Props) {
             <Stack spacing={1.5} mb={2}>
               {comments.map((c) => (
                 <Stack key={c._id} direction="row" spacing={1} alignItems="flex-start">
-                  <Badge overlap="circular" anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-                    variant="dot" sx={onlineDotSx(isOnline(c.author.userId ?? ''))}>
+                  <OnlineBadge userId={c.author.userId}>
                     <Avatar
                       src={c.author.avatar}
                       sx={{ width: 32, height: 32, fontSize: 13 }}
                     >
                       {c.author.name?.[0]}
                     </Avatar>
-                  </Badge>
+                  </OnlineBadge>
                   <Box sx={{ bgcolor: 'action.hover', borderRadius: 2, px: 1.5, py: 1, flex: 1 }}>
                     <Stack direction="row" spacing={1} alignItems="center">
                       <Typography variant="caption" fontWeight={700}>{c.author.name}</Typography>
@@ -585,3 +579,7 @@ export function PostCard({ post }: Props) {
     </Card>
   );
 }
+
+// Memoized: feeds re-render often (e.g. typing in the create-post box on HomePage),
+// and each card only depends on its `post` object, which keeps its identity in the store.
+export const PostCard = memo(PostCardImpl);

@@ -8,12 +8,13 @@ import { Add, Image, Close, Login, PersonAdd, EditNote } from '@mui/icons-materi
 import { useNavigate } from 'react-router';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import { setActiveTopic, addPost, setPosts, setLoading } from '../../store/slices/postsSlice';
-import { useOnlineUsers } from '../../context/OnlineUsersContext';
+import { useIsOnline } from '../../context/OnlineUsersContext';
 import { PostCard } from '../shared/PostCard';
 import { PostSkeleton } from '../shared/LoadingSkeleton';
 import { EmptyState } from '../shared/EmptyState';
 import { Inbox } from '@mui/icons-material';
 import type { Post, QuizTopic } from '../../types';
+import { loadTopicsWithSubtopics } from '../../utils/topicsCache';
 
 const API = import.meta.env.VITE_API_URL ?? '';
 
@@ -24,8 +25,9 @@ export function HomePage() {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
   const { posts, activeTopic, loading: isLoading } = useAppSelector((s) => s.posts);
-  const { user, accessToken } = useAppSelector((s) => s.auth);
-  const { isOnline } = useOnlineUsers();
+  const user = useAppSelector((s) => s.auth.user);
+  const accessToken = useAppSelector((s) => s.auth.accessToken);
+  const selfOnline = useIsOnline(user?.id);
   const isGuest = !accessToken;
   const displayName = user?.name?.split(' ')[0] ?? 'there';
 
@@ -36,21 +38,11 @@ export function HomePage() {
   const [activeSubTopicId, setActiveSubTopicId] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch(`${API}/api/topics`)
-      .then((r) => r.json())
-      .then(async (d) => {
-        if (!d.success || !d.topics?.length) return;
-        const active = (d.topics as ApiTopic[]).filter((t: ApiTopic & { isActive?: boolean }) => t.isActive !== false);
+    // Shared with RightSidebar — one set of requests for both
+    loadTopicsWithSubtopics()
+      .then(({ topics: active, subTopics: flat }) => {
+        if (!active.length) return;
         setTopics(active);
-        const results = await Promise.all(
-          active.map((t) =>
-            fetch(`${API}/api/topics/${t._id}/subtopics`)
-              .then((r) => r.json())
-              .then((sd) => ((sd.subtopics ?? []) as (ApiSubTopic & { isActive?: boolean })[]).filter((s) => s.isActive !== false))
-              .catch(() => [] as ApiSubTopic[])
-          )
-        );
-        const flat = results.flat();
         const engineeringKw = ['engineering', 'engineer'];
         const isEngineering = (s: ApiSubTopic) =>
           engineeringKw.some((kw) => s.name.toLowerCase().includes(kw));
@@ -65,11 +57,13 @@ export function HomePage() {
   }, []);
 
   // ── Posts from API ────────────────────────────────────────────────────────────
+  // Depends on the selected subtopic's *name*, not the whole subtopic list — otherwise
+  // the feed was fetched twice on every visit (once at mount, again when topics arrived).
+  const activeSubName = allSubTopics.find((s) => s._id === activeSubTopicId)?.name;
   useEffect(() => {
     dispatch(setLoading(true));
     const params = new URLSearchParams({ page: '1', limit: '20' });
-    const activeSub = allSubTopics.find((s) => s._id === activeSubTopicId);
-    if (activeSub) params.set('subTopic', activeSub.name);
+    if (activeSubName) params.set('subTopic', activeSubName);
     fetch(`${API}/api/posts?${params}`, {
       credentials: 'include',
       headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
@@ -129,7 +123,7 @@ export function HomePage() {
       })
       .catch(() => {})
       .finally(() => dispatch(setLoading(false)));
-  }, [activeSubTopicId, allSubTopics, accessToken]);
+  }, [activeSubName, accessToken]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Create post dialog ────────────────────────────────────────────────────────
   const [open, setOpen]               = useState(false);
@@ -275,7 +269,7 @@ export function HomePage() {
                 <Box sx={{
                   position: 'absolute', bottom: 1, right: 1,
                   width: 10, height: 10, borderRadius: '50%',
-                  bgcolor: isOnline(user?.id ?? '') ? '#44b700' : 'text.disabled',
+                  bgcolor: selfOnline ? '#44b700' : 'text.disabled',
                   border: '2px solid', borderColor: 'background.paper',
                 }} />
               </Box>

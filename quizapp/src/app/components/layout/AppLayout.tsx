@@ -17,7 +17,8 @@ export function AppLayout() {
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   usePresence();
   const dispatch = useAppDispatch();
-  const { accessToken, user } = useAppSelector((s) => s.auth);
+  const accessToken = useAppSelector((s) => s.auth.accessToken);
+  const user = useAppSelector((s) => s.auth.user);
   const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
