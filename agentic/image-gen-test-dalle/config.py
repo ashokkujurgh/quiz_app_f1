@@ -3,7 +3,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-GEMINI_API_KEY      = os.getenv("GEMINI_API_KEY")
+OPENAI_API_KEY      = os.getenv("OPENAI_API_KEY")
+DALLE_API_KEY       = os.getenv("OPENAI_DALLE_E_API_KEY") or os.getenv("OPENAI_API_KEY")
 PINECONE_API_KEY    = os.getenv("PINECONE_API_KEY")
 
 # Service URLs
@@ -20,12 +21,8 @@ PINECONE_INDEX      = os.getenv("PINECONE_INDEX",   "meenzo-posts")
 PINECONE_CLOUD      = os.getenv("PINECONE_CLOUD",   "aws")
 PINECONE_REGION     = os.getenv("PINECONE_REGION",  "us-east-1")
 
-# Gemini models
-CHAT_MODEL          = os.getenv("GEMINI_CHAT_MODEL",  "gemini-3.8-flash")
-IMAGE_MODELS        = ["gemini-3.1-flash-image", "gemini-2.5-flash-image"]
-
-# Embedding model (truncated to 1536-dim to match the Pinecone index)
-EMBED_MODEL         = "gemini-embedding-001"
+# Embedding model
+EMBED_MODEL         = "text-embedding-3-small"
 EMBED_DIM           = 1536
 
 # Duplicate threshold — cosine similarity above this = already exists

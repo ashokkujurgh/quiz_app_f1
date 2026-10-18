@@ -1,19 +1,18 @@
 """
-Generate quiz questions via Google Gemini and produce embeddings.
+Generate quiz questions via OpenAI and produce embeddings.
 """
 import json
 import logging
-from google import genai
-from google.genai import types
-from config import GEMINI_API_KEY, CHAT_MODEL, EMBED_MODEL, EMBED_DIM
+from openai import OpenAI
+from config import OPENAI_API_KEY, EMBED_MODEL
 
 logger = logging.getLogger(__name__)
-client = genai.Client(api_key=GEMINI_API_KEY)
+client = OpenAI(api_key=OPENAI_API_KEY)
 
 
 def generate_question(topic_name: str, subtopic_name: str) -> dict | None:
     """
-    Ask Gemini to generate one multiple-choice question for the given subtopic.
+    Ask GPT to generate one multiple-choice question for the given subtopic.
     Returns a dict with keys: text, description, options, correctOption (0-3), difficulty
     """
     prompt = f"""
@@ -44,15 +43,13 @@ Rules:
 """
 
     try:
-        response = client.models.generate_content(
-            model=CHAT_MODEL,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                temperature=0.7,
-                response_mime_type="application/json",
-            ),
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.7,
+            max_tokens=600,
         )
-        raw = response.text.strip()
+        raw = response.choices[0].message.content.strip()
         # Strip markdown code fences if present
         if raw.startswith("```"):
             raw = raw.split("```")[1]
@@ -66,15 +63,11 @@ Rules:
         assert data.get("difficulty") in ("easy", "medium", "hard")
         return data
     except Exception as exc:
-        logger.error("Gemini question generation failed: %s", exc)
+        logger.error("OpenAI question generation failed: %s", exc)
         return None
 
 
 def embed_text(text: str) -> list[float]:
     """Return an embedding vector for the given text."""
-    response = client.models.embed_content(
-        model=EMBED_MODEL,
-        contents=text,
-        config=types.EmbedContentConfig(output_dimensionality=EMBED_DIM),
-    )
-    return response.embeddings[0].values
+    response = client.embeddings.create(model=EMBED_MODEL, input=text)
+    return response.data[0].embedding

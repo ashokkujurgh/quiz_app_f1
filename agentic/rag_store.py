@@ -5,9 +5,9 @@ Handles RAG retrieval (fetch existing questions as context) and upsert.
 import logging
 from pinecone import Pinecone, ServerlessSpec
 from langchain_pinecone import PineconeVectorStore
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
+from langchain_openai import OpenAIEmbeddings
 from config import (
-    GEMINI_API_KEY, PINECONE_API_KEY, PINECONE_INDEX,
+    OPENAI_API_KEY, PINECONE_API_KEY, PINECONE_INDEX,
     PINECONE_CLOUD, PINECONE_REGION, EMBED_MODEL, EMBED_DIM,
     SIMILARITY_THRESHOLD, RAG_CONTEXT_SIZE,
 )
@@ -34,11 +34,7 @@ def _get_store() -> PineconeVectorStore:
         )
         logger.info("Index created.")
 
-    embeddings = GoogleGenerativeAIEmbeddings(
-        model=EMBED_MODEL,
-        google_api_key=GEMINI_API_KEY,
-        output_dimensionality=EMBED_DIM,
-    )
+    embeddings = OpenAIEmbeddings(model=EMBED_MODEL, api_key=OPENAI_API_KEY)
     _store = PineconeVectorStore(
         index=pc.Index(PINECONE_INDEX),
         embedding=embeddings,

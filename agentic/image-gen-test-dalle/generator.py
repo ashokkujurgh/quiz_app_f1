@@ -1,18 +1,19 @@
 """
-AI content generation (Google Gemini): title, post content, image, embeddings.
+AI content generation: title, post content, DALL-E image, embeddings.
 """
 import logging
 import json
+import base64
 import os
 import tempfile
 import requests as _requests
-from google import genai
-from google.genai import types
-from config import GEMINI_API_KEY, CHAT_MODEL, IMAGE_MODELS, EMBED_MODEL, EMBED_DIM
+from openai import OpenAI
+from config import OPENAI_API_KEY, DALLE_API_KEY, EMBED_MODEL
 
 logger = logging.getLogger(__name__)
 
-_client = genai.Client(api_key=GEMINI_API_KEY)
+_gpt_client   = OpenAI(api_key=OPENAI_API_KEY)
+_dalle_client = OpenAI(api_key=DALLE_API_KEY)
 
 
 def generate_title_and_content(
@@ -58,15 +59,13 @@ Rules:
 - Write for a general educated audience.
 """
     try:
-        resp = _client.models.generate_content(
-            model=CHAT_MODEL,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                temperature=0.75,
-                response_mime_type="application/json",
-            ),
+        resp = _gpt_client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.75,
+            max_tokens=900,
         )
-        raw = resp.text.strip()
+        raw = resp.choices[0].message.content.strip()
         if raw.startswith("```"):
             raw = raw.split("```")[1]
             if raw.startswith("json"):
@@ -91,36 +90,40 @@ def generate_image(title: str | None, subtopic_name: str, topic_name: str) -> st
         f"Style: modern flat design, bright colors, no text overlays, suitable for all ages."
     )
 
-    for model in IMAGE_MODELS:
+    for model in ["gpt-image-1", "dall-e-3", "dall-e-2"]:
         try:
-            resp = _client.models.generate_content(
+            # gpt-image-1 returns b64_json; dall-e-* return urls
+            response_format = "b64_json" if model == "gpt-image-1" else "url"
+            resp = _dalle_client.images.generate(
                 model=model,
-                contents=image_prompt,
-                config=types.GenerateContentConfig(
-                    response_modalities=["IMAGE"],
-                    image_config=types.ImageConfig(aspect_ratio="1:1"),
-                ),
+                prompt=image_prompt,
+                size="1024x1024",
+                n=1,
+                response_format=response_format,
             )
-            image = next((p.inline_data for p in resp.parts or [] if p.inline_data and p.inline_data.data), None)
-            if not image:
+            item = resp.data[0] if resp.data else None
+            if not item:
                 continue
 
-            # Gemini returns raw image bytes — upload to the post-service so we get a persistent URL
-            mime = image.mime_type or "image/png"
-            ext = mime.split("/")[-1]
-            from config import POST_API_URL
-            from auth_client import auth_headers
-            upload_resp = _requests.post(
-                f"{POST_API_URL}/api/auth/upload/images",
-                files={"images": (f"image.{ext}", image.data, mime)},
-                headers=auth_headers(),
-                timeout=60,
-            )
-            if upload_resp.ok:
-                urls = upload_resp.json().get("urls", [])
-                if urls:
-                    logger.info("Image generated via %s (bytes→upload)", model)
-                    return urls[0]
+            if response_format == "b64_json" and item.b64_json:
+                # Upload b64 image to the post-service so we get a persistent URL
+                img_bytes = base64.b64decode(item.b64_json)
+                from config import POST_API_URL
+                from auth_client import auth_headers
+                upload_resp = _requests.post(
+                    f"{POST_API_URL}/api/auth/upload/images",
+                    files={"images": ("image.png", img_bytes, "image/png")},
+                    headers=auth_headers(),
+                    timeout=60,
+                )
+                if upload_resp.ok:
+                    urls = upload_resp.json().get("urls", [])
+                    if urls:
+                        logger.info("Image generated via %s (b64→upload)", model)
+                        return urls[0]
+            elif item.url:
+                logger.info("Image generated via %s", model)
+                return item.url
 
         except Exception as exc:
             logger.warning("Image generation failed with %s: %s", model, exc)
@@ -131,9 +134,5 @@ def generate_image(title: str | None, subtopic_name: str, topic_name: str) -> st
 
 def embed_text(text: str) -> list[float]:
     """Return a 1536-dim embedding for the given text."""
-    resp = _client.models.embed_content(
-        model=EMBED_MODEL,
-        contents=text[:8000],
-        config=types.EmbedContentConfig(output_dimensionality=EMBED_DIM),
-    )
-    return resp.embeddings[0].values
+    resp = _gpt_client.embeddings.create(model=EMBED_MODEL, input=text[:8000])
+    return resp.data[0].embedding

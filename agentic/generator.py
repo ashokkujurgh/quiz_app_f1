@@ -4,15 +4,15 @@ LangChain LCEL chain for quiz question generation with RAG context.
 - Non Engineering topics → India-focused questions
 """
 import logging
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import JsonOutputParser
-from config import GEMINI_API_KEY, CHAT_MODEL
+from config import OPENAI_API_KEY
 from rag_store import get_similar_questions
 
 logger = logging.getLogger(__name__)
 
-_llm = ChatGoogleGenerativeAI(model=CHAT_MODEL, google_api_key=GEMINI_API_KEY, temperature=0.7)
+_llm = ChatOpenAI(model="gpt-4o-mini", api_key=OPENAI_API_KEY, temperature=0.7)
 
 _SYSTEM = (
     "You are a quiz content creator. Generate unique multiple-choice questions.\n"

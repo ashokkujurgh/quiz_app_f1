@@ -18,11 +18,10 @@ import subprocess
 import tempfile
 import time
 import requests
-from google import genai
-from google.genai import types
-from google.genai import errors as genai_errors
+import base64
+from openai import OpenAI, RateLimitError
 from config import (
-    GEMINI_API_KEY, CHAT_MODEL, CHAT_FALLBACK_MODELS, EMBED_MODEL, EMBED_DIM, IMAGE_MODELS,
+    OPENAI_API_KEY, CHAT_MODEL, CHAT_FALLBACK_MODELS, EMBED_MODEL, EMBED_DIM, IMAGE_MODELS,
     KIE_API_KEY, KIE_API_URL, KIE_IMAGE_MODEL, KIE_TIMEOUT_SECONDS,
     OPENART_ENABLED, OPENART_IMAGE_MODEL, OPENART_TIMEOUT,
 )
@@ -30,7 +29,7 @@ from trending import INDIA_BIASED_SUBTOPICS, INDIA_50_SUBTOPICS, TRENDING_BIASED
 
 logger = logging.getLogger(__name__)
 
-_client = genai.Client(api_key=GEMINI_API_KEY)
+_client = OpenAI(api_key=OPENAI_API_KEY)
 
 # ── post mode weights ─────────────────────────────────────────────────────────
 # trending = current-affairs-hooked posts (kept to 30% so the feed doesn't read like a news app)
@@ -344,31 +343,23 @@ def _quality_violations(content: str) -> list[str]:
 
 
 def _generate_once(messages: list[dict]) -> dict:
-    # Gemini takes the system prompt separately and calls the assistant role "model"
-    system = "\n\n".join(m["content"] for m in messages if m["role"] == "system")
-    contents = [
-        types.Content(
-            role="model" if m["role"] == "assistant" else "user",
-            parts=[types.Part(text=m["content"])],
-        )
-        for m in messages if m["role"] != "system"
-    ]
-    gen_config = types.GenerateContentConfig(
-        system_instruction=system or None,
-        temperature=0.85,
-        response_mime_type="application/json",
-    )
     models = [CHAT_MODEL] + [m for m in CHAT_FALLBACK_MODELS if m != CHAT_MODEL]
     for i, model in enumerate(models):
         try:
-            resp = _client.models.generate_content(model=model, contents=contents, config=gen_config)
+            resp = _client.chat.completions.create(
+                model=model,
+                messages=messages,
+                temperature=0.85,
+                max_tokens=4096,
+                response_format={"type": "json_object"},
+            )
             break
-        except genai_errors.APIError as exc:
-            # 429 = this model's quota is used up — try the next one
-            if exc.code != 429 or i == len(models) - 1:
+        except RateLimitError:
+            # 429 — this model is rate-limited / out of quota, try the next one
+            if i == len(models) - 1:
                 raise
-            logger.warning("Model %s out of quota — falling back to %s", model, models[i + 1])
-    raw = resp.text.strip()
+            logger.warning("Model %s rate-limited — falling back to %s", model, models[i + 1])
+    raw = resp.choices[0].message.content.strip()
     if raw.startswith("```"):
         raw = raw.split("```")[1]
         if raw.startswith("json"):
@@ -397,12 +388,8 @@ def generate_title_and_content(
 
 
 def embed_text(text: str) -> list[float]:
-    resp = _client.models.embed_content(
-        model=EMBED_MODEL,
-        contents=text[:8000],
-        config=types.EmbedContentConfig(output_dimensionality=EMBED_DIM),
-    )
-    return resp.embeddings[0].values
+    resp = _client.embeddings.create(model=EMBED_MODEL, input=text[:8000])
+    return resp.data[0].embedding
 
 
 def _openart_available() -> bool:
@@ -480,7 +467,7 @@ def _kie_generate_image(prompt: str) -> tuple[bytes, str] | None:
 def generate_image(title: str | None, content: str, topic_name: str, subtopic_name: str) -> tuple[bytes, str] | None:
     """
     Generate one cover image for a post. Returns (image_bytes, mime_type) or None.
-    Tries OpenArt (when signed in), then Kie.ai (when KIE_API_KEY is set), then each Gemini model in IMAGE_MODELS;
+    Tries OpenArt (when signed in), then Kie.ai (when KIE_API_KEY is set), then each OpenAI image model in IMAGE_MODELS;
     any failure just means the post goes out without an image.
     """
     prompt = (
@@ -507,20 +494,13 @@ def generate_image(title: str | None, content: str, topic_name: str, subtopic_na
         except Exception as exc:
             logger.warning("Kie.ai image generation failed: %s", str(exc)[:200])
     for model in IMAGE_MODELS:
-        model = model.strip()
         try:
-            resp = _client.models.generate_content(
-                model=model,
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    response_modalities=["IMAGE"],
-                    image_config=types.ImageConfig(aspect_ratio="16:9"),
-                ),
-            )
-            image = next((p.inline_data for p in resp.parts or [] if p.inline_data and p.inline_data.data), None)
-            if image:
-                logger.info("Image generated via %s (%d bytes)", model, len(image.data))
-                return image.data, image.mime_type or "image/png"
+            resp = _client.images.generate(model=model, prompt=prompt, size="1536x1024", n=1)
+            item = resp.data[0] if resp.data else None
+            if item and item.b64_json:
+                data = base64.b64decode(item.b64_json)
+                logger.info("Image generated via OpenAI %s (%d bytes)", model, len(data))
+                return data, "image/png"
             logger.warning("Image model %s returned no image.", model)
         except Exception as exc:
             logger.warning("Image generation failed with %s: %s", model, str(exc)[:200])

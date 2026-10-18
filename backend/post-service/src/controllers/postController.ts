@@ -1,29 +1,14 @@
 import { Response, RequestHandler } from 'express';
 import mongoose from 'mongoose';
+import OpenAI from 'openai';
 import Post, { IQuizResult, ISeoMeta } from '../models/Post';
 import { AuthRequest } from '../middleware/auth';
 import { sendNewPostNotification, sendCommentNotification } from '../services/notificationService';
 
-// ── Google Gemini config ──────────────────────────────────────────────────────
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_MODEL = process.env.GEMINI_CHAT_MODEL || 'gemini-3.8-flash';
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
-
-type GeminiPart = { text: string } | { inline_data: { mime_type: string; data: string } };
-
-// Gemini can't fetch remote image URLs itself — download and inline them as base64
-async function imageToGeminiPart(url: string): Promise<GeminiPart | null> {
-  try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
-    if (!res.ok) return null;
-    const mimeType = res.headers.get('content-type')?.split(';')[0] || 'image/jpeg';
-    if (!mimeType.startsWith('image/')) return null;
-    const data = Buffer.from(await res.arrayBuffer()).toString('base64');
-    return { inline_data: { mime_type: mimeType, data } };
-  } catch {
-    return null;
-  }
-}
+// ── OpenAI client ─────────────────────────────────────────────────────────────
+const openai = process.env.OPENAI_API_KEY
+  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  : null;
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -144,21 +129,22 @@ async function checkContentPolicy(content: string, imageUrl?: string | null): Pr
   }
 }
 
-// ── Gemini second-layer validation ────────────────────────────────────────────
-async function geminiValidate(
+// ── OpenAI second-layer validation ────────────────────────────────────────────
+async function openAIValidate(
   content: string,
   topic: string,
   subTopic: string | null,
   imageUrls: string[],
 ): Promise<{ allowed: boolean; reason?: string }> {
-  if (!GEMINI_API_KEY) return { allowed: true }; // skip if key not configured
+  if (!openai) return { allowed: true }; // skip if key not configured
 
   try {
     const topicLabel = subTopic ? `${topic} > ${subTopic}` : topic;
 
     // Build message content — text + optional image URLs
-    const userParts: GeminiPart[] = [
+    const userParts: OpenAI.Chat.ChatCompletionContentPart[] = [
       {
+        type: 'text',
         text: `You are a strict content moderator for an educational quiz social platform called Meenzo.
 
 Evaluate the following post against two criteria:
@@ -188,33 +174,25 @@ Respond ONLY with valid JSON (no markdown, no explanation outside JSON):
     ];
 
     // Attach images for vision check if present
-    const imageParts = await Promise.all(imageUrls.slice(0, 3).map(imageToGeminiPart));
-    for (const part of imageParts) {
-      if (part) userParts.push(part);
+    for (const url of imageUrls.slice(0, 3)) {
+      userParts.push({ type: 'image_url', image_url: { url, detail: 'low' } });
     }
 
-    const response = await fetch(GEMINI_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': GEMINI_API_KEY },
-      body: JSON.stringify({
-        contents: [{ role: 'user', parts: userParts }],
-        generationConfig: { temperature: 0, responseMimeType: 'application/json' },
-      }),
-      signal: AbortSignal.timeout(30_000),
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [{ role: 'user', content: userParts }],
+      max_tokens: 120,
+      temperature: 0,
     });
-    if (!response.ok) throw new Error(`Gemini HTTP ${response.status}: ${await response.text()}`);
 
-    const body = await response.json() as {
-      candidates?: { content?: { parts?: { text?: string }[] } }[];
-    };
-    const raw = body.candidates?.[0]?.content?.parts?.map((p) => p.text ?? '').join('').trim() ?? '';
+    const raw = response.choices[0]?.message?.content?.trim() ?? '';
     // Strip markdown code fences if model wraps anyway
     const jsonStr = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
     const parsed = JSON.parse(jsonStr) as { allowed: boolean; reason?: string | null };
     return { allowed: !!parsed.allowed, reason: parsed.reason ?? undefined };
   } catch (err) {
-    console.error('[Gemini validate] error (fail open):', err);
-    return { allowed: true }; // fail open — don't block posts if Gemini is down
+    console.error('[OpenAI validate] error (fail open):', err);
+    return { allowed: true }; // fail open — don't block posts if OpenAI is down
   }
 }
 
@@ -280,8 +258,8 @@ export const createPost: RequestHandler = async (req: AuthRequest, res: Response
       }
     }
 
-    // ── Gemini second-layer: topic relevance + safety (all users including admin) ──
-    const aiCheck = await geminiValidate(content.trim(), topic, subTopic ?? null, imageList);
+    // ── OpenAI second-layer: topic relevance + safety (all users including admin) ──
+    const aiCheck = await openAIValidate(content.trim(), topic, subTopic ?? null, imageList);
     if (!aiCheck.allowed) {
       res.status(422).json({
         success: false,

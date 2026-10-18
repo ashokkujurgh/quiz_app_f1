@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-GEMINI_API_KEY      = os.getenv("GEMINI_API_KEY")
+OPENAI_API_KEY      = os.getenv("OPENAI_API_KEY")
 PINECONE_API_KEY    = os.getenv("PINECONE_API_KEY")
 
 # Service URLs
@@ -21,13 +21,13 @@ PINECONE_INDEX      = os.getenv("PINECONE_INDEX",   "meenzo-posts")
 PINECONE_CLOUD      = os.getenv("PINECONE_CLOUD",   "aws")
 PINECONE_REGION     = os.getenv("PINECONE_REGION",  "us-east-1")
 
-# Gemini models
-CHAT_MODEL          = os.getenv("GEMINI_CHAT_MODEL", "gemini-3.8-flash")
-# Tried in order when CHAT_MODEL is out of quota (free tier limits each model separately)
+# OpenAI models
+CHAT_MODEL          = os.getenv("OPENAI_CHAT_MODEL", "gpt-4o-mini")
+# Tried in order when CHAT_MODEL is rate-limited
 CHAT_FALLBACK_MODELS = [m.strip() for m in os.getenv(
-    "GEMINI_CHAT_FALLBACK_MODELS", "gemini-3.7-flash,gemini-3.6-flash,gemini-3.5-flash").split(",") if m.strip()]
-# Image models, tried in order (needs a billed Gemini API project — free tier has no image quota)
-IMAGE_MODELS        = os.getenv("GEMINI_IMAGE_MODELS", "gemini-3.1-flash-image,gemini-2.5-flash-image").split(",")
+    "OPENAI_CHAT_FALLBACK_MODELS", "gpt-4.1-mini").split(",") if m.strip()]
+# Last-resort image models (after OpenArt and Kie.ai), tried in order
+IMAGE_MODELS        = [m.strip() for m in os.getenv("OPENAI_IMAGE_MODELS", "gpt-image-1").split(",") if m.strip()]
 IMAGE_ENABLED       = os.getenv("IMAGE_GENERATION_ENABLED", "true").lower() == "true"
 
 # OpenArt CLI (tried first when the binary and a signed-in ~/.openart are present)
@@ -35,14 +35,14 @@ OPENART_ENABLED       = os.getenv("OPENART_ENABLED", "true").lower() == "true"
 OPENART_IMAGE_MODEL   = os.getenv("OPENART_IMAGE_MODEL", "nano-banana-2")
 OPENART_TIMEOUT       = int(os.getenv("OPENART_TIMEOUT_SECONDS", "300"))
 
-# Kie.ai image API (tried first when a key is set; Gemini image models are the fallback)
+# Kie.ai image API (tried after OpenArt; OpenAI image models are the last fallback)
 KIE_API_KEY         = os.getenv("KIE_API_KEY")
 KIE_API_URL         = os.getenv("KIE_API_URL",      "https://api.kie.ai")
 KIE_IMAGE_MODEL     = os.getenv("KIE_IMAGE_MODEL",  "google/nano-banana")
 KIE_TIMEOUT_SECONDS = int(os.getenv("KIE_TIMEOUT_SECONDS", "180"))
 
-# Embedding model (truncated to 1536-dim to match the Pinecone index)
-EMBED_MODEL         = "gemini-embedding-001"
+# Embedding model (1536-dim, matches the Pinecone index)
+EMBED_MODEL         = "text-embedding-3-small"
 EMBED_DIM           = 1536
 
 # Duplicate threshold — cosine similarity above this = already exists
