@@ -27,6 +27,8 @@ def save_question(
         "subTopic":      subtopic_id,
         "difficulty":    question.get("difficulty", "medium"),
     }
+    if question.get("isActive") is False:
+        payload["isActive"] = False   # saved pending admin approval
 
     for attempt in range(2):
         try:

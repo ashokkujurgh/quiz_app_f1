@@ -9,7 +9,7 @@ from topic_client import fetch_all_subtopics
 from generator import generate_question
 from rag_store import question_exists, upsert_question
 from question_client import save_question
-from config import SUBTOPICS_PER_RUN, QUESTIONS_PER_RUN, QUESTIONS_PER_DAY
+from config import SUBTOPICS_PER_RUN, QUESTIONS_PER_RUN, QUESTIONS_PER_DAY, EXCLUDED_TOPICS
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +45,8 @@ def run_agent() -> None:
         logger.warning("No active subtopics found. Skipping.")
         return
 
+    # Current affairs come only from the grounded, approval-gated pipeline — never from memory
+    subtopics = [s for s in subtopics if s["topicName"].strip().lower() not in EXCLUDED_TOPICS]
     logger.info("Total available subtopics: %d", len(subtopics))
     selected = random.sample(subtopics, min(SUBTOPICS_PER_RUN, len(subtopics)))
     logger.info("Processing %d subtopics: %s", len(selected), [s["name"] for s in selected])

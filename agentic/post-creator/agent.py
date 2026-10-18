@@ -35,6 +35,9 @@ def run_agent() -> None:
         logger.error("Could not fetch subtopics: %s", exc)
         return
 
+    # Current affairs have their own fact-checked, approval-gated pipeline — no posts from memory
+    subtopics = [s for s in subtopics if s.get("topicName", "").strip().lower() != "current affairs"]
+
     if not subtopics:
         logger.warning("No active subtopics found. Skipping.")
         return

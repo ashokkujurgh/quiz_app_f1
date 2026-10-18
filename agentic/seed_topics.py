@@ -47,6 +47,13 @@ TOPICS = [
         ],
     },
     {
+        "name": "Current Affairs",
+        "description": "Daily current affairs from official PIB releases, fact-checked and approved, for SSC, Banking, Police, State and Central Government exams.",
+        "subtopics": [
+            "Current Affairs",
+        ],
+    },
+    {
         "name": "Programming",
         "description": "Programming for Indian students and job seekers — Python, Java, DSA, SQL and web development for campus placements and IT jobs.",
         "subtopics": [

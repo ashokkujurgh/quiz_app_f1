@@ -273,6 +273,8 @@ export default function Questions() {
   const [filterSub, setFilterSub]       = useState('');
   const [filterDiff, setFilterDiff]     = useState('');
   const [search, setSearch]             = useState('');
+  // Pending approval = inactive questions (e.g. current-affairs questions awaiting review)
+  const [showPending, setShowPending]   = useState(false);
 
   // ── Data fetching ───────────────────────────────────────────────────────────
 
@@ -299,14 +301,16 @@ export default function Questions() {
       if (filterDiff)  params.set('difficulty', filterDiff);
       if (search)      params.set('search', search);
       params.set('limit', '100');
-      const { data } = await api.get(`/api/questions?${params}`);
+      const { data } = showPending
+        ? await api.get('/api/questions/pending?limit=200')
+        : await api.get(`/api/questions?${params}`);
       setQuestions(data.questions);
     } catch {
       setError('Failed to load questions.');
     } finally {
       setLoading(false);
     }
-  }, [filterTopic, filterSub, filterDiff, search]);
+  }, [filterTopic, filterSub, filterDiff, search, showPending]);
 
   useEffect(() => { fetchTopics(); }, [fetchTopics]);
   useEffect(() => { fetchQuestions(); }, [fetchQuestions]);
@@ -366,7 +370,9 @@ export default function Questions() {
   const handleToggle = async (q: Question) => {
     try {
       const { data } = await api.patch(`/api/questions/${q._id}`, { isActive: !q.isActive });
-      setQuestions((prev) => prev.map((x) => x._id === q._id ? data.question : x));
+      setQuestions((prev) => showPending && data.question.isActive
+        ? prev.filter((x) => x._id !== q._id)          // approved — no longer pending
+        : prev.map((x) => x._id === q._id ? data.question : x));
     } catch {
       setError('Failed to update status.');
     }
@@ -421,6 +427,18 @@ export default function Questions() {
 
       {/* Filters */}
       <div className="flex flex-wrap gap-3 mb-5">
+        <button
+          type="button"
+          onClick={() => setShowPending((v) => !v)}
+          className={`text-sm font-semibold rounded-xl px-3 py-2 border transition-colors ${
+            showPending
+              ? 'bg-amber-500 border-amber-500 text-white'
+              : 'bg-white border-gray-200 text-gray-700 hover:border-amber-400 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-200'
+          }`}
+          title="Inactive questions awaiting review, e.g. current affairs. Use Activate to approve."
+        >
+          {showPending ? '✓ Pending approval' : 'Pending approval'}
+        </button>
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}

@@ -10,9 +10,11 @@ import signal
 import sys
 from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.triggers.interval import IntervalTrigger
-from config import CRON_INTERVAL_MINUTES
+from apscheduler.triggers.cron import CronTrigger
+from config import CRON_INTERVAL_MINUTES, CA_RUN_IST
 from agent import run_agent
 from seed_topics import seed_topics
+from current_affairs import run_current_affairs
 
 logging.basicConfig(
     level=logging.INFO,
@@ -39,6 +41,19 @@ def main() -> None:
         replace_existing=True,
         max_instances=1,
     )
+
+    # Daily current-affairs questions (CA_RUN_IST, IST → UTC), saved pending approval
+    ca_h, ca_m = (int(x) for x in CA_RUN_IST.split(":"))
+    utc_h, utc_m = divmod((ca_h * 60 + ca_m - 330) % (24 * 60), 60)
+    scheduler.add_job(
+        run_current_affairs,
+        trigger=CronTrigger(hour=utc_h, minute=utc_m, timezone="UTC"),
+        id="current_affairs",
+        name=f"Current affairs @ {CA_RUN_IST} IST",
+        replace_existing=True,
+        max_instances=1,
+    )
+    logger.info("Scheduled current affairs @ %02d:%02d UTC (%s IST)", utc_h, utc_m, CA_RUN_IST)
 
     def _shutdown(signum, frame):
         logger.info("Shutting down scheduler…")

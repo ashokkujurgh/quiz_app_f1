@@ -85,6 +85,7 @@ export const createQuestion: RequestHandler = async (req: Request, res: Response
       topic,
       subTopic,
       difficulty,
+      isActive,
     } = req.body as {
       text?: string;
       description?: string;
@@ -93,6 +94,7 @@ export const createQuestion: RequestHandler = async (req: Request, res: Response
       topic?: string;
       subTopic?: string;
       difficulty?: Difficulty;
+      isActive?: boolean; // false = saved pending approval (e.g. current-affairs questions)
     };
 
     if (!text?.trim()) {
@@ -125,6 +127,7 @@ export const createQuestion: RequestHandler = async (req: Request, res: Response
       topic,
       subTopic: subTopic ?? null,
       difficulty: difficulty ?? 'medium',
+      ...(isActive === false && { isActive: false }),
     });
 
     res.status(201).json({ success: true, question });
@@ -229,5 +232,18 @@ export const getStats: RequestHandler = async (_req: Request, res: Response) => 
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: 'Failed to fetch stats.' });
+  }
+};
+
+// GET /api/questions/pending — admin only: inactive questions awaiting approval, newest first.
+// (The public list only ever returns active questions.)
+export const getPendingQuestions: RequestHandler = async (req: Request, res: Response) => {
+  try {
+    const limit = Math.min(200, Math.max(1, parseInt(String(req.query.limit ?? '100'), 10) || 100));
+    const questions = await Question.find({ isActive: false }).sort({ createdAt: -1 }).limit(limit).lean();
+    res.json({ success: true, questions, total: await Question.countDocuments({ isActive: false }) });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Failed to fetch pending questions.' });
   }
 };

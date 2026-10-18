@@ -37,5 +37,21 @@ CRON_INTERVAL_MINUTES = int(os.getenv("CRON_INTERVAL_MINUTES", "14"))
 QUESTIONS_PER_RUN = int(os.getenv("QUESTIONS_PER_RUN", "1"))
 SUBTOPICS_PER_RUN = 3
 
+# ── Current affairs (official PIB releases → pending approval) ─────────────────
+CA_TOPIC              = "Current Affairs"
+CA_SUBTOPIC           = "Current Affairs"
+CA_QUESTIONS_PER_DAY  = int(os.getenv("CA_QUESTIONS_PER_DAY", "10"))
+CA_MODEL              = os.getenv("CA_MODEL", "gpt-4.1")   # writes + verifies; accuracy matters most here
+CA_RUN_IST            = os.getenv("CA_RUN_IST", "18:00")   # after most of the day's releases
+# Topics the regular generator must never write from memory (they have their own grounded pipeline)
+EXCLUDED_TOPICS       = {CA_TOPIC.lower()}
+
+# Approval reminder email (same Hostinger account as the rest of Meenzo)
+APPROVAL_EMAIL_TO     = os.getenv("APPROVAL_EMAIL_TO", "")
+MAIL_USER             = os.getenv("MAIL_USER", "info@meenzo.com")
+MAIL_PASSWORD         = os.getenv("MAIL_PASSWORD")
+SMTP_HOST             = os.getenv("SMTP_HOST", "smtp.hostinger.com")
+SMTP_PORT             = int(os.getenv("SMTP_PORT", "465"))
+
 # How many existing questions to pass as RAG context (more = less repetition)
 RAG_CONTEXT_SIZE = 15
