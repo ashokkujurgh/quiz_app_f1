@@ -6,17 +6,19 @@ Post-creator agent:
 4. Fetch live news (Google News RSS) + Wikipedia background context
 5. Generate human-like post content for the chosen mode
 6. Embed title+content → check Pinecone for duplicates
-7. Save post to MongoDB via post-service (no image)
-8. Upsert embedding to Pinecone
+7. Generate a cover image (Gemini) and upload it to Spaces — optional, skipped on failure
+8. Save post to MongoDB via post-service
+9. Upsert embedding to Pinecone
 """
 import logging
 from topic_client import fetch_all_subtopics, pick_subtopics_with_priority
 from trending import fetch_trending_news, fetch_web_context, fetch_wikipedia_trending, match_trending_to_subtopic
-from generator import generate_post, pick_post_mode, pick_level, embed_text
+from generator import generate_post, pick_post_mode, pick_level, embed_text, generate_image
+from auth_client import upload_image
 from pinecone_client import post_exists, upsert_post
 from post_client import save_post
 from filter_client import is_content_allowed
-from config import POSTS_PER_RUN
+from config import POSTS_PER_RUN, IMAGE_ENABLED
 
 logger = logging.getLogger(__name__)
 
@@ -107,11 +109,22 @@ def run_agent() -> None:
             )
             continue
 
-        # 9. Save to MongoDB (no image)
+        # 9. Generate + upload a cover image (post is still saved if this fails)
+        image_url = None
+        if IMAGE_ENABLED:
+            image = generate_image(title, content, topic_name, subtopic_name)
+            if image:
+                image_url = upload_image(*image)
+                if image_url:
+                    logger.info("  Image uploaded: %s", image_url)
+            if not image_url:
+                logger.warning("  No image for '%s' — saving post without one.", subtopic_name)
+
+        # 10. Save to MongoDB
         post = save_post(
             title=title,
             content=content,
-            image_url=None,
+            image_url=image_url,
             topic_name=topic_name,
             subtopic_name=subtopic_name,
             seo=seo,
@@ -120,7 +133,7 @@ def run_agent() -> None:
             logger.error("MongoDB save failed for '%s'. Skipping Pinecone upsert.", subtopic_name)
             continue
 
-        # 10. Upsert to Pinecone
+        # 11. Upsert to Pinecone
         upsert_post(
             post_id=post["_id"],
             embedding=embedding,

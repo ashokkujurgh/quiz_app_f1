@@ -23,6 +23,9 @@ PINECONE_REGION     = os.getenv("PINECONE_REGION",  "us-east-1")
 
 # Gemini models
 CHAT_MODEL          = os.getenv("GEMINI_CHAT_MODEL", "gemini-3.8-flash")
+# Image models, tried in order (needs a billed Gemini API project — free tier has no image quota)
+IMAGE_MODELS        = os.getenv("GEMINI_IMAGE_MODELS", "gemini-3.1-flash-image,gemini-2.5-flash-image").split(",")
+IMAGE_ENABLED       = os.getenv("IMAGE_GENERATION_ENABLED", "true").lower() == "true"
 
 # Embedding model (truncated to 1536-dim to match the Pinecone index)
 EMBED_MODEL         = "gemini-embedding-001"

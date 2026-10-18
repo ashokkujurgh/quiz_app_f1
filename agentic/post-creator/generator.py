@@ -14,7 +14,7 @@ import json
 import random
 from google import genai
 from google.genai import types
-from config import GEMINI_API_KEY, CHAT_MODEL, EMBED_MODEL, EMBED_DIM
+from config import GEMINI_API_KEY, CHAT_MODEL, EMBED_MODEL, EMBED_DIM, IMAGE_MODELS
 from trending import INDIA_BIASED_SUBTOPICS, INDIA_50_SUBTOPICS, TRENDING_BIASED_SUBTOPICS
 
 logger = logging.getLogger(__name__)
@@ -359,6 +359,35 @@ def embed_text(text: str) -> list[float]:
     return resp.embeddings[0].values
 
 
-def generate_image(*args, **kwargs) -> None:
-    """Image generation is currently disabled."""
+def generate_image(title: str | None, content: str, topic_name: str, subtopic_name: str) -> tuple[bytes, str] | None:
+    """
+    Generate one cover image for a post. Returns (image_bytes, mime_type) or None.
+    Tries each model in IMAGE_MODELS; any failure just means the post goes out without an image.
+    """
+    prompt = (
+        f"A clean, modern editorial illustration to accompany a social post on a learning platform.\n"
+        f"Post title: {title or subtopic_name}\n"
+        f"Subject: {subtopic_name} ({topic_name})\n"
+        f"What the post is about: {content[:500]}\n\n"
+        "Style: bright, flat or semi-realistic illustration, visually explains the core idea, "
+        "suitable for all ages. Absolutely no text, letters, numbers, logos or watermarks in the image."
+    )
+    for model in IMAGE_MODELS:
+        model = model.strip()
+        try:
+            resp = _client.models.generate_content(
+                model=model,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    response_modalities=["IMAGE"],
+                    image_config=types.ImageConfig(aspect_ratio="16:9"),
+                ),
+            )
+            image = next((p.inline_data for p in resp.parts or [] if p.inline_data and p.inline_data.data), None)
+            if image:
+                logger.info("Image generated via %s (%d bytes)", model, len(image.data))
+                return image.data, image.mime_type or "image/png"
+            logger.warning("Image model %s returned no image.", model)
+        except Exception as exc:
+            logger.warning("Image generation failed with %s: %s", model, str(exc)[:200])
     return None
