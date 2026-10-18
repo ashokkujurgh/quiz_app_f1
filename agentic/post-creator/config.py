@@ -14,8 +14,10 @@ FILTER_API_URL      = os.getenv("FILTER_API_URL",   "http://localhost:5051")
 
 # Approval email — sent after each generated post (leave APPROVAL_EMAIL_TO empty to disable)
 APPROVAL_EMAIL_TO   = os.getenv("APPROVAL_EMAIL_TO", "")
-# The email's "Approve post" button opens <ADMIN_PANEL_URL>/approve/<post id>, prefilled with ADMIN_EMAIL
+# The email's "Approve post" button opens <ADMIN_PANEL_URL>/approve/<post id>, prefilled with APPROVER_EMAIL
+# (an admin account; separate from ADMIN_EMAIL, which the agents use to log in)
 ADMIN_PANEL_URL     = os.getenv("ADMIN_PANEL_URL",  "https://admin.meenzo.com")
+APPROVER_EMAIL      = os.getenv("APPROVER_EMAIL") or APPROVAL_EMAIL_TO
 MAIL_USER           = os.getenv("MAIL_USER",        "info@meenzo.com")
 MAIL_PASSWORD       = os.getenv("MAIL_PASSWORD")
 SMTP_HOST           = os.getenv("SMTP_HOST",        "smtp.hostinger.com")

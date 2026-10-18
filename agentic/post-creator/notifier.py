@@ -9,7 +9,7 @@ import ssl
 from email.message import EmailMessage
 from urllib.parse import quote
 from config import (
-    APPROVAL_EMAIL_TO, MAIL_USER, MAIL_PASSWORD, SMTP_HOST, SMTP_PORT, ADMIN_PANEL_URL, ADMIN_EMAIL,
+    APPROVAL_EMAIL_TO, MAIL_USER, MAIL_PASSWORD, SMTP_HOST, SMTP_PORT, ADMIN_PANEL_URL, APPROVER_EMAIL,
 )
 
 logger = logging.getLogger(__name__)
@@ -38,7 +38,7 @@ def send_approval_email(
     words   = len(content.split())
     region_label = "India" if region == "india" else "World"
     # Opens the admin approve page: email is filled in, the reviewer types the password
-    approve_url  = f"{ADMIN_PANEL_URL.rstrip('/')}/approve/{post.get('_id')}?email={quote(ADMIN_EMAIL)}"
+    approve_url  = f"{ADMIN_PANEL_URL.rstrip('/')}/approve/{post.get('_id')}?email={quote(APPROVER_EMAIL)}"
 
     msg = EmailMessage()
     msg["Subject"] = f"Reminder: new post waiting for approval — {heading[:80]}"
