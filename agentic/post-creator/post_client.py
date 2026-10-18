@@ -38,6 +38,7 @@ def save_post(
     if image_url:
         payload["image"]  = image_url
         payload["images"] = [image_url]
+        payload["isAiImage"] = True  # agent images always come from an image model
 
     try:
         resp = requests.post(

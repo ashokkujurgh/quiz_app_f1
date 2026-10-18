@@ -148,7 +148,7 @@ function CreatePostModal({
   const [imageFiles, setImageFiles]         = useState<File[]>([]);
   const [uploading, setUploading]           = useState(false);
   const [nsfwChecking, setNsfwChecking]     = useState(false);
-  const [isAiImage, setIsAiImage]           = useState(false);
+  const [isAiImage, setIsAiImage]           = useState(true); // checked by default — untick for real photos
   const nsfwModel = useRef<Awaited<ReturnType<typeof nsfwjs.load>> | null>(null);
   const [selectedTopicId, setSelectedTopicId]   = useState(topics[0]?._id ?? '');
   const [selectedTopicName, setSelectedTopicName] = useState(topics[0]?.name ?? '');
