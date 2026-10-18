@@ -7,6 +7,10 @@ RUN npm ci
 
 COPY . .
 
+# Empty = same origin (API and socket go through this container's nginx)
+ARG VITE_API_URL=""
+ENV VITE_API_URL=$VITE_API_URL
+
 RUN npm run build
 
 FROM nginx:alpine AS runner
