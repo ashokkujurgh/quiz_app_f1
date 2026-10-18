@@ -12,9 +12,14 @@ Each post also gets a reading level, independent of mode:
 import logging
 import json
 import random
+import time
+import requests
 from google import genai
 from google.genai import types
-from config import GEMINI_API_KEY, CHAT_MODEL, EMBED_MODEL, EMBED_DIM, IMAGE_MODELS
+from config import (
+    GEMINI_API_KEY, CHAT_MODEL, EMBED_MODEL, EMBED_DIM, IMAGE_MODELS,
+    KIE_API_KEY, KIE_API_URL, KIE_IMAGE_MODEL, KIE_TIMEOUT_SECONDS,
+)
 from trending import INDIA_BIASED_SUBTOPICS, INDIA_50_SUBTOPICS, TRENDING_BIASED_SUBTOPICS
 
 logger = logging.getLogger(__name__)
@@ -359,10 +364,55 @@ def embed_text(text: str) -> list[float]:
     return resp.embeddings[0].values
 
 
+def _kie_generate_image(prompt: str) -> tuple[bytes, str] | None:
+    """Create a Kie.ai image task, poll until it finishes, and download the result."""
+    headers = {"Authorization": f"Bearer {KIE_API_KEY}", "Content-Type": "application/json"}
+    resp = requests.post(
+        f"{KIE_API_URL}/api/v1/jobs/createTask",
+        headers=headers,
+        json={
+            "model": KIE_IMAGE_MODEL,
+            "input": {"prompt": prompt, "output_format": "png", "aspect_ratio": "16:9"},
+        },
+        timeout=30,
+    )
+    body = resp.json()
+    # Kie returns HTTP 200 even on errors — the real status is in body["code"]
+    if body.get("code") != 200:
+        raise RuntimeError(f"createTask failed: {body.get('code')} {body.get('msg')}")
+    task_id = body["data"]["taskId"]
+
+    deadline, delay = time.time() + KIE_TIMEOUT_SECONDS, 3
+    while time.time() < deadline:
+        time.sleep(delay)
+        delay = min(delay + 2, 10)
+        info = requests.get(
+            f"{KIE_API_URL}/api/v1/jobs/recordInfo",
+            headers=headers, params={"taskId": task_id}, timeout=30,
+        ).json()
+        data = info.get("data") or {}
+        state = data.get("state")
+        if state == "success":
+            urls = json.loads(data.get("resultJson") or "{}").get("resultUrls") or []
+            if not urls:
+                raise RuntimeError(f"task {task_id} succeeded without resultUrls")
+            # Kie keeps files for only 14 days — download so we can re-host on Spaces
+            img = requests.get(urls[0], timeout=60)
+            img.raise_for_status()
+            mime = img.headers.get("content-type", "image/png").split(";")[0]
+            logger.info("Image generated via Kie.ai %s (task %s, %s credits)",
+                        KIE_IMAGE_MODEL, task_id, data.get("creditsConsumed"))
+            return img.content, mime
+        if state == "fail":
+            raise RuntimeError(f"task {task_id} failed: {data.get('failCode')} {data.get('failMsg')}")
+    raise TimeoutError(f"task {task_id} not finished after {KIE_TIMEOUT_SECONDS}s")
+
+
 def generate_image(title: str | None, content: str, topic_name: str, subtopic_name: str) -> tuple[bytes, str] | None:
     """
     Generate one cover image for a post. Returns (image_bytes, mime_type) or None.
-    Tries each model in IMAGE_MODELS; any failure just means the post goes out without an image.
+    Tries Kie.ai first (when KIE_API_KEY is set), then each Gemini model in IMAGE_MODELS;
+    any failure just means the post goes out without an image.
     """
     prompt = (
         f"A clean, modern editorial illustration to accompany a social post on a learning platform.\n"
@@ -372,6 +422,11 @@ def generate_image(title: str | None, content: str, topic_name: str, subtopic_na
         "Style: bright, flat or semi-realistic illustration, visually explains the core idea, "
         "suitable for all ages. Absolutely no text, letters, numbers, logos or watermarks in the image."
     )
+    if KIE_API_KEY:
+        try:
+            return _kie_generate_image(prompt)
+        except Exception as exc:
+            logger.warning("Kie.ai image generation failed: %s", str(exc)[:200])
     for model in IMAGE_MODELS:
         model = model.strip()
         try:
