@@ -448,12 +448,17 @@ def generate_image(title: str | None, content: str, topic_name: str, subtopic_na
     any failure just means the post goes out without an image.
     """
     prompt = (
-        f"A clean, modern editorial illustration to accompany a social post on a learning platform.\n"
+        f"A photorealistic editorial news photograph to accompany a social post on a learning platform.\n"
         f"Post title: {title or subtopic_name}\n"
         f"Subject: {subtopic_name} ({topic_name})\n"
         f"What the post is about: {content[:500]}\n\n"
-        "Style: bright, flat or semi-realistic illustration, visually explains the core idea, "
-        "suitable for all ages. Absolutely no text, letters, numbers, logos or watermarks in the image."
+        "Show one concrete, real-world scene that a photojournalist could actually have photographed for "
+        "this story — real places, real objects, real people at work (in India when the story is set in India). "
+        "Style: professional DSLR photograph, 35mm lens, natural light, true-to-life colours and textures, "
+        "realistic proportions, shallow depth of field, documentary / National Geographic quality. "
+        "Keep the main subject centred with space around it (the image is cropped to a wide banner in the feed). "
+        "NOT an illustration, cartoon, 3D render, infographic, diagram, map or collage. "
+        "No text, letters, numbers, signs, logos or watermarks anywhere in the image."
     )
     if _openart_available():
         try:
