@@ -65,6 +65,8 @@ services:
       - "127.0.0.1:5050:5050"
     environment:
       FILTER_API_URL: http://post-filter:5100
+      QUIZ_API_URL: http://quiz-service:4005
+      QUESTION_API_URL: http://question-service:4003
     volumes:
       - /root/.openart:/root/.openart   # OpenArt CLI sign-in (rw: the CLI refreshes its token)
 

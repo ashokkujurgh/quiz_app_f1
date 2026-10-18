@@ -483,6 +483,11 @@ def generate_image(title: str | None, content: str, topic_name: str, subtopic_na
         "NOT an illustration, cartoon, 3D render, infographic, diagram, map or collage. "
         "No text, letters, numbers, signs, logos or watermarks anywhere in the image."
     )
+    return generate_image_from_prompt(prompt)
+
+
+def generate_image_from_prompt(prompt: str) -> tuple[bytes, str] | None:
+    """Run an image prompt through the provider chain: OpenArt → Kie.ai → OpenAI. None if all fail."""
     if _openart_available():
         try:
             return _openart_generate_image(prompt)

@@ -11,6 +11,21 @@ TOPIC_API_URL       = os.getenv("TOPIC_API_URL",    "http://localhost:4002")
 POST_API_URL        = os.getenv("POST_API_URL",     "http://localhost:4004")
 AUTH_API_URL        = os.getenv("AUTH_API_URL",     "http://localhost:4001")
 FILTER_API_URL      = os.getenv("FILTER_API_URL",   "http://localhost:5051")
+QUIZ_API_URL        = os.getenv("QUIZ_API_URL",     "http://localhost:4005")
+QUESTION_API_URL    = os.getenv("QUESTION_API_URL", "http://localhost:4003")
+
+# ── Daily games ───────────────────────────────────────────────────────────────
+# Every day: one game per subtopic for topics in GAMES_PER_SUBTOPIC_TOPICS, and one
+# game covering all subtopics for every other topic. Open GAME_START → GAME_END (IST).
+DAILY_GAMES_ENABLED        = os.getenv("DAILY_GAMES_ENABLED", "true").lower() == "true"
+GAMES_PER_SUBTOPIC_TOPICS  = [t.strip().lower() for t in os.getenv("GAMES_PER_SUBTOPIC_TOPICS", "engineering").split(",") if t.strip()]
+GAME_QUESTIONS             = int(os.getenv("GAME_QUESTIONS", "20"))
+# If a category has fewer than GAME_QUESTIONS questions, run a shorter game if at least this many exist
+GAME_MIN_QUESTIONS         = int(os.getenv("GAME_MIN_QUESTIONS", "10"))
+GAME_START_IST             = os.getenv("GAME_START_IST", "08:00")
+GAME_END_IST               = os.getenv("GAME_END_IST",   "20:00")
+# Games for the day are prepared at this time (IST), before they open
+GAME_PREPARE_IST           = os.getenv("GAME_PREPARE_IST", "07:00")
 
 # Approval email — sent after each generated post (leave APPROVAL_EMAIL_TO empty to disable)
 APPROVAL_EMAIL_TO   = os.getenv("APPROVAL_EMAIL_TO", "")

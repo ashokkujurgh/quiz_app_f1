@@ -1,8 +1,10 @@
 """
 Post-creator entry point.
 - Scheduler: runs agent at 07:00 and 19:00 IST (01:30 and 13:30 UTC) every day.
-- HTTP server: POST /trigger  — manually trigger a run
-               GET  /health   — liveness check
+- Daily games: prepared at GAME_PREPARE_IST (07:00 IST), open 08:00–20:00 IST.
+- HTTP server: POST /trigger        — manually trigger a post run
+               POST /trigger-games  — manually create today's (or tomorrow's) games
+               GET  /health         — liveness check
 Run: python main.py
 """
 import logging
@@ -13,8 +15,9 @@ import threading
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from flask import Flask, jsonify
-from config import CRON_SCHEDULE_UTC
+from config import CRON_SCHEDULE_UTC, DAILY_GAMES_ENABLED, GAME_PREPARE_IST
 from agent import run_agent
+from daily_games import run_daily_games
 
 logging.basicConfig(
     level=logging.INFO,
@@ -48,6 +51,22 @@ def trigger():
     return jsonify({"status": "started", "message": "Post-creator agent triggered"}), 202
 
 
+_games_lock = threading.Lock()
+
+
+@app.post("/trigger-games")
+def trigger_games():
+    if not _games_lock.acquire(blocking=False):
+        return jsonify({"status": "busy", "message": "Daily games are already being created"}), 409
+    def _run():
+        try:
+            run_daily_games()
+        finally:
+            _games_lock.release()
+    threading.Thread(target=_run, daemon=True).start()
+    return jsonify({"status": "started", "message": "Daily games creation triggered"}), 202
+
+
 # ── Scheduler + main ───────────────────────────────────────────────────────────
 
 def main() -> None:
@@ -69,6 +88,21 @@ def main() -> None:
             hour, minute, ist_h, ist_m,
         )
 
+    if DAILY_GAMES_ENABLED:
+        # GAME_PREPARE_IST (e.g. "07:00") → UTC
+        ist_h, ist_m = (int(x) for x in GAME_PREPARE_IST.split(":"))
+        total = (ist_h * 60 + ist_m - 330) % (24 * 60)
+        utc_h, utc_m = divmod(total, 60)
+        scheduler.add_job(
+            run_daily_games,
+            trigger=CronTrigger(hour=utc_h, minute=utc_m, timezone="UTC"),
+            id="daily_games",
+            name=f"Daily games @ {utc_h:02d}:{utc_m:02d} UTC ({GAME_PREPARE_IST} IST)",
+            replace_existing=True,
+            max_instances=1,
+        )
+        logger.info("Scheduled daily games @ %02d:%02d UTC  (%s IST)", utc_h, utc_m, GAME_PREPARE_IST)
+
     def _shutdown(signum, frame):
         logger.info("Shutting down…")
         scheduler.shutdown(wait=False)
@@ -80,8 +114,8 @@ def main() -> None:
     scheduler.start()
     logger.info("Scheduler started.")
 
-    # Run once on startup
-    threading.Thread(target=run_agent, daemon=True).start()
+    # No run on startup: posts are created only on schedule (or via POST /trigger),
+    # so redeploys don't generate extra posts.
 
     port = int(os.getenv("PORT", 5050))
     logger.info("HTTP server listening on port %d", port)
