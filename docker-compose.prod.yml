@@ -1,0 +1,68 @@
+# Production overrides for the meenzo.com server.
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# All ports bind to 127.0.0.1 only — public traffic reaches the stack through
+# the host nginx (meenzo.com → 7203, admin.meenzo.com → 7204).
+
+x-origins: &origins
+  ALLOWED_ORIGINS: https://meenzo.com,https://www.meenzo.com,https://admin.meenzo.com
+
+services:
+  rabbitmq:
+    ports: !override
+      - "127.0.0.1:7200:5672"
+      - "127.0.0.1:7201:15672"
+
+  auth-service:
+    ports: !override
+      - "127.0.0.1:7202:4001"
+    environment:
+      CLIENT_URL: https://meenzo.com
+      ADMIN_URL: https://admin.meenzo.com
+      FRONTEND_URL: https://meenzo.com
+
+  topic-service:
+    ports: !override
+      - "127.0.0.1:7205:4002"
+    environment: *origins
+
+  post-filter:
+    ports: !override
+      - "127.0.0.1:5100:5100"
+
+  post-service:
+    ports: !override
+      - "127.0.0.1:7207:4004"
+    environment: *origins
+
+  question-service:
+    ports: !override
+      - "127.0.0.1:7206:4003"
+    environment: *origins
+
+  quiz-service:
+    ports: !override
+      - "127.0.0.1:7208:4005"
+    environment: *origins
+
+  post-creator:
+    ports: !override
+      - "127.0.0.1:5050:5050"
+
+  admin:
+    ports: !override
+      - "127.0.0.1:7204:80"
+
+  frontend:
+    ports: !override
+      - "127.0.0.1:7203:80"
+
+  friend-service:
+    ports: !override
+      - "127.0.0.1:7209:4006"
+    environment: *origins
+
+  message-service:
+    ports: !override
+      - "127.0.0.1:7210:4007"
+    environment: *origins
