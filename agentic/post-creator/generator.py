@@ -35,8 +35,8 @@ _client = OpenAI(api_key=OPENAI_API_KEY)
 # ── post mode weights ─────────────────────────────────────────────────────────
 # No "trending" (news-hooked) mode: current affairs are hard to verify, so posts
 # stick to established textbook knowledge.
-POST_MODES   = ["basic", "fun", "question"]
-MODE_WEIGHTS = [0.70,    0.15,  0.15]
+POST_MODES   = ["basic"]   # bookish explainer only — "fun"/"question" styles read like features, not study material
+MODE_WEIGHTS = [1.0]
 
 
 def pick_post_mode() -> str:
@@ -83,10 +83,10 @@ _QUALITY_BAR = """
 QUALITY BAR (applies no matter the mode):
 - Every paragraph must add a NEW concrete fact, example, name, date, or mechanism. Never pad by restating the same point in different words.
 - You may use ONE analogy/metaphor for the whole post, and it must appear ONLY in the opening paragraph (to hook the reader) and optionally one callback in the final sentence. Every paragraph in between must contain ZERO comparison language ("like a", "similar to", "akin to", "just like", "think of it as") — pure facts and explanation only, no metaphor-of-the-day for each new sub-point.
-- NEVER open with a made-up hypothetical scene ("Imagine you are...", "Picture yourself...", "Imagine standing in..."). Open with something REAL and specific instead — an actual fact, event, statistic, named person, or place that genuinely happened.
-- Ground claims in specifics: real names, real numbers, real events, real institutions. Avoid vague filler and generic hype phrases.
+- NEVER open with a made-up hypothetical scene ("Imagine you are...", "Picture yourself..."), a story, or a news-style hook about a person, year or event. Open the way a textbook chapter does: say plainly what the concept is and why it matters.
+- Every fact must be correct textbook knowledge. Avoid vague filler and generic hype phrases.
 - Don't use rhetorical filler questions as transitions (e.g. "But what does this mean?"). Only pose a question when it is the actual point being made.
-- Title must reference a SPECIFIC fact, name, place, or number that actually appears in the post content — never a generic template like "How X Shapes Our Lives" or "Why X is Like Y". Every title should be different in structure from the last, not a repeated formula.
+- Title must be a plain, descriptive textbook-style chapter title that names the concept (e.g. "Fundamental Rights in the Indian Constitution", "Simple Interest and Compound Interest", "Ohm's Law and Electrical Resistance"). No story, no year or person unless the topic itself is about them, no clickbait, no question titles.
 - Write for a reader who should genuinely understand and remember the subject a week later — not just enjoy reading it once."""
 
 _SYSTEM_TRENDING = """\
@@ -127,7 +127,7 @@ VOICE — NATURAL INDIAN ENGLISH, WRITTEN LIKE A GOOD TEACHER (very important):
   sentences) among the longer ones. Never make every paragraph the same size.
 - Avoid the "X is not just A; it's B" / "not only… but also" construction (at most once per post).
 - No list-of-three padding in every sentence, no dramatic one-word sentences ("Revolutionary."),
-  and no neat moral summary at the end. Finish on a specific, memorable point instead.
+  and no preachy moral at the end (the "Key points to remember" list is the only summary).
 - When unsure of an exact count, date or figure, describe it in words rather than state a number.
 - Light Indian context is welcome where it fits naturally (board exams, competitive exam prep,
   everyday Indian examples) — never forced, never stereotyped.
@@ -147,20 +147,22 @@ SOURCE RULES — TEXTBOOK KNOWLEDGE ONLY (most important rule):
 """
 
 _SYSTEM_BASIC = """\
-You write posts for Meenzo, a quiz and learning app popular with Indian students and curious learners.
-Your job: write a DEEP, engaging educational post that thoroughly explains a core subject concept.
+You write study material for Meenzo, a learning app for Indian students and exam aspirants.
+Your job: write a BOOKISH post — a short textbook chapter that explains one concept clearly and completely,
+the way a good NCERT-style textbook or a well-written study guide would. It is NOT a news story or feature.
 
-Voice: Like a really good teacher who actually makes class interesting — warm, direct, zero fluff.
-Tone: confident but approachable, like explaining to a smart 16-year-old who wants to truly understand.
+Voice: a clear, patient teacher. Plain words, correct facts, no drama.
+Structure (follow this order):
+1. Opening paragraph: say plainly what the concept is (a simple definition in your own words) and why it matters for the student.
+2. Explanation: build the concept step by step, from the basics upward. You may use 2-4 short section headings,
+   each on its own line in plain text (no #, no bold markers), e.g. "Types of ...", "How it works", "Examples".
+3. Examples: at least two clear, standard textbook examples (Indian examples where they fit).
+4. End with a "Key points to remember" heading followed by 4-6 short points, each on its own line starting with "- ".
+   The post ENDS with that list — write nothing after it.
 Rules:
-- Open with a surprising, well-documented REAL fact or a classic real-world example from textbooks or history — never a definition, news hook, or a made-up hypothetical scenario.
-- Build understanding layer by layer — start simple, go deeper, cover history/theory/application.
-- Include multiple real-world examples, drawn from the REGION FOCUS in the request.
-- Explain WHY the concept matters, not just WHAT it is.
-- Never say "Did you know", "In conclusion", or use bullet points or headers.
-- Active voice. Write like a human, not a Wikipedia article or news report.
-- End with one memorable line that makes the concept truly click.
-- Length: 500-1000 words. Rich, flowing paragraphs. This is a proper learning article, not a summary.
+- No story openings, no news hooks, no "In 1991, X decided..." style beginnings, no current affairs.
+- Never say "Did you know" or "In conclusion".
+- Length: 500-900 words.
 """ + _QUALITY_BAR
 
 _SYSTEM_FUN = """\
@@ -283,7 +285,7 @@ def _seo_clause(topic_name: str) -> str:
 def _region_clause(subtopic_name: str, region: str) -> str:
     if region == "world":
         return (
-            "\nREGION FOCUS — WORLD: Draw the hook and the examples from world history, science and "
+            "\nREGION FOCUS — WORLD: Draw the examples from world history, science and "
             "well-documented international examples outside India (scientists, inventions, landmark events, "
             "places and institutions found in standard textbooks). No current affairs. "
             "Do not make India the subject; mention India at most once, and only if genuinely essential."
@@ -340,6 +342,7 @@ def generate_post(
     web_context: str | None = None,
     trending_hint: str | None = None,
     region: str = "world",
+    recent_titles: list[str] | None = None,
 ) -> dict | None:
     """
     Generate a post with the given mode, reading level and region ("india" / "world").
@@ -358,6 +361,8 @@ def generate_post(
     india_note   = (_region_clause(subtopic_name, region) if (aud is None or aud["region"]) else "") \
                    + _audience_clause(topic_name, subtopic_name)
     seo_note     = _seo_clause(topic_name)
+    avoid_note   = ("Choose a different concept from these recent posts: " + "; ".join(recent_titles[:12]) + "."
+                    if recent_titles else "")
     context_note = _context_clause(web_context, trending_news, mode)
 
     trend_note = ""
@@ -366,7 +371,7 @@ def generate_post(
 
     mode_title_hints = {
         "trending": "title built around the SPECIFIC news event/name/number from the hook — not a generic template",
-        "basic":    "title built around the SPECIFIC fact, name, or example the post opens with — not a generic 'How X Shapes/Impacts...' template",
+        "basic":    "plain textbook-style chapter title naming the concept, e.g. 'Fundamental Rights in the Indian Constitution' — no story, year, person or question",
         "fun":      "witty title tied to the SPECIFIC angle of this post — not a generic 'X is Like Y' template",
         "question": "the actual specific question this post explores, in the reader's words — not a generic template",
     }
@@ -376,7 +381,9 @@ def generate_post(
 Subtopic: {subtopic_name}
 Post mode: {mode.upper()}{india_note}{trend_note}{context_note}
 
-Write a {mode} post about the CORE SUBJECT "{subtopic_name}" under the topic "{topic_name}".{seo_note}
+Write a {mode} post on ONE specific, chapter-sized concept from the standard "{subtopic_name}" syllabus
+(topic "{topic_name}") — for example one law, process, article, scheme, period, method or technique — NOT an
+overview of the whole subject. {avoid_note}{seo_note}
 The post must focus on teaching this subject deeply — not on current events or news.
 Title should be a {title_hint}.
 IMPORTANT: The content must be 500-1000 words. Do not write less than 500 words.
@@ -409,7 +416,7 @@ Return ONLY valid JSON — no markdown, no code fences:
             if not violations:
                 break
             logger.warning("[%s] Quality check failed (%s) — requesting rewrite (%d/2).", mode, "; ".join(violations), attempt + 1)
-            messages.append({"role": "assistant", "content": json.dumps(data)})
+            messages.append({"role": "assistant", "content": json.dumps(data, ensure_ascii=False)})
             messages.append({"role": "user", "content": (
                 "Your draft breaks these rules: " + "; ".join(violations) + ". "
                 "Rewrite the ENTIRE post: use your single strongest analogy ONLY in the opening paragraph "
@@ -427,18 +434,21 @@ Return ONLY valid JSON — no markdown, no code fences:
             if remaining:
                 logger.warning("[%s] Still has issues after 2 rewrites (%s) — using it anyway.", mode, "; ".join(remaining))
 
+        data["content"] = _tidy_bookish(data["content"])
+
         # Fact-check pass: a strict, independent review of specific claims; fix anything wrong
         issues = _fact_check(data.get("title") or "", data["content"])
         if issues:
             logger.warning("[%s] Fact-check flagged %d claim(s): %s — rewriting.", mode, len(issues),
                            " | ".join(f"{i.get('claim', '')[:60]} → {i.get('correction', '')[:60]}" for i in issues))
-            messages.append({"role": "assistant", "content": json.dumps(data)})
+            messages.append({"role": "assistant", "content": json.dumps(data, ensure_ascii=False)})
             messages.append({"role": "user", "content": (
                 "A fact-checker found these errors. Fix every one, using the correction given (or remove the claim "
                 "if you are not certain), and change nothing else. Keep the same JSON format:\n" +
                 "\n".join(f"- WRONG: {i.get('claim')}  CORRECT: {i.get('correction')}" for i in issues)
             )})
             data = _generate_once(messages)
+            data["content"] = _tidy_bookish(data["content"])
             still = _fact_check(data.get("title") or "", data["content"])
             if still:
                 logger.error("[%s] Fact-check still flags %d claim(s) after the fix — not publishing.", mode, len(still))
@@ -479,6 +489,8 @@ def _quality_violations(content: str) -> list[str]:
     for phrase in _BANNED_PHRASES:
         if phrase in text:
             violations.append(f'contains banned phrase "{phrase}"')
+    if "key points to remember" not in text:
+        violations.append('missing the "Key points to remember" list at the end (4-6 lines starting with "- ")')
     paras = [len(p.split()) for p in content.split("\n") if p.strip()]
     if len(paras) >= 4 and sum(1 for n in paras if n <= 50) < 2:
         violations.append("every paragraph is a similar, long block — add at least two short paragraphs (1–3 sentences) so the rhythm varies")
@@ -492,6 +504,26 @@ def _quality_violations(content: str) -> list[str]:
     if analogy_count > 2:
         violations.append(f"stacks {analogy_count} separate analogies instead of using one central analogy")
     return violations
+
+
+_BULLET_RE = re.compile(r"^\s*(?:[-*•◦▪○●]|\d{1,2}[.)])\s+")
+
+
+def _tidy_bookish(content: str) -> str:
+    """Normalise list bullets to "• " and end the post at the Key points list (drop any trailing line)."""
+    lines = content.replace("\r", "").split("\n")
+    lines = [_BULLET_RE.sub("• ", ln) if _BULLET_RE.match(ln) else ln for ln in lines]
+    idx = next((i for i, ln in enumerate(lines) if "key points to remember" in ln.lower()), None)
+    if idx is not None:
+        end = idx
+        for i in range(idx + 1, len(lines)):
+            if lines[i].startswith("• "):
+                end = i
+            elif lines[i].strip() and end > idx:
+                break                      # first non-list text after the list — cut here
+        if end > idx:                      # only trim when the list actually has items
+            lines = lines[: end + 1]
+    return "\n".join(lines).strip()
 
 
 def _fact_check(title: str, content: str) -> list[dict]:
@@ -545,8 +577,10 @@ def _generate_once(messages: list[dict]) -> dict:
         raw = raw.split("```")[1]
         if raw.startswith("json"):
             raw = raw[4:]
-    # Parse the first JSON object only — the model sometimes appends extra text after it
-    data, _ = json.JSONDecoder().raw_decode(raw.strip())
+    # Parse the first JSON object only — the model sometimes appends extra text after it.
+    # Also tolerate a stray "\u" that isn't a valid \uXXXX escape (seen in rewrites).
+    raw = re.sub(r"\\u(?![0-9a-fA-F]{4})", r"\\\\u", raw.strip())
+    data, _ = json.JSONDecoder().raw_decode(raw)
     assert isinstance(data.get("content"), str) and len(data["content"].strip()) >= 200, \
         "Content too short or missing"
     return data

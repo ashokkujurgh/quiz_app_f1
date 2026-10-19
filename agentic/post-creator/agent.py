@@ -12,6 +12,8 @@ Post-creator agent:
 10. Upsert embedding to Pinecone
 """
 import logging
+import random
+import requests
 from topic_client import fetch_all_subtopics, pick_subtopics_with_priority
 from trending import fetch_web_context
 from generator import generate_post, pick_post_mode, pick_level, pick_region, embed_text, generate_image
@@ -20,9 +22,42 @@ from pinecone_client import post_exists, upsert_post
 from post_client import save_post
 from filter_client import is_content_allowed
 from notifier import send_approval_email
-from config import POSTS_PER_RUN, IMAGE_ENABLED
+from config import POSTS_PER_RUN, IMAGE_ENABLED, POST_API_URL
 
 MAX_RETRIES = 2  # other subjects to try when a post is rejected
+
+# Subject mix: 70% non-engineering (high-school level), 30% engineering (Engineering + Programming)
+ENGINEERING_TOPICS = {"engineering", "programming"}
+NON_ENGINEERING_SHARE = 0.70
+
+
+def _recent_titles(subtopic_name: str) -> list[str]:
+    """Recent post titles for this subtopic, so the next post covers a different concept."""
+    try:
+        r = requests.get(f"{POST_API_URL}/api/posts", params={"subTopic": subtopic_name, "limit": 12}, timeout=15)
+        return [p["title"] for p in r.json().get("posts", []) if p.get("title")]
+    except Exception:
+        return []
+
+
+def _is_engineering(subtopic: dict) -> bool:
+    return subtopic.get("topicName", "").strip().lower() in ENGINEERING_TOPICS
+
+
+def _pick_candidates(subtopics: list[dict], n: int) -> list[dict]:
+    """n distinct subtopics, each drawn 70/30 from the non-engineering / engineering pools."""
+    pools = {False: [s for s in subtopics if not _is_engineering(s)],
+             True:  [s for s in subtopics if _is_engineering(s)]}
+    for pool in pools.values():
+        random.shuffle(pool)
+    picked: list[dict] = []
+    for _ in range(n):
+        want_eng = random.random() >= NON_ENGINEERING_SHARE
+        pool = pools[want_eng] or pools[not want_eng]
+        if not pool:
+            break
+        picked.append(pool.pop())
+    return picked
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +82,7 @@ def run_agent() -> None:
     # 2. Pick with diversity
     # Extra candidates: if a post is rejected (e.g. by the fact-check), try another subject
     # so the run still delivers POSTS_PER_RUN posts.
-    selected = pick_subtopics_with_priority(subtopics, POSTS_PER_RUN + MAX_RETRIES)
+    selected = _pick_candidates(subtopics, POSTS_PER_RUN + MAX_RETRIES)
     logger.info("Candidates (%d needed): %s", POSTS_PER_RUN, [s["name"] for s in selected])
     created = 0
 
@@ -59,7 +94,8 @@ def run_agent() -> None:
 
         # 4. Pick post mode + reading level + region (60% India / 40% world)
         mode   = pick_post_mode()
-        level  = pick_level()
+        # Non-engineering posts are written at high-school level; engineering keeps the foundation/advanced mix
+        level  = pick_level() if _is_engineering(subtopic) else "foundation"
         region = pick_region()
         logger.info("Processing: %s > %s  [mode=%s, level=%s, region=%s]", topic_name, subtopic_name, mode, level, region)
 
@@ -74,6 +110,7 @@ def run_agent() -> None:
             mode=mode,
             level=level,
             web_context=web_context or None,
+            recent_titles=_recent_titles(subtopic_name),
             region=region,
         )
         if not generated:
