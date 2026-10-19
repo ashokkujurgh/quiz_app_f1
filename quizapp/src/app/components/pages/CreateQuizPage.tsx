@@ -354,7 +354,8 @@ export function CreateQuizPage() {
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: 'background.default' }}>
       <Navbar onMenuToggle={() => {}} />
-      <Box sx={{ pt: '64px', maxWidth: 760, mx: 'auto', width: '100%', p: { xs: 2, md: 3 } }}>
+      {/* p first, then pt — the other way round, p wipes the 64px clearance and the header covers the back button */}
+      <Box sx={{ maxWidth: 760, mx: 'auto', width: '100%', p: { xs: 2, md: 3 }, pt: { xs: 'calc(64px + 16px)', md: 'calc(64px + 24px)' } }}>
 
         {/* Header */}
         <Stack direction="row" spacing={1.5} alignItems="center" mb={3}>
