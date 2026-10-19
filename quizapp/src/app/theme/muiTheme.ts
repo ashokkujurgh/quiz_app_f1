@@ -120,6 +120,17 @@ const getDesignTokens = (mode: ThemeMode): ThemeOptions => ({
         },
       },
     },
+    // Tab rows scroll sideways on narrow screens instead of cutting off the last tabs
+    MuiTabs: {
+      defaultProps: {
+        variant: 'scrollable',
+        scrollButtons: 'auto',
+        allowScrollButtonsMobile: true,
+      },
+      styleOverrides: {
+        scrollButtons: { '&.Mui-disabled': { opacity: 0.3 } },
+      },
+    },
     MuiTab: {
       styleOverrides: {
         root: { textTransform: 'none', fontWeight: 600 },
