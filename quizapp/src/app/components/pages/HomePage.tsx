@@ -275,10 +275,10 @@ export function HomePage() {
         </Card>
       ) : (
         <Card sx={{ mb: 2 }}>
-          <CardContent sx={{ pb: '12px !important' }}>
-            <Stack direction="row" spacing={1.5} alignItems="center">
+          <CardContent sx={{ p: { xs: 1.25, sm: 2 }, pb: { xs: '10px !important', sm: '12px !important' } }}>
+            <Stack direction="row" spacing={{ xs: 1, sm: 1.5 }} alignItems="center">
               <Box sx={{ position: 'relative', flexShrink: 0 }}>
-                <Avatar src={user?.avatar} sx={{ width: 42, height: 42, bgcolor: 'primary.main' }}>
+                <Avatar src={user?.avatar} sx={{ width: { xs: 36, sm: 42 }, height: { xs: 36, sm: 42 }, bgcolor: 'primary.main' }}>
                   {user?.name?.[0]}
                 </Avatar>
                 <Box sx={{
@@ -291,9 +291,11 @@ export function HomePage() {
               <Box
                 onClick={openDialog}
                 sx={{
-                  flex: 1, bgcolor: 'action.hover', borderRadius: 3,
-                  px: 2, py: 1.4, cursor: 'pointer', color: 'text.secondary',
+                  flex: 1, minWidth: 0, bgcolor: 'action.hover', borderRadius: 3,
+                  px: { xs: 1.5, sm: 2 }, py: { xs: 1, sm: 1.4 }, cursor: 'pointer', color: 'text.secondary',
                   fontSize: '0.875rem',
+                  // one line — never wrap the prompt into a tall bubble on phones
+                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                   border: '1px solid transparent',
                   transition: 'all 0.15s',
                   '&:hover': { bgcolor: 'action.selected', borderColor: 'divider' },
