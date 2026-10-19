@@ -113,8 +113,9 @@ export function LeftSidebar({ open, onClose, variant = 'permanent' }: Props) {
 
       </List>
 
-      {/* Footer — info pages */}
-      <Box sx={{ px: 2, pb: 2 }}>
+      {/* Footer — info pages. Below md the fixed bottom nav (56px, zIndex 1300) sits over the
+          drawer, so lift the footer above it, including the iPhone home-indicator safe area. */}
+      <Box sx={{ px: 2, pb: { xs: 'calc(56px + 16px + env(safe-area-inset-bottom))', md: 2 } }}>
         <Box component="nav" aria-label="About Meenzo" sx={{ display: 'flex', flexWrap: 'wrap', columnGap: 1.5, rowGap: 0.5, mb: 0.75 }}>
           {[
             { label: 'About Us',       path: '/about' },
