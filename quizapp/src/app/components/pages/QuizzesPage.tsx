@@ -13,6 +13,8 @@ import { startQuiz } from '../../store/slices/quizSlice';
 import { EmptyState } from '../shared/EmptyState';
 import type { Quiz, QuizQuestion, QuizTopic } from '../../types';
 import { formatDuration } from '../../utils/formatDuration';
+import { QuizTypeSwitch } from '../shared/QuizTypeSwitch';
+import { useQuizType, useEngineeringTopicIds, quizTypeOf } from '../../utils/quizType';
 
 const SOCKET_URL = import.meta.env.VITE_API_URL || window.location.origin;
 const API = import.meta.env.VITE_API_URL ?? '';
@@ -47,6 +49,8 @@ interface ApiQuestion {
 function mapQuiz(q: ApiQuiz): Omit<Quiz, 'questions'> & { _apiId: string; status: string } {
   return {
     _apiId: q._id, id: q._id,
+    // topic arrives as an id (or populated object) — used by the GK / Engineering switch
+    topicId: typeof q.topic === 'string' ? q.topic : ((q.topic as { _id?: string } | null)?._id ?? null),
     title: q.title,
     description: q.description || 'Test your knowledge!',
     category: 'General Science' as QuizTopic,
@@ -238,6 +242,14 @@ export function QuizzesPage() {
   const { accessToken } = useAppSelector((s) => s.auth);
 
   const [mainTab, setMainTab]       = useState(0);
+  // GK / Engineering switch (shared with the Live Games sidebar)
+  const [quizType] = useQuizType();
+  const engIds     = useEngineeringTopicIds();
+  const byType = useCallback(
+    <T extends { topicId?: string | null }>(list: T[]): T[] =>
+      engIds ? list.filter((q) => quizTypeOf(q.topicId, engIds) === quizType) : [],
+    [engIds, quizType],
+  );
   const [search, setSearch]         = useState('');
   const [pastSearch, setPastSearch] = useState('');
   const [inviteSearch, setInviteSearch] = useState('');
@@ -414,6 +426,11 @@ export function QuizzesPage() {
       />
 
       {/* Main tabs */}
+      {/* GK / Engineering — filters every tab below */}
+      <Box sx={{ mb: 2 }}>
+        <QuizTypeSwitch />
+      </Box>
+
       <Tabs value={mainTab} onChange={(_, v) => setMainTab(v)} sx={{ mb: 2.5, borderBottom: 1, borderColor: 'divider' }}>
         <Tab icon={<QuizIcon fontSize="small" />} iconPosition="start" label="Active & Upcoming" />
         <Tab icon={<EmojiEvents fontSize="small" />} iconPosition="start" label="Past Quizzes" />
@@ -423,7 +440,7 @@ export function QuizzesPage() {
       {/* ── Active & Upcoming tab ── */}
       {mainTab === 0 && (
         <QuizGrid
-          quizzes={activeQuizzes} loading={activeLoading} error={activeError}
+          quizzes={byType(activeQuizzes)} loading={activeLoading || !engIds} error={activeError}
           search={search} onSearchChange={setSearch}
           onPlay={handlePlay} playingId={playingId}
           emptyMsg="No active or upcoming quizzes right now."
@@ -433,7 +450,7 @@ export function QuizzesPage() {
       {/* ── Past Quizzes tab ── */}
       {mainTab === 1 && (
         <QuizGrid
-          quizzes={pastQuizzes} loading={pastLoading} error={pastError}
+          quizzes={byType(pastQuizzes)} loading={pastLoading || !engIds} error={pastError}
           search={pastSearch} onSearchChange={setPastSearch}
           onPlay={handlePlay} onHistory={handleHistory} onTest={handleTest}
           playingId={playingId}
@@ -450,7 +467,7 @@ export function QuizzesPage() {
           </Alert>
         ) : (
           <QuizGrid
-            quizzes={invitedQuizzes} loading={invitedLoading} error={invitedError}
+            quizzes={byType(invitedQuizzes)} loading={invitedLoading || !engIds} error={invitedError}
             search={inviteSearch} onSearchChange={setInviteSearch}
             onPlay={handlePlay} playingId={playingId}
             emptyMsg="When someone invites you to a quiz, it will appear here."

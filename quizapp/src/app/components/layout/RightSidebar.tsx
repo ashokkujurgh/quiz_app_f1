@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import {
   Box, Typography, Stack, Button, Chip, CircularProgress,
@@ -9,6 +9,8 @@ import { useAppSelector } from '../../store/hooks';
 import { apiFetch } from '../../utils/apiFetch';
 import { loadTopicsWithSubtopics } from '../../utils/topicsCache';
 import { formatDuration } from '../../utils/formatDuration';
+import { QuizTypeSwitch } from '../shared/QuizTypeSwitch';
+import { useQuizType, useEngineeringTopicIds, quizTypeOf } from '../../utils/quizType';
 
 const API = import.meta.env.VITE_API_URL ?? '';
 
@@ -18,6 +20,7 @@ interface ApiQuiz {
   status: string;
   durationMinutes: number;
   questionCount: number;
+  topic?: string | { _id?: string } | null;
 }
 
 interface ApiSubTopic { _id: string; name: string; topic: string }
@@ -26,13 +29,20 @@ interface ApiSubTopic { _id: string; name: string; topic: string }
 function LiveGamesSection() {
   const navigate = useNavigate();
   const accessToken = useAppSelector((s) => s.auth.accessToken);
-  const [games, setGames]     = useState<ApiQuiz[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [allGames, setAllGames] = useState<ApiQuiz[]>([]);
+  const [loading, setLoading]   = useState(true);
+  const [quizType] = useQuizType();
+  const engIds     = useEngineeringTopicIds();
+  // Filter by GK / Engineering first, then show the first five
+  const games = useMemo(() => (engIds ? allGames.filter((g) => {
+    const topicId = typeof g.topic === 'string' ? g.topic : (g.topic?._id ?? null);
+    return quizTypeOf(topicId, engIds) === quizType;
+  }) : []).slice(0, 5), [allGames, engIds, quizType]);
 
   useEffect(() => {
     fetch(`${API}/api/quizzes?status=active`)
       .then((r) => r.json())
-      .then((d) => { if (d.success) setGames((d.quizzes as ApiQuiz[]).slice(0, 5)); })
+      .then((d) => { if (d.success) setAllGames(d.quizzes as ApiQuiz[]); })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
@@ -47,7 +57,7 @@ function LiveGamesSection() {
       <Stack direction="row" spacing={1} alignItems="center" mb={1.5}>
         <SportsEsports sx={{ color: 'success.main', fontSize: 18 }} />
         <Typography variant="subtitle2" fontWeight={700}>Live Games</Typography>
-        {games.length > 0 && (
+        {!loading && games.length > 0 && (
           <Chip
             label={`${games.length} live`}
             size="small"
@@ -57,12 +67,18 @@ function LiveGamesSection() {
         )}
       </Stack>
 
-      {loading ? (
+      <Box sx={{ mb: 1.5 }}>
+        <QuizTypeSwitch fullWidth />
+      </Box>
+
+      {loading || !engIds ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 1.5 }}>
           <CircularProgress size={20} />
         </Box>
       ) : games.length === 0 ? (
-        <Typography variant="caption" color="text.secondary">No live games right now.</Typography>
+        <Typography variant="caption" color="text.secondary">
+          No live {quizType === 'engineering' ? 'Engineering' : 'GK'} games right now.
+        </Typography>
       ) : (
         <Stack spacing={1}>
           {games.map((g) => (
