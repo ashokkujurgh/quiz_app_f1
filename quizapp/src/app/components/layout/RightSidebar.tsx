@@ -2,8 +2,9 @@ import { useMemo, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import {
   Box, Typography, Stack, Button, Chip, CircularProgress,
-  MenuItem, Select, FormControl, InputLabel,
+  MenuItem, Select, FormControl, InputLabel, useMediaQuery,
 } from '@mui/material';
+import type { Theme } from '@mui/material/styles';
 import { SportsEsports, FiberManualRecord, Quiz as QuizIcon, PlayArrow } from '@mui/icons-material';
 import { useAppSelector } from '../../store/hooks';
 import { apiFetch } from '../../utils/apiFetch';
@@ -184,6 +185,10 @@ function PracticeQuizSection() {
 
 // ── Main Sidebar ──────────────────────────────────────────────────────────────
 export function RightSidebar() {
+  // Don't mount below lg (not just hide it): the home feed shows its own Live Games there,
+  // and a hidden copy would still fetch the games list.
+  const visible = useMediaQuery((t: Theme) => t.breakpoints.up('lg'));
+  if (!visible) return null;
   return (
     <Box sx={{ width: 280, flexShrink: 0, display: { xs: 'none', lg: 'block' } }}>
       <Box sx={{ position: 'sticky', top: 80, display: 'flex', flexDirection: 'column', gap: 2 }}>

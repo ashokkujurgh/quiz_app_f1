@@ -1,9 +1,10 @@
 import { lazy, Suspense, type ComponentType, type ReactNode } from 'react';
-import { createBrowserRouter, Navigate } from 'react-router';
+import { createBrowserRouter, Navigate, type RouteObject } from 'react-router';
 import { Box, CircularProgress } from '@mui/material';
 import { useAppSelector } from '../store/hooks';
 import { AppLayout } from '../components/layout/AppLayout';
 import { NavOnlyLayout } from '../components/layout/NavOnlyLayout';
+import { PageErrorBoundary, RouteErrorPage, NotFoundPage } from '../components/shared/ErrorBoundary';
 
 // ── Route-level code splitting ────────────────────────────────────────────────
 // Each page is its own chunk, downloaded the first time its route is visited.
@@ -47,8 +48,13 @@ function PageLoader() {
   );
 }
 
-/** Wrap a lazy page so its loading spinner shows inside the layout, not over the whole app. */
-const page = (node: ReactNode) => <Suspense fallback={<PageLoader />}>{node}</Suspense>;
+/** Wrap a lazy page so its loading spinner — and any crash, including a failed chunk
+ *  download — stays inside the layout instead of taking over the whole app. */
+const page = (node: ReactNode) => (
+  <PageErrorBoundary>
+    <Suspense fallback={<PageLoader />}>{node}</Suspense>
+  </PageErrorBoundary>
+);
 
 function RequireAuth({ children }: { children: JSX.Element }) {
   const accessToken = useAppSelector((s) => s.auth.accessToken);
@@ -62,7 +68,7 @@ function RedirectIfAuth({ children }: { children: JSX.Element }) {
   return children;
 }
 
-export const router = createBrowserRouter([
+const routes: RouteObject[] = [
   { path: '/', element: <Navigate to="/home" replace /> },
   { path: '/login',            element: page(<RedirectIfAuth><LoginPage /></RedirectIfAuth>) },
   { path: '/signup',           element: page(<RedirectIfAuth><SignupPage /></RedirectIfAuth>) },
@@ -103,4 +109,8 @@ export const router = createBrowserRouter([
       { path: 'admin',         element: page(<RequireAuth><AdminDashboard /></RequireAuth>) },
     ],
   },
-]);
+  { path: '*', element: <NotFoundPage /> },
+];
+
+// Every top-level route gets the friendly error page instead of React Router's default screen
+export const router = createBrowserRouter(routes.map((r) => ({ ...r, errorElement: <RouteErrorPage /> })));
