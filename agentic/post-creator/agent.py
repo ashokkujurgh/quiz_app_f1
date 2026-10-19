@@ -26,8 +26,9 @@ from config import POSTS_PER_RUN, IMAGE_ENABLED, POST_API_URL
 
 MAX_RETRIES = 2  # other subjects to try when a post is rejected
 
-# Subject mix: 70% non-engineering (high-school level), 30% engineering (Engineering + Programming)
-ENGINEERING_TOPICS = {"engineering", "programming"}
+# Subject mix: 70% non-engineering (high-school level), 30% engineering.
+# (Programming/IT was removed; its topic is deactivated, so it never reaches this list.)
+ENGINEERING_TOPICS = {"engineering"}
 NON_ENGINEERING_SHARE = 0.70
 
 

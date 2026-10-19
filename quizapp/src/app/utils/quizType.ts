@@ -2,11 +2,11 @@ import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { loadTopicsWithSubtopics } from './topicsCache';
 
 // Games are split into two types for the GK / Engineering switch.
-// Engineering = the Engineering and Programming topics; GK = every other topic
+// Engineering = the Engineering topic; GK = every other topic
 // (General Studies, Aptitude & Reasoning, Current Affairs, …) and games with no topic.
 export type QuizType = 'gk' | 'engineering';
 
-const ENGINEERING_TOPIC_NAMES = new Set(['engineering', 'programming']);
+const ENGINEERING_TOPIC_NAMES = new Set(['engineering']);
 const STORAGE_KEY = 'meenzo.quizType';
 
 // ── Selected type: remembered per browser, shared by every switch on the page ──

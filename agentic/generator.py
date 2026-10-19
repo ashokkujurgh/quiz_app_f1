@@ -72,12 +72,6 @@ _EXAM_STYLE = {
         "tests. Use Indian context (₹, Indian names and places). For calculations, keep the numbers clean so it can "
         "be solved in under a minute without a calculator, and put the short working in the description."
     ),
-    "programming": (
-        "Write it like a question from campus-placement and IT company tests (e.g. TCS NQT, Infosys, Wipro, "
-        "Accenture) or a fresher technical interview: predict-the-output, concept or short code-reasoning. "
-        "If you include code, keep it short and correct, on separate lines with normal indentation — "
-        "no markdown fences or backticks (the quiz screen shows plain text)."
-    ),
 }
 # Subtopics whose answers are re-solved independently before saving
 _VERIFY_SUBTOPICS = {"quantitative aptitude", "logical reasoning"}

@@ -240,12 +240,6 @@ _EXAM_AUDIENCE = {
         "exams": ["SSC", "Bank PO", "Police exam", "PSU exam", "Placement aptitude test"],
         "region": False,
     },
-    "programming": {
-        "readers": "Indian students and freshers preparing for campus placements, IT company tests (TCS NQT, Infosys, "
-                   "Wipro, Accenture) and technical interviews",
-        "exams": ["Campus placement", "TCS NQT", "Coding interview", "Private company jobs"],
-        "region": False,
-    },
 }
 
 
@@ -261,13 +255,6 @@ def _audience_clause(topic_name: str, subtopic_name: str) -> str:
         f"\nREADERS: {aud['readers']}. Teach what such an aspirant actually needs to understand and remember. "
         "You may mention exam relevance once, naturally, in a sentence — never as a list of tags or hashtags."
     )
-    if topic_name.strip().lower() == "programming":
-        clause += (
-            "\nTUTORIAL FORMAT: This is a short programming tutorial. Explain the concept step by step and include "
-            "one or two small, correct code examples, each in <pre><code>…</code></pre> with normal indentation "
-            "(escape < and > inside code as &lt; and &gt;). Explain what each example prints or does. Mention a "
-            "common interview or placement-test question on this concept."
-        )
     if topic_name.strip().lower() == "aptitude & reasoning":
         clause += (
             "\nInclude one or two fully worked examples with clean numbers, showing each step, plus a quick shortcut "
@@ -361,7 +348,7 @@ def generate_post(
     system_prompt = system_map.get(mode, _SYSTEM_BASIC) + _level_clause(level) + _VOICE_RULES + _TEXTBOOK_RULES
 
     aud          = _audience(topic_name)
-    # Region focus only where it makes sense (not for Programming / Aptitude)
+    # Region focus only where it makes sense (not for Aptitude)
     india_note   = (_region_clause(subtopic_name, region) if (aud is None or aud["region"]) else "") \
                    + _audience_clause(topic_name, subtopic_name)
     seo_note     = _seo_clause(topic_name)
@@ -561,7 +548,7 @@ def _fact_check(title: str, content: str) -> list[dict]:
                 {"role": "system", "content": (
                     "You are a strict fact-checker for Indian competitive-exam study material. Check every specific "
                     "claim — numbers, dates, counts, names, firsts, superlatives — against standard references "
-                    "(NCERT, M. Laxmikanth, standard engineering and programming textbooks, official sources). "
+                    "(NCERT, M. Laxmikanth, standard engineering textbooks, official sources). "
                     "Flag only claims that are wrong or seriously misleading; do not flag style or opinions. "
                     'Return ONLY JSON: {"issues": [{"claim": "<exact wrong text>", "correction": "<correct fact>"}]} '
                     '— an empty list if everything is correct.'

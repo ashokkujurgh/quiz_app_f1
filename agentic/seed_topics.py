@@ -16,12 +16,11 @@ logger = logging.getLogger(__name__)
 TOPICS = [
     {
         "name": "Engineering",
-        "description": "GATE and PSU engineering subjects — Civil, Mechanical, Electrical, Electronics and Computer Science.",
+        "description": "GATE and PSU engineering subjects — Civil, Mechanical, Electrical and Electronics.",
         "subtopics": [
             "Electrical Engineering",
             "Mechanical Engineering",
             "Civil Engineering",
-            "Computer Science",
             "Electronics and Communication",
         ],
     },
@@ -53,17 +52,6 @@ TOPICS = [
             "Current Affairs",
         ],
     },
-    {
-        "name": "Programming",
-        "description": "Programming for Indian students and job seekers — Python, Java, DSA, SQL and web development for campus placements and IT jobs.",
-        "subtopics": [
-            "Python",
-            "Java",
-            "Data Structures & Algorithms",
-            "SQL & Databases",
-            "Web Development",
-        ],
-    },
 ]
 
 TOPIC_RENAMES = {"Non Engineering": "General Studies"}
@@ -92,6 +80,27 @@ def _apply_renames() -> None:
                 r = requests.patch(f"{TOPIC_API_URL}/api/topics/subtopics/{sub_names[old]['_id']}", json={"name": new},
                                    headers=auth_headers(), timeout=10)
                 logger.info("  Renamed subtopic %s → %s (%s)", old, new, r.status_code)
+
+
+# Programming / IT content was removed (Oct 2026). Keep these deactivated — never deleted,
+# so their questions and posts stay recoverable — and out of every generator and game.
+DEACTIVATED_TOPICS    = {"Programming"}
+DEACTIVATED_SUBTOPICS = {"Computer Science"}
+
+
+def _apply_deactivations() -> None:
+    for t in requests.get(f"{TOPIC_API_URL}/api/topics", timeout=10).json().get("topics", []):
+        if t["name"] in DEACTIVATED_TOPICS and t.get("isActive", True):
+            requests.patch(f"{TOPIC_API_URL}/api/topics/{t['_id']}", json={"isActive": False},
+                           headers=auth_headers(), timeout=10)
+            logger.info("Deactivated topic %s", t["name"])
+        subs = requests.get(f"{TOPIC_API_URL}/api/topics/{t['_id']}/subtopics", timeout=10).json().get("subtopics", [])
+        for s in subs:
+            off = t["name"] in DEACTIVATED_TOPICS or s["name"] in DEACTIVATED_SUBTOPICS
+            if off and s.get("isActive", True):
+                requests.patch(f"{TOPIC_API_URL}/api/topics/subtopics/{s['_id']}", json={"isActive": False},
+                               headers=auth_headers(), timeout=10)
+                logger.info("  Deactivated subtopic %s", s["name"])
 
 
 def _update_description(topic_id: str, description: str) -> None:
@@ -139,6 +148,7 @@ def seed_topics() -> None:
     logger.info("Seeding topics…")
     try:
         _apply_renames()
+        _apply_deactivations()
         for topic_def in TOPICS:
             topic_id = _create_topic(topic_def["name"], topic_def["description"])
             if not topic_id:
