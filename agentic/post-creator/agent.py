@@ -30,6 +30,8 @@ MAX_RETRIES = 2  # other subjects to try when a post is rejected
 # (Programming/IT was removed; its topic is deactivated, so it never reaches this list.)
 ENGINEERING_TOPICS = {"engineering"}
 NON_ENGINEERING_SHARE = 0.70
+# Aptitude & reasoning are practised through quizzes only — no posts
+QUIZ_ONLY_SUBTOPICS = {"logical reasoning", "quantitative aptitude"}
 
 
 def _recent_titles(subtopic_name: str) -> list[str]:
@@ -74,7 +76,8 @@ def run_agent() -> None:
         return
 
     # Current affairs have their own fact-checked, approval-gated pipeline — no posts from memory
-    subtopics = [s for s in subtopics if s.get("topicName", "").strip().lower() != "current affairs"]
+    subtopics = [s for s in subtopics if s.get("topicName", "").strip().lower() != "current affairs"
+                 and s.get("name", "").strip().lower() not in QUIZ_ONLY_SUBTOPICS]
 
     if not subtopics:
         logger.warning("No active subtopics found. Skipping.")

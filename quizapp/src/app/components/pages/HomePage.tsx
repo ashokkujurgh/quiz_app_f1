@@ -21,6 +21,9 @@ import { apiFetch } from '../../utils/apiFetch';
 import { htmlToText } from '../../utils/html';
 
 // The editor (TipTap + ProseMirror, ~100 kB gzipped) loads only when someone writes a post
+// Practised through quizzes only — no posts are written for these, so no category chip
+const POST_HIDDEN_SUBTOPICS = new Set(['logical reasoning', 'quantitative aptitude']);
+
 const RichTextEditor = lazy(() => import('../shared/RichTextEditor').then((m) => ({ default: m.RichTextEditor })));
 
 const API = import.meta.env.VITE_API_URL ?? '';
@@ -55,10 +58,12 @@ export function HomePage() {
         const engineeringKw = ['engineering', 'engineer'];
         const isEngineering = (s: ApiSubTopic) =>
           engineeringKw.some((kw) => s.name.toLowerCase().includes(kw));
+        // Quiz-only subtopics get no post category chip
+        const shown = flat.filter((s) => !POST_HIDDEN_SUBTOPICS.has(s.name.trim().toLowerCase()));
         // Non-engineering first, engineering subtopics after
         setAllSubTopics([
-          ...flat.filter((s) => !isEngineering(s)),
-          ...flat.filter((s) =>  isEngineering(s)),
+          ...shown.filter((s) => !isEngineering(s)),
+          ...shown.filter((s) =>  isEngineering(s)),
         ]);
       })
       .catch(() => {})
