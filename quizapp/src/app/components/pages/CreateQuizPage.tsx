@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router';
 import {
   Box, Card, CardContent, Typography, Stack, TextField, Button,
@@ -12,6 +12,7 @@ import {
 } from '@mui/icons-material';
 import { useAppSelector } from '../../store/hooks';
 import { Navbar } from '../layout/Navbar';
+import { loadTopicsWithSubtopics } from '../../utils/topicsCache';
 
 const API = import.meta.env.VITE_API_URL ?? '';
 
@@ -230,26 +231,28 @@ export function CreateQuizPage() {
 
   // Random mode
   const [topics, setTopics]           = useState<ApiTopic[]>([]);
-  const [subTopics, setSubTopics]     = useState<ApiSubTopic[]>([]);
-  const [topicsLoaded, setTopicsLoaded] = useState(false);
+  const [allSubTopics, setAllSubTopics] = useState<ApiSubTopic[]>([]);
   const [selectedTopic, setSelectedTopic]     = useState('');
   const [selectedSubTopic, setSelectedSubTopic] = useState('');
 
-  const loadTopics = useCallback(async () => {
-    if (topicsLoaded) return;
-    const res  = await fetch(`${API}/api/topics`);
-    const data = await res.json();
-    setTopics(data.topics ?? []);
-    setTopicsLoaded(true);
-  }, [topicsLoaded]);
+  // Load on mount (not on first click — the menu would open before the list arrived).
+  // Shared cache: active topics and subtopics only, one set of requests per few minutes.
+  useEffect(() => {
+    let alive = true;
+    loadTopicsWithSubtopics()
+      .then(({ topics: t, subTopics: s }) => { if (alive) { setTopics(t); setAllSubTopics(s); } })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
 
-  const handleTopicChange = async (topicId: string) => {
+  const subTopics = useMemo(
+    () => (selectedTopic ? allSubTopics.filter((s) => s.topic === selectedTopic) : []),
+    [allSubTopics, selectedTopic],
+  );
+
+  const handleTopicChange = (topicId: string) => {
     setSelectedTopic(topicId);
     setSelectedSubTopic('');
-    if (!topicId) { setSubTopics([]); return; }
-    const res  = await fetch(`${API}/api/topics/${topicId}/subtopics`);
-    const data = await res.json();
-    setSubTopics(data.subtopics ?? []);
   };
 
   // Manual mode
@@ -500,7 +503,7 @@ export function CreateQuizPage() {
                     sx={{ maxWidth: 220 }}
                   />
                   <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-                    <FormControl size="small" sx={{ flex: 1 }} onClick={loadTopics}>
+                    <FormControl size="small" sx={{ flex: 1 }}>
                       <InputLabel>Topic</InputLabel>
                       <Select value={selectedTopic} label="Topic" onChange={(e) => handleTopicChange(e.target.value)}>
                         <MenuItem value=""><em>Any Topic</em></MenuItem>
