@@ -8,6 +8,7 @@ import smtplib
 import ssl
 from email.message import EmailMessage
 from urllib.parse import quote
+from generator import html_to_text
 from config import (
     APPROVAL_EMAIL_TO, MAIL_USER, MAIL_PASSWORD, SMTP_HOST, SMTP_PORT, ADMIN_PANEL_URL, APPROVER_EMAIL,
 )
@@ -33,9 +34,10 @@ def send_approval_email(
         logger.warning("Approval email skipped: MAIL_USER / MAIL_PASSWORD not set.")
         return False
 
-    heading = title or content.split("\n")[0][:90]
-    preview = content[:600].rsplit(" ", 1)[0] + "…" if len(content) > 600 else content
-    words   = len(content.split())
+    text    = html_to_text(content)       # posts are HTML; the email shows plain text
+    heading = title or text.split("\n")[0][:90]
+    preview = text[:600].rsplit(" ", 1)[0] + "…" if len(text) > 600 else text
+    words   = len(text.split())
     region_label = "India" if region == "india" else "World"
     # Opens the admin approve page: email is filled in, the reviewer types the password
     approve_url  = f"{ADMIN_PANEL_URL.rstrip('/')}/approve/{post.get('_id')}?email={quote(APPROVER_EMAIL)}"

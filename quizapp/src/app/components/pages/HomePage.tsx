@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, lazy, Suspense } from 'react';
 import {
   Box, Stack, Button, Chip, Card, CardContent,
   Avatar, Dialog, DialogTitle, DialogContent, DialogActions,
@@ -16,6 +16,10 @@ import { Inbox } from '@mui/icons-material';
 import type { Post, QuizTopic } from '../../types';
 import { loadTopicsWithSubtopics } from '../../utils/topicsCache';
 import { apiFetch } from '../../utils/apiFetch';
+import { htmlToText } from '../../utils/html';
+
+// The editor (TipTap + ProseMirror, ~100 kB gzipped) loads only when someone writes a post
+const RichTextEditor = lazy(() => import('../shared/RichTextEditor').then((m) => ({ default: m.RichTextEditor })));
 
 const API = import.meta.env.VITE_API_URL ?? '';
 
@@ -156,7 +160,7 @@ export function HomePage() {
   };
 
   const handleSubmit = async () => {
-    if (!content.trim()) { setError('Please write something.'); return; }
+    if (!htmlToText(content)) { setError('Please write something.'); return; }
     setSubmitting(true); setError('');
     try {
       let imageUrls: string[] = [];
@@ -387,10 +391,16 @@ export function HomePage() {
             </Box>
           </Stack>
 
-          <TextField multiline rows={4} fullWidth
-            placeholder={`What's on your mind, ${displayName}?`}
-            value={content} onChange={(e) => setContent(e.target.value)}
-            sx={{ mb: 2 }} />
+          <Box sx={{ mb: 2 }}>
+<Suspense fallback={<Skeleton variant="rounded" height={190} />}>
+            <RichTextEditor
+              value={content}
+              onChange={setContent}
+              placeholder={`What's on your mind, ${displayName}?`}
+              minHeight={140}
+            />
+</Suspense>
+          </Box>
 
           {imagePreviews.length > 0 && (
             <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: 1, mb: 2 }}>
@@ -419,7 +429,7 @@ export function HomePage() {
           <Button onClick={() => setOpen(false)} disabled={submitting}>Cancel</Button>
           <Button variant="contained" onClick={handleSubmit}
             sx={{ color: 'white', '&.Mui-disabled': { color: 'rgba(255,255,255,0.6)' } }}
-            disabled={submitting || !content.trim()}
+            disabled={submitting || !htmlToText(content)}
             startIcon={submitting ? <CircularProgress size={16} color="inherit" /> : null}>
             {submitting ? 'Posting…' : 'Post'}
           </Button>

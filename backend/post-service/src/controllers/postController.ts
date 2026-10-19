@@ -5,6 +5,7 @@ import Post, { IQuizResult, ISeoMeta } from '../models/Post';
 import { AuthRequest } from '../middleware/auth';
 import { sendNewPostNotification, sendCommentNotification } from '../services/notificationService';
 import { notifyIndexNow } from './seoController';
+import { sanitizePostContent, toPlainText } from '../utils/html';
 
 // ── OpenAI client ─────────────────────────────────────────────────────────────
 const openai = process.env.OPENAI_API_KEY
@@ -248,8 +249,13 @@ export const createPost: RequestHandler = async (req: AuthRequest, res: Response
       }
     }
 
-    if (userType === 'user' && content.trim()) {
-      const textPolicy = await checkContentPolicy(content.trim());
+    // Rich HTML is sanitised before storage; checks below run on the plain text
+    const safeContent = sanitizePostContent(content);
+    const plain       = toPlainText(safeContent);
+    if (!plain) { res.status(400).json({ success: false, message: 'Post content is required.' }); return; }
+
+    if (userType === 'user' && plain) {
+      const textPolicy = await checkContentPolicy(plain);
       if (!textPolicy.allowed) {
         res.status(422).json({
           success: false,
@@ -260,7 +266,7 @@ export const createPost: RequestHandler = async (req: AuthRequest, res: Response
     }
 
     // ── OpenAI second-layer: topic relevance + safety (all users including admin) ──
-    const aiCheck = await openAIValidate(content.trim(), topic, subTopic ?? null, imageList);
+    const aiCheck = await openAIValidate(plain, topic, subTopic ?? null, imageList);
     if (!aiCheck.allowed) {
       res.status(422).json({
         success: false,
@@ -271,7 +277,7 @@ export const createPost: RequestHandler = async (req: AuthRequest, res: Response
       return;
     }
 
-    const titleText = title?.trim() ?? content.trim().split(' ').slice(0, 10).join(' ');
+    const titleText = title?.trim() || plain.split(/\s+/).slice(0, 10).join(' ');
     const slug = await uniqueSlug(generateSlug(titleText));
 
     const post = await Post.create({
@@ -284,7 +290,7 @@ export const createPost: RequestHandler = async (req: AuthRequest, res: Response
       userType,
       title:      title?.trim() ?? null,
       slug,
-      content:    content.trim(),
+      content:    safeContent,
       image:      imageList[0] ?? null,
       images:     imageList,
       topic,
@@ -317,7 +323,8 @@ export const createInternalPost: RequestHandler = async (req: AuthRequest, res: 
     if (!content?.trim()) { res.status(400).json({ success: false, message: 'Content required.' }); return; }
     if (!topic?.trim())   { res.status(400).json({ success: false, message: 'Topic required.' }); return; }
 
-    const titleText = title?.trim() ?? content.trim().split(' ').slice(0, 10).join(' ');
+    const safeContent = sanitizePostContent(content);
+    const titleText = title?.trim() || toPlainText(safeContent).split(/\s+/).slice(0, 10).join(' ');
     const slug = await uniqueSlug(generateSlug(titleText));
 
     const post = await Post.create({
@@ -330,7 +337,7 @@ export const createInternalPost: RequestHandler = async (req: AuthRequest, res: 
       userType:       'admin',
       title:          title?.trim() ?? null,
       slug,
-      content:        content.trim(),
+      content:        safeContent,
       image:          image ?? null,
       images:         image ? [image] : [],
       topic,
@@ -369,7 +376,7 @@ export const updatePost: RequestHandler = async (req: AuthRequest, res: Response
 
     if (title     !== undefined) post.title     = title?.trim() ?? null;
     if (seo       !== undefined) post.seo       = (seo as typeof post.seo) ?? null;
-    if (content   !== undefined) post.content   = content.trim();
+    if (content   !== undefined) post.content   = sanitizePostContent(content);
     if (image     !== undefined) post.image     = image;
     if (topic?.trim()) post.topic = topic.trim();
     if (subTopic  !== undefined) post.subTopic  = subTopic ?? null;
@@ -533,7 +540,7 @@ export const addComment: RequestHandler = async (req: AuthRequest, res: Response
     // Notify post author (skip if commenter is the author)
     const authorId = post.author.userId.toString();
     if (authorId !== req.user!.id) {
-      const postTitle = post.title ?? post.content.split(' ').slice(0, 8).join(' ');
+      const postTitle = post.title ?? toPlainText(post.content).split(/\s+/).slice(0, 8).join(' ');
       sendCommentNotification(authorId, authorName, postTitle, post._id.toString()).catch(console.error);
     }
 
@@ -701,7 +708,7 @@ export const approvePost: RequestHandler = async (req: AuthRequest, res: Respons
     if (!post) { res.status(404).json({ success: false, message: 'Post not found.' }); return; }
 
     // Notify all users that a new post is live
-    const notifTitle = post.title ?? post.content.split(' ').slice(0, 8).join(' ');
+    const notifTitle = post.title ?? toPlainText(post.content).split(/\s+/).slice(0, 8).join(' ');
     sendNewPostNotification(post._id.toString(), notifTitle, post.topic ?? '').catch(console.error);
 
     // Tell IndexNow engines (Bing, Yandex) the post is live; Google finds it via the sitemap

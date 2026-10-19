@@ -1,4 +1,4 @@
-import { useLayoutEffect, useState } from 'react';
+import { useLayoutEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import { Helmet } from 'react-helmet-async';
 import {
@@ -16,6 +16,8 @@ import { useIsOnline } from '../../context/OnlineUsersContext';
 import { OnlineBadge } from '../shared/OnlineBadge';
 import { Navbar } from '../layout/Navbar';
 import { UserAvatar } from '../shared/UserAvatar';
+import { RichContent } from '../shared/RichContent';
+import { htmlToText } from '../../utils/html';
 import { isOfficialPost, withOfficialAvatar } from '../shared/officialAvatar';
 import { TopicChip } from '../shared/TopicChip';
 import type { Post, QuizTopic } from '../../types';
@@ -63,6 +65,7 @@ function mapPost(p: Record<string, unknown>): PostWithSeo {
     },
     content: p['content'] as string,
     image: p['image'] as string | undefined,
+    isAiImage: (p['isAiImage'] as boolean) ?? false,
     topic: (p['topic'] ?? 'General') as QuizTopic,
     subTopic: (p['subTopic'] as string | null) ?? null,
     userType: (p['userType'] as 'user' | 'admin') ?? 'user',
@@ -103,7 +106,7 @@ function RelatedPostCard({ post }: { post: Post }) {
             WebkitBoxOrient: 'vertical', overflow: 'hidden',
           }}
         >
-          {post.content}
+          {htmlToText(post.content)}
         </Typography>
         <Stack direction="row" spacing={1} alignItems="center" mt={1}>
           <TopicChip topic={(post.subTopic ?? post.topic) as QuizTopic} />
@@ -135,6 +138,7 @@ export function PostDetailPage() {
 
   const [post, setPost] = useState<PostWithSeo | null>(null);
   const authorOnline = useIsOnline(post?.author.id);
+  const readingMinutes = useMemo(() => Math.max(1, Math.round(htmlToText(post?.content).split(/\s+/).filter(Boolean).length / 200)), [post?.content]);
   const [loading, setLoading] = useState(true);
   const [comments, setComments] = useState<ApiComment[]>([]);
   const [commentsLoading, setCommentsLoading] = useState(true);
@@ -266,34 +270,50 @@ export function PostDetailPage() {
       {/* Post card */}
       <Card sx={{ mb: 2 }}>
         <CardContent>
-          <Stack direction="row" spacing={1.5} alignItems="flex-start" mb={2}>
-            <UserAvatar user={withOfficialAvatar({ ...post.author, isOnline: authorOnline }, isOfficialPost(post))} size={48} showOnline={!isOfficialPost(post)} />
-            <Box flex={1}>
-              <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap">
-                <Typography variant="subtitle2" fontWeight={700}>{post.author.name}</Typography>
-                <Typography variant="caption" color="text.secondary">@{post.author.username}</Typography>
-                <TopicChip topic={(post.subTopic ?? post.topic) as QuizTopic} />
-              </Stack>
-              <Typography variant="caption" color="text.secondary">
-                {formatDistanceToNow(new Date(post.timestamp), { addSuffix: true })}
-              </Typography>
-            </Box>
+          {/* Article header: topic · reading time · date, then title and author */}
+          <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap" useFlexGap mb={1.5}>
+            <TopicChip topic={(post.subTopic ?? post.topic) as QuizTopic} />
+            <Typography variant="caption" color="text.secondary">
+              {readingMinutes} min read · {formatDistanceToNow(new Date(post.timestamp), { addSuffix: true })}
+            </Typography>
           </Stack>
 
           {post.title && (
-            <Typography variant="h6" fontWeight={700} mb={1.5} sx={{ lineHeight: 1.4 }}>
+            <Typography component="h1" sx={{
+              fontSize: { xs: '1.6rem', sm: '2.1rem' }, fontWeight: 800, lineHeight: 1.2,
+              letterSpacing: '-0.02em', mb: 2,
+            }}>
               {post.title}
             </Typography>
           )}
 
-          <Typography variant="body1" sx={{ lineHeight: 1.9, whiteSpace: 'pre-wrap', mb: post.image ? 2 : 0 }}>
-            {post.content}
-          </Typography>
+          <Stack direction="row" spacing={1.5} alignItems="center" mb={2.5}>
+            <UserAvatar user={withOfficialAvatar({ ...post.author, isOnline: authorOnline }, isOfficialPost(post))} size={40} showOnline={!isOfficialPost(post)} />
+            <Box>
+              <Typography variant="subtitle2" fontWeight={700} lineHeight={1.3}>{post.author.name}</Typography>
+              <Typography variant="caption" color="text.secondary">@{post.author.username}</Typography>
+            </Box>
+          </Stack>
 
           {post.image && (
-            <Box component="img" src={post.image} alt="post"
-              sx={{ width: '100%', borderRadius: 2, maxHeight: 480, objectFit: 'cover', display: 'block' }} />
+            <Box sx={{ position: 'relative', mb: 3 }}>
+              <Box component="img" src={post.image} alt={post.title ?? 'post image'}
+                sx={{ width: '100%', aspectRatio: '16 / 9', borderRadius: 3, objectFit: 'cover', display: 'block' }} />
+              {post.isAiImage && (
+                <Typography variant="caption" sx={{
+                  position: 'absolute', left: 12, bottom: 12, px: 1, py: 0.25, borderRadius: 1,
+                  bgcolor: 'rgba(15,27,69,0.75)', color: '#fff', fontWeight: 600,
+                }}>
+                  ✦ AI generated image
+                </Typography>
+              )}
+            </Box>
           )}
+
+          {/* Body: rich HTML (sanitised) or legacy plain text */}
+          <Box component="article" sx={{ maxWidth: 720 }}>
+            <RichContent content={post.content} />
+          </Box>
         </CardContent>
 
         <Box sx={{ px: 2 }}>

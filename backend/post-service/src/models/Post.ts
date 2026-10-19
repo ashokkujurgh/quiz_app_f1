@@ -152,7 +152,8 @@ const postSchema = new Schema<IPost>(
     userType:   { type: String, enum: ['user', 'admin'], default: 'user' },
     title:      { type: String, default: null, trim: true, maxlength: 300 },
     slug:       { type: String, default: null, trim: true },
-    content:    { type: String, required: true, trim: true, maxlength: 8000 },
+    // Rich HTML (sanitised) or plain text; HTML tags add ~20%, so the cap is generous
+    content:    { type: String, required: true, trim: true, maxlength: 30000 },
     seo:        { type: seoSchema, default: null },
     image:      { type: String, default: null },
     images:     { type: [String], default: [] },

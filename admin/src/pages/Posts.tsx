@@ -1,6 +1,9 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import api from '../lib/api';
 import { getAdminProfile, setAdminProfile, type AdminProfile } from '../lib/auth';
+import RichTextEditor from '../components/RichTextEditor';
+import RichHtml from '../components/RichHtml';
+import { htmlToText, plainToHtml } from '../lib/html';
 
 // NSFW.js is loaded from CDN via index.html script tag
 declare const nsfwjs: {
@@ -210,7 +213,7 @@ function CreatePostModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!content.trim()) { setError('Content is required.'); return; }
+    if (!htmlToText(content)) { setError('Content is required.'); return; }
     if (!selectedTopicName) { setError('Please select a topic.'); return; }
     if (!profile) { setError('Admin profile not loaded yet.'); return; }
 
@@ -323,18 +326,8 @@ function CreatePostModal({
             <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
               Content <span className="text-red-500">*</span>
             </label>
-            <textarea
-              rows={4}
-              required
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              placeholder="What would you like to share with the community?"
-              className="w-full text-sm rounded-xl px-3 py-2 border resize-none
-                bg-white border-gray-200 text-gray-900 placeholder-gray-400
-                dark:bg-gray-800 dark:border-gray-700 dark:text-white dark:placeholder-gray-500
-                focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-            <p className="text-xs text-gray-400 mt-1 text-right">{content.length} / 2000</p>
+            <RichTextEditor value={content} onChange={setContent} placeholder="What would you like to share with the community?" />
+            <p className="text-xs text-gray-400 mt-1 text-right">{htmlToText(content).length} characters</p>
           </div>
 
           {/* Topic + Subtopic */}
@@ -628,7 +621,7 @@ function CreatePostModal({
           <button
             type="submit"
             form="cpform"
-            disabled={saving || uploading || nsfwChecking || !content.trim()}
+            disabled={saving || uploading || nsfwChecking || !htmlToText(content)}
             className="px-5 py-2 text-sm font-semibold bg-indigo-600 hover:bg-indigo-500
               text-white rounded-xl disabled:opacity-50 transition-colors"
           >
@@ -654,7 +647,7 @@ function EditPostModal({
   onSaved: (updated: Post) => void;
 }) {
   const [title, setTitle]     = useState(post.title ?? '');
-  const [content, setContent] = useState(post.content);
+  const [content, setContent] = useState(() => plainToHtml(post.content));
   const [timezone, setTimezone] = useState(post.timezone || LOCAL_TZ || 'UTC');
   const [saving, setSaving]   = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -708,7 +701,7 @@ function EditPostModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!content.trim()) { setError('Content is required.'); return; }
+    if (!htmlToText(content)) { setError('Content is required.'); return; }
     setSaving(true); setError('');
     try {
       // upload any newly picked files
@@ -801,17 +794,8 @@ function EditPostModal({
             <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
               Content <span className="text-red-500">*</span>
             </label>
-            <textarea
-              rows={5}
-              required
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              className="w-full text-sm rounded-xl px-3 py-2 border resize-none
-                bg-white border-gray-200 text-gray-900
-                dark:bg-gray-800 dark:border-gray-700 dark:text-white
-                focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-            <p className="text-xs text-gray-400 mt-1 text-right">{content.length} / 2000</p>
+            <RichTextEditor value={content} onChange={setContent} />
+            <p className="text-xs text-gray-400 mt-1 text-right">{htmlToText(content).length} characters</p>
           </div>
 
           {/* Topic + Subtopic */}
@@ -1008,7 +992,7 @@ function EditPostModal({
             className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors">
             Cancel
           </button>
-          <button type="submit" form="epform" disabled={saving || uploading || !content.trim()}
+          <button type="submit" form="epform" disabled={saving || uploading || !htmlToText(content)}
             className="px-5 py-2 text-sm font-semibold bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl disabled:opacity-50 transition-colors">
             {uploading ? 'Uploading…' : saving ? 'Saving…' : 'Save Changes'}
           </button>
@@ -1214,7 +1198,7 @@ function PostCard({
         {post.title && (
           <p className="text-sm font-semibold text-gray-900 dark:text-white mb-1">{post.title}</p>
         )}
-        <p className="text-sm text-gray-800 dark:text-gray-200 leading-relaxed">{post.content}</p>
+        <RichHtml content={post.content} />
 
         {/* Images */}
         {(() => {
@@ -1380,7 +1364,7 @@ function PendingTab({ onApproved }: { onApproved: () => void }) {
             {/* Content */}
             <div className="px-4 pb-3">
               {post.title && <p className="text-sm font-semibold text-gray-900 dark:text-white mb-1">{post.title}</p>}
-              <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed line-clamp-4">{post.content}</p>
+              <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed line-clamp-4 whitespace-pre-line">{htmlToText(post.content)}</p>
               {(() => {
                 const imgs = post.images?.length ? post.images : post.image ? [post.image] : [];
                 if (!imgs.length) return null;

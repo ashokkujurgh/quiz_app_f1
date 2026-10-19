@@ -1,4 +1,4 @@
-import { memo, useState, useEffect } from 'react';
+import { memo, useMemo, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import {
   Card, CardContent, CardActions, Box, Typography, IconButton,
@@ -167,6 +167,7 @@ import { useBlockedUsers } from '../../hooks/useBlockedUsers';
 import { UserAvatar } from './UserAvatar';
 import { withOfficialAvatar } from './officialAvatar';
 import { formatDuration } from '../../utils/formatDuration';
+import { htmlToText } from '../../utils/html';
 import { TopicChip } from './TopicChip';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -191,6 +192,8 @@ function PostCardImpl({ post }: Props) {
   const user        = useAppSelector((s) => s.auth.user);
   const accessToken = useAppSelector((s) => s.auth.accessToken);
   const authorOnline = useIsOnline(post.author.id);
+  // Feed shows a plain-text preview; the post page renders the full rich content
+  const previewText = useMemo(() => htmlToText(post.content), [post.content]);
 
   const timeAgo = formatDistanceToNow(new Date(post.timestamp), { addSuffix: true });
 
@@ -372,7 +375,7 @@ function PostCardImpl({ post }: Props) {
                 mb: 0.5,
               }}
             >
-              {post.content}
+              {previewText}
             </Typography>
             <Typography
               variant="caption"

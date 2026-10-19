@@ -1,6 +1,7 @@
 import { useEffect, useState, FormEvent } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { setToken, setAdminProfile } from '../lib/auth';
+import { htmlToText } from '../lib/html';
 
 // Opened from the "post waiting for approval" reminder email.
 // Email comes from the link, password is typed in; we log in first and only
@@ -81,8 +82,9 @@ export default function ApprovePost() {
     }
   };
 
-  const heading = post?.title ?? post?.content.split('\n')[0].slice(0, 90) ?? '';
-  const preview = post ? (post.content.length > 500 ? post.content.slice(0, 500).replace(/\s+\S*$/, '') + '…' : post.content) : '';
+  const text    = htmlToText(post?.content);
+  const heading = post?.title ?? text.split('\n')[0].slice(0, 90);
+  const preview = text.length > 500 ? text.slice(0, 500).replace(/\s+\S*$/, '') + '…' : text;
 
   return (
     <div className="min-h-screen bg-gray-950 flex items-start sm:items-center justify-center px-4 py-10">

@@ -1,6 +1,7 @@
 import { Request, Response, RequestHandler } from 'express';
 import mongoose from 'mongoose';
 import Post, { IPost } from '../models/Post';
+import { toPlainText } from '../utils/html';
 
 // ── SEO for public post pages ────────────────────────────────────────────────
 // Follows Google Search guidelines:
@@ -37,7 +38,7 @@ async function getShell(): Promise<string> {
 }
 
 function plainText(content: string, max: number): string {
-  const text = content.replace(/\s+/g, ' ').trim();
+  const text = toPlainText(content).replace(/\s+/g, ' ').trim();
   return text.length > max ? text.slice(0, max - 1).replace(/\s+\S*$/, '') + '…' : text;
 }
 

@@ -16,7 +16,7 @@ import random
 import requests
 from topic_client import fetch_all_subtopics, pick_subtopics_with_priority
 from trending import fetch_web_context
-from generator import generate_post, pick_post_mode, pick_level, pick_region, embed_text, generate_image
+from generator import generate_post, pick_post_mode, pick_level, pick_region, embed_text, generate_image, html_to_text
 from auth_client import upload_image
 from pinecone_client import post_exists, upsert_post
 from post_client import save_post
@@ -122,7 +122,8 @@ def run_agent() -> None:
         seo     = generated.get("seo")
 
         # 7. Embed and check duplicate
-        embedding_text = f"{title}\n{content}" if title else content
+        text = html_to_text(content)          # content is HTML; embeddings/filters use the plain text
+        embedding_text = f"{title}\n{text}" if title else text
         try:
             embedding = embed_text(embedding_text)
         except Exception as exc:
@@ -135,7 +136,7 @@ def run_agent() -> None:
             continue
 
         # 8. Content policy filter
-        filter_text = f"{title}\n{content}" if title else content
+        filter_text = f"{title}\n{text}" if title else text
         allowed, filter_reason = is_content_allowed(filter_text)
         if not allowed:
             logger.warning(

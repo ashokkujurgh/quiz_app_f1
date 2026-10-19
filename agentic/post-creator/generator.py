@@ -9,6 +9,7 @@ Each post also gets a reading level, independent of mode:
   foundation (70%) — high-school / job-seeker level, no jargon left unexplained
   advanced   (30%) — assumes the reader already knows the subject's fundamentals
 """
+import html
 import logging
 import json
 import random
@@ -152,12 +153,15 @@ Your job: write a BOOKISH post — a short textbook chapter that explains one co
 the way a good NCERT-style textbook or a well-written study guide would. It is NOT a news story or feature.
 
 Voice: a clear, patient teacher. Plain words, correct facts, no drama.
+FORMAT: write the "content" field as clean HTML using ONLY these tags: <p>, <h2>, <h3>, <strong>, <em>,
+<ul>, <ol>, <li>, <blockquote>, <pre><code> (code only), <table>/<tr>/<th>/<td> (only for a genuine comparison).
+No <h1>, no inline styles, no classes, no images, no markdown.
 Structure (follow this order):
-1. Opening paragraph: say plainly what the concept is (a simple definition in your own words) and why it matters for the student.
-2. Explanation: build the concept step by step, from the basics upward. You may use 2-4 short section headings,
-   each on its own line in plain text (no #, no bold markers), e.g. "Types of ...", "How it works", "Examples".
+1. Opening <p>: say plainly what the concept is (a simple definition in your own words) and why it matters for the student.
+2. Explanation: build the concept step by step, from the basics upward, under 2-4 short <h2> section headings
+   (e.g. "Types of …", "How it works", "Examples"). Use <strong> for key terms the first time they appear.
 3. Examples: at least two clear, standard textbook examples (Indian examples where they fit).
-4. End with a "Key points to remember" heading followed by 4-6 short points, each on its own line starting with "- ".
+4. End with <h2>Key points to remember</h2> followed by a <ul> of 4-6 short <li> points.
    The post ENDS with that list — write nothing after it.
 Rules:
 - No story openings, no news hooks, no "In 1991, X decided..." style beginnings, no current affairs.
@@ -260,9 +264,9 @@ def _audience_clause(topic_name: str, subtopic_name: str) -> str:
     if topic_name.strip().lower() == "programming":
         clause += (
             "\nTUTORIAL FORMAT: This is a short programming tutorial. Explain the concept step by step and include "
-            "one or two small, correct code examples, each on its own lines with normal indentation, as plain text — "
-            "no markdown fences or backticks. Explain what each example prints or does. Mention a common interview "
-            "or placement-test question on this concept."
+            "one or two small, correct code examples, each in <pre><code>…</code></pre> with normal indentation "
+            "(escape < and > inside code as &lt; and &gt;). Explain what each example prints or does. Mention a "
+            "common interview or placement-test question on this concept."
         )
     if topic_name.strip().lower() == "aptitude & reasoning":
         clause += (
@@ -412,7 +416,7 @@ Return ONLY valid JSON — no markdown, no code fences:
     try:
         data = _generate_once(messages)
         for attempt in range(2):
-            violations = _quality_violations(data["content"])
+            violations = _quality_violations(html_to_text(data["content"]))
             if not violations:
                 break
             logger.warning("[%s] Quality check failed (%s) — requesting rewrite (%d/2).", mode, "; ".join(violations), attempt + 1)
@@ -430,14 +434,15 @@ Return ONLY valid JSON — no markdown, no code fences:
             )})
             data = _generate_once(messages)
         else:
-            remaining = _quality_violations(data["content"])
+            remaining = _quality_violations(html_to_text(data["content"]))
             if remaining:
                 logger.warning("[%s] Still has issues after 2 rewrites (%s) — using it anyway.", mode, "; ".join(remaining))
 
-        data["content"] = _tidy_bookish(data["content"])
+        if not _is_html(data["content"]):          # legacy plain-text output only
+            data["content"] = _tidy_bookish(data["content"])
 
         # Fact-check pass: a strict, independent review of specific claims; fix anything wrong
-        issues = _fact_check(data.get("title") or "", data["content"])
+        issues = _fact_check(data.get("title") or "", html_to_text(data["content"]))
         if issues:
             logger.warning("[%s] Fact-check flagged %d claim(s): %s — rewriting.", mode, len(issues),
                            " | ".join(f"{i.get('claim', '')[:60]} → {i.get('correction', '')[:60]}" for i in issues))
@@ -448,13 +453,14 @@ Return ONLY valid JSON — no markdown, no code fences:
                 "\n".join(f"- WRONG: {i.get('claim')}  CORRECT: {i.get('correction')}" for i in issues)
             )})
             data = _generate_once(messages)
-            data["content"] = _tidy_bookish(data["content"])
-            still = _fact_check(data.get("title") or "", data["content"])
+            if not _is_html(data["content"]):
+                data["content"] = _tidy_bookish(data["content"])
+            still = _fact_check(data.get("title") or "", html_to_text(data["content"]))
             if still:
                 logger.error("[%s] Fact-check still flags %d claim(s) after the fix — not publishing.", mode, len(still))
                 return None
 
-        word_count = len(data["content"].split())
+        word_count = len(html_to_text(data["content"]).split())
         logger.info("[%s/%s] Generated %d words for content.", mode, level, word_count)
         data["mode"] = mode
         data["level"] = level
@@ -504,6 +510,21 @@ def _quality_violations(content: str) -> list[str]:
     if analogy_count > 2:
         violations.append(f"stacks {analogy_count} separate analogies instead of using one central analogy")
     return violations
+
+
+def _is_html(content: str) -> bool:
+    return bool(re.search(r"</?(p|h[1-6]|ul|ol|li|strong|pre|code)\b", content or "", re.I))
+
+
+def html_to_text(content: str) -> str:
+    """Plain text of a post (HTML or legacy text) — for checks, embeddings, filters and previews."""
+    if not re.search(r"</?(p|h[1-6]|ul|ol|li|strong|em|pre|code|blockquote|table|br)\b", content or "", re.I):
+        return (content or "").strip()
+    text = re.sub(r"</(p|h[1-6]|li|blockquote|pre|tr)>", "\\g<0>\n", content, flags=re.I)
+    text = re.sub(r"<br\s*/?>", "\n", text, flags=re.I)
+    text = re.sub(r"<li[^>]*>", "• ", text, flags=re.I)
+    text = html.unescape(re.sub(r"<[^>]+>", "", text))
+    return re.sub(r"\n{3,}", "\n\n", re.sub(r"[ \t]+\n", "\n", text)).strip()
 
 
 _BULLET_RE = re.compile(r"^\s*(?:[-*•◦▪○●]|\d{1,2}[.)])\s+")
@@ -689,7 +710,7 @@ def generate_image(title: str | None, content: str, topic_name: str, subtopic_na
         f"A photorealistic educational documentary photograph to accompany a social post on a learning platform.\n"
         f"Post title: {title or subtopic_name}\n"
         f"Subject: {subtopic_name} ({topic_name})\n"
-        f"What the post is about: {content[:500]}\n\n"
+        f"What the post is about: {html_to_text(content)[:500]}\n\n"
         "Show one concrete, real-world scene that a photojournalist could actually have photographed for "
         "this story — real places, real objects, real people at work (in India when the story is set in India). "
         "Style: professional DSLR photograph, 35mm lens, natural light, true-to-life colours and textures, "

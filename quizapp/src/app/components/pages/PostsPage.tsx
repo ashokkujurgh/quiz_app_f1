@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import {
   Box, Stack, Typography, Button, Avatar, Card, CardContent,
   IconButton, Dialog, DialogTitle, DialogContent, DialogActions,
@@ -12,6 +12,10 @@ import { useAppSelector } from '../../store/hooks';
 import { useNavigate } from 'react-router';
 import { PostCard } from '../shared/PostCard';
 import type { Post } from '../../types';
+import { htmlToText, plainToHtml } from '../../utils/html';
+
+// The editor (TipTap + ProseMirror, ~100 kB gzipped) loads only when someone writes a post
+const RichTextEditor = lazy(() => import('../shared/RichTextEditor').then((m) => ({ default: m.RichTextEditor })));
 
 const API = import.meta.env.VITE_API_URL ?? '';
 
@@ -80,7 +84,7 @@ function PostForm({ open, editPost, topics, accessToken, user, onClose, onSaved 
     if (!open) return;
     if (editPost) {
       setTitle(editPost.title ?? '');
-      setContent(editPost.content);
+      setContent(plainToHtml(editPost.content));
       setImagePreviews(editPost.images?.length ? editPost.images : editPost.image ? [editPost.image] : []);
       setImageFiles([]);
       setError('');
@@ -132,7 +136,8 @@ function PostForm({ open, editPost, topics, accessToken, user, onClose, onSaved 
   };
 
   const handleSubmit = async () => {
-    if (!content.trim()) { setError('Content is required.'); return; }
+    if (!htmlToText(content)) { setError('Content is required.'); return; }
+    if (htmlToText(content).length > 2000) { setError('Please keep your post under 2000 characters.'); return; }
     setSaving(true); setError('');
 
     try {
@@ -218,14 +223,14 @@ function PostForm({ open, editPost, topics, accessToken, user, onClose, onSaved 
         />
 
         {/* Content */}
-        <TextField
-          label="What's on your mind?"
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-          fullWidth multiline rows={4} sx={{ mb: 2 }}
-          inputProps={{ maxLength: 2000 }}
-          helperText={`${content.length}/2000`}
-        />
+        <Box sx={{ mb: 0.5 }}>
+<Suspense fallback={<Skeleton variant="rounded" height={190} />}>
+          <RichTextEditor value={content} onChange={setContent} placeholder="What's on your mind?" minHeight={140} />
+</Suspense>
+        </Box>
+        <Typography variant="caption" color={htmlToText(content).length > 2000 ? 'error' : 'text.secondary'} sx={{ display: 'block', mb: 2, ml: 1.5 }}>
+          {htmlToText(content).length}/2000
+        </Typography>
 
         {/* Topic + Subtopic */}
         <Stack direction="row" spacing={1.5} mb={2}>
@@ -286,7 +291,7 @@ function PostForm({ open, editPost, topics, accessToken, user, onClose, onSaved 
         <Button onClick={onClose} sx={{ borderRadius: 2, textTransform: 'none' }}>Cancel</Button>
         <Button
           variant="contained" onClick={handleSubmit}
-          disabled={saving || !content.trim()}
+          disabled={saving || !htmlToText(content)}
           sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700 }}
         >
           {saving ? <CircularProgress size={18} color="inherit" /> : editPost ? 'Save Changes' : 'Publish'}
