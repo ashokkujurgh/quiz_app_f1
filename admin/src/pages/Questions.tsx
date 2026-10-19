@@ -275,12 +275,21 @@ export default function Questions() {
   const [search, setSearch]             = useState('');
   // Pending approval = inactive questions (e.g. current-affairs questions awaiting review)
   const [showPending, setShowPending]   = useState(false);
+  // Paging: the API returns 100 at a time plus the real total
+  const PAGE_SIZE = 100;
+  const [total, setTotal]               = useState(0);
+  const [page, setPage]                 = useState(1);
+  const [loadingMore, setLoadingMore]   = useState(false);
 
   // ── Data fetching ───────────────────────────────────────────────────────────
 
   const fetchTopics = useCallback(async () => {
     const { data } = await api.get('/api/topics');
     setTopics(data.topics);
+    // Load every topic's subtopics so each question shows its subtopic name (not its id)
+    const lists = await Promise.all((data.topics as Topic[]).map((t) =>
+      api.get(`/api/topics/${t._id}/subtopics`).then((r) => r.data.subtopics as SubTopic[]).catch(() => [] as SubTopic[])));
+    setSubTopics(lists.flat());
   }, []);
 
   const fetchSubTopicsForTopic = useCallback(async (topicId: string) => {
@@ -292,25 +301,49 @@ export default function Questions() {
     });
   }, []);
 
+  const buildParams = useCallback((pageNum: number) => {
+    const params = new URLSearchParams();
+    if (filterTopic) params.set('topic', filterTopic);
+    if (filterSub)   params.set('subTopic', filterSub);
+    if (filterDiff)  params.set('difficulty', filterDiff);
+    if (search)      params.set('search', search);
+    params.set('limit', String(PAGE_SIZE));
+    params.set('page', String(pageNum));
+    return params;
+  }, [filterTopic, filterSub, filterDiff, search]);
+
   const fetchQuestions = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams();
-      if (filterTopic) params.set('topic', filterTopic);
-      if (filterSub)   params.set('subTopic', filterSub);
-      if (filterDiff)  params.set('difficulty', filterDiff);
-      if (search)      params.set('search', search);
-      params.set('limit', '100');
       const { data } = showPending
         ? await api.get('/api/questions/pending?limit=200')
-        : await api.get(`/api/questions?${params}`);
+        : await api.get(`/api/questions?${buildParams(1)}`);
       setQuestions(data.questions);
+      setTotal(showPending ? (data.total ?? data.questions.length) : (data.pagination?.total ?? data.questions.length));
+      setPage(1);
     } catch {
       setError('Failed to load questions.');
     } finally {
       setLoading(false);
     }
-  }, [filterTopic, filterSub, filterDiff, search, showPending]);
+  }, [buildParams, showPending]);
+
+  const loadMore = async () => {
+    setLoadingMore(true);
+    try {
+      const { data } = await api.get(`/api/questions?${buildParams(page + 1)}`);
+      setQuestions((prev) => {
+        const seen = new Set(prev.map((q) => q._id));
+        return [...prev, ...(data.questions as Question[]).filter((q) => !seen.has(q._id))];
+      });
+      setTotal(data.pagination?.total ?? total);
+      setPage((p) => p + 1);
+    } catch {
+      setError('Failed to load more questions.');
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   useEffect(() => { fetchTopics(); }, [fetchTopics]);
   useEffect(() => { fetchQuestions(); }, [fetchQuestions]);
@@ -402,7 +435,11 @@ export default function Questions() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Questions</h1>
-          <p className="text-sm text-gray-500 mt-0.5">{questions.length} questions</p>
+          <p className="text-sm text-gray-500 mt-0.5">
+            {showPending
+              ? `${total} pending approval`
+              : questions.length < total ? `Showing ${questions.length} of ${total} questions` : `${total} questions`}
+          </p>
         </div>
         <button
           onClick={openCreate}
@@ -627,6 +664,19 @@ export default function Questions() {
               </div>
             );
           })}
+          {!showPending && questions.length < total && (
+            <div className="pt-2 text-center">
+              <button
+                type="button"
+                onClick={loadMore}
+                disabled={loadingMore}
+                className="text-sm font-semibold rounded-xl px-5 py-2.5 border border-gray-200 dark:border-gray-700
+                  text-gray-700 dark:text-gray-200 hover:border-indigo-400 disabled:opacity-50"
+              >
+                {loadingMore ? 'Loading…' : `Load more (${total - questions.length} more)`}
+              </button>
+            </div>
+          )}
         </div>
       )}
 
