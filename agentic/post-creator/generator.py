@@ -169,7 +169,7 @@ Structure (follow this order):
 Rules:
 - No story openings, no news hooks, no "In 1991, X decided..." style beginnings, no current affairs.
 - Never say "Did you know" or "In conclusion".
-- Length: 500-900 words.
+- Length: 350-500 words in total (headings and key points included). NEVER more than 500 words.
 """ + _QUALITY_BAR
 
 _SYSTEM_FUN = """\
@@ -380,7 +380,7 @@ Write a {mode} post on ONE specific, chapter-sized concept from the standard "{s
 overview of the whole subject. {avoid_note}{seo_note}
 The post must focus on teaching this subject deeply — not on current events or news.
 Title should be a {title_hint}.
-IMPORTANT: The content must be 500-1000 words. Do not write less than 500 words.
+IMPORTANT: The content must be 350-500 words in total. NEVER more than 500 words — cut, don't pad.
 
 Return ONLY valid JSON — no markdown, no code fences:
 
@@ -419,12 +419,17 @@ Return ONLY valid JSON — no markdown, no code fences:
                 "made-up hypothetical scene, replace that opener with a real, specific, verifiable fact, event, "
                 "or statistic instead. Remove any banned phrase entirely and reword naturally, the way a good "
                 "Indian teacher would say it. Fix any US spellings to British/Indian English. Make the title "
-                "reference a specific fact/name from the content, not a generic template. Keep the same length "
-                "and JSON format."
+                "reference a specific fact/name from the content, not a generic template. Keep the content "
+                f"within {MAX_POST_WORDS} words (trim the least important sentences if it is longer), and keep the "
+                "same JSON format."
             )})
             data = _generate_once(messages)
         else:
             remaining = _quality_violations(html_to_text(data["content"]))
+            if _hard_violations(remaining):
+                logger.error("[%s] Still breaks a hard rule after 2 rewrites (%s) — not publishing.",
+                             mode, "; ".join(_hard_violations(remaining)))
+                return None
             if remaining:
                 logger.warning("[%s] Still has issues after 2 rewrites (%s) — using it anyway.", mode, "; ".join(remaining))
 
@@ -448,6 +453,10 @@ Return ONLY valid JSON — no markdown, no code fences:
             still = _fact_check(data.get("title") or "", html_to_text(data["content"]))
             if still:
                 logger.error("[%s] Fact-check still flags %d claim(s) after the fix — not publishing.", mode, len(still))
+                return None
+            hard = _hard_violations(_quality_violations(html_to_text(data["content"])))
+            if hard:  # the fact-fix rewrite must not reintroduce exam talk or overrun the length cap
+                logger.error("[%s] Fact-fixed draft breaks a hard rule (%s) — not publishing.", mode, "; ".join(hard))
                 return None
 
         word_count = len(html_to_text(data["content"]).split())
@@ -477,7 +486,13 @@ _US_SPELLINGS     = {"color": "colour", "colors": "colours", "favorite": "favour
 _EXAM_TALK_RE     = re.compile(r"\b(exams?|examinations?|aspirants?|competitive|frequently (?:tested|asked)|"
                                r"students preparing|recruitment tests?)\b", re.I)
 _EXAM_NAMES_RE    = re.compile(r"\b(SSC|UPSC|IBPS|GATE|PSUs?|CGL|Bank PO|RRB)\b")  # case-sensitive: skips "logic gate"
+MAX_POST_WORDS    = 500  # hard cap on post length (plain-text words)
 _HYPOTHETICAL_OPENERS = ["imagine you", "imagine standing", "imagine a world", "imagine a", "picture yourself", "picture this"]
+
+
+def _hard_violations(violations: list[str]) -> list[str]:
+    """Rules a post must never break when published: no exam talk, and the word cap."""
+    return [v for v in violations if v.startswith("mentions exams") or v.startswith("is ") and " words — cut" in v]
 
 
 def _quality_violations(content: str) -> list[str]:
@@ -494,6 +509,9 @@ def _quality_violations(content: str) -> list[str]:
     if exam_talk:
         violations.append("mentions exams/aspirants (" + ", ".join(exam_talk) + ") — remove every sentence about exam "
                           "relevance or exam names; keep only subject content")
+    words = len(content.split())
+    if words > MAX_POST_WORDS:
+        violations.append(f"is {words} words — cut it to at most {MAX_POST_WORDS} words, keeping every section")
     if "key points to remember" not in text:
         violations.append('missing the "Key points to remember" list at the end (4-6 lines starting with "- ")')
     paras = [len(p.split()) for p in content.split("\n") if p.strip()]
