@@ -128,9 +128,9 @@ export function Navbar({ onMenuToggle }: Props) {
           component="span"
           onClick={() => navigate('/home')}
           sx={(t) => ({
-            display: { xs: 'none', sm: 'block' },
+            display: 'block',  // on phones the logo is hidden, so the wordmark sits next to the menu icon
             cursor: 'pointer',
-            fontSize: 24,
+            fontSize: { xs: 22, sm: 24 },
             fontWeight: 800,
             letterSpacing: '-0.02em',
             lineHeight: 1,
