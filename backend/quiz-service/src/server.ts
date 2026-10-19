@@ -12,7 +12,12 @@ import quizRoutes from './routes/quiz';
 import { rehydrateSchedules, startCleanupJob, startPostRecoveryJob } from './jobs/scheduler';
 import { initGameSocket } from './socket/gameController';
 
-initFirebase();
+// Push notifications only — never let a bad/missing Firebase key take the quiz service down
+try {
+  initFirebase();
+} catch (err) {
+  console.warn('⚠️  Firebase Admin init failed — push notifications disabled:', (err as Error).message);
+}
 
 const app    = express();
 app.set('trust proxy', 1);

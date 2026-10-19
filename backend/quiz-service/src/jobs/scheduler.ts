@@ -4,8 +4,10 @@ import { startGameSession } from '../socket/gameController';
 import { recoverMissingPosts } from '../services/quizPostService';
 import { sendQuizReminder, sendQuizStarted } from '../services/notificationService';
 
-// quizId → cron task handle
-const _tasks = new Map<string, cron.ScheduledTask>();
+// quizId → start handle (cron task for recurring quizzes, timer for one-off quizzes)
+const _tasks = new Map<string, { stop: () => void }>();
+// setTimeout's maximum delay (~24.8 days); beyond that a one-off quiz falls back to cron
+const MAX_TIMEOUT_MS = 2_147_483_647;
 // quizId → reminder setTimeout handle
 const _reminders = new Map<string, ReturnType<typeof setTimeout>>();
 
@@ -117,12 +119,34 @@ export function scheduleQuiz(quiz: IQuiz): void {
   cancelQuiz(id);
 
   if (ms <= 0) {
+    // Start time already passed (e.g. service restarted). A one-off quiz keeps its original
+    // end time; one that has already ended is left for the cleanup sweep.
+    if (quiz.scheduleType === 'once') {
+      const minutesLeft = Math.floor((quiz.scheduledAt.getTime() + quiz.durationMinutes * 60_000 - now) / 60_000);
+      if (minutesLeft < 5) return;
+      Quiz.findByIdAndUpdate(id, { durationMinutes: minutesLeft })
+        .then(() => activateQuiz(id))
+        .catch(console.error);
+      return;
+    }
     activateQuiz(id).catch(console.error);
     return;
   }
 
   // Schedule 10-min reminder
   scheduleReminder(id, quiz.title, quiz.scheduledAt);
+
+  // One-off quizzes start on a precise timer. A minute-precision cron misses its start when the
+  // quiz is created within the same minute as its start time (e.g. created 19:21:17 for 19:21:51).
+  if (quiz.scheduleType === 'once' && ms <= MAX_TIMEOUT_MS) {
+    const handle = setTimeout(() => {
+      _tasks.delete(id);
+      activateQuiz(id).catch(console.error);
+    }, ms);
+    _tasks.set(id, { stop: () => clearTimeout(handle) });
+    console.log(`⏰ Quiz "${quiz.title}" scheduled: starts ${quiz.scheduledAt.toISOString()} (once, timer)`);
+    return;
+  }
 
   const expr = toCronExpression(quiz.scheduledAt, quiz.scheduleType);
   const task = cron.schedule(expr, () => {
@@ -147,9 +171,27 @@ export async function rehydrateSchedules(): Promise<void> {
   console.log(`🔄 Rehydrated ${quizzes.length} scheduled quiz(zes).`);
 }
 
+// ── Missed-start recovery ─────────────────────────────────────────────────────
+// Safety net: a scheduled quiz whose start time has passed but which should still be
+// running is started now, keeping its original end time (duration = time left).
+async function startMissedQuizzes(now: Date): Promise<void> {
+  const missed = await Quiz.find({ status: 'scheduled', scheduledAt: { $lte: new Date(now.getTime() - 60_000) } });
+  for (const quiz of missed) {
+    const id = (quiz._id as { toString(): string }).toString();
+    const endsAt = quiz.scheduledAt.getTime() + quiz.durationMinutes * 60_000;
+    const minutesLeft = Math.floor((endsAt - now.getTime()) / 60_000);
+    if (quiz.scheduleType !== 'once' || minutesLeft < 5) continue; // recurring/expired: handled elsewhere
+    await Quiz.findByIdAndUpdate(id, { durationMinutes: minutesLeft });
+    cancelQuiz(id);
+    console.log(`⏯️  Missed start: quiz "${quiz.title}" (${id}) starting now for its remaining ${minutesLeft} min.`);
+    await activateQuiz(id);
+  }
+}
+
 // ── Stale-game cleanup — runs every 10 minutes ─────────────────────────────────
 async function cleanupStaleGames(): Promise<void> {
   const now = new Date();
+  await startMissedQuizzes(now).catch((err) => console.error('[MissedStart] error:', err));
   const stale = await Quiz.find({ status: 'active', startedAt: { $ne: null } }).lean();
 
   const expired = stale.filter((q) => {
