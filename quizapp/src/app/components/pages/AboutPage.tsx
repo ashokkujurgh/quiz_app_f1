@@ -22,7 +22,7 @@ export function AboutPage() {
       <InfoSection title="What you can do on Meenzo">
         <ul>
           <li><strong>Play daily games</strong> — new quiz games every day, open all day from midnight to midnight IST, across engineering subjects and general knowledge, with a live leaderboard.</li>
-          <li><strong>Practise any topic</strong> — engineering (GATE), Indian history, geography, polity and economy, general science and GK, aptitude, reasoning and English — at your own pace.</li>
+          <li><strong>Practise any topic</strong> — engineering (GATE), Indian history, geography, polity and economy, general science and GK, aptitude and reasoning — at your own pace.</li>
           <li><strong>Learn from short posts</strong> — read clear, textbook-style explainers on history, science, polity, economy, engineering and more.</li>
           <li><strong>Learn together</strong> — add friends, share posts, comment, message and compare scores.</li>
           <li><strong>Track your progress</strong> — see your game history, scores and how you rank over time.</li>

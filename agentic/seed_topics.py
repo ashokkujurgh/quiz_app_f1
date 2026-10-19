@@ -38,11 +38,10 @@ TOPICS = [
     },
     {
         "name": "Aptitude & Reasoning",
-        "description": "Quantitative Aptitude, Logical Reasoning and English for SSC, Banking, Police, PSU and private-company recruitment tests.",
+        "description": "Quantitative Aptitude and Logical Reasoning for SSC, Banking, Police, PSU and private-company recruitment tests.",
         "subtopics": [
             "Quantitative Aptitude",
             "Logical Reasoning",
-            "English Language",
         ],
     },
     {
@@ -82,10 +81,10 @@ def _apply_renames() -> None:
                 logger.info("  Renamed subtopic %s → %s (%s)", old, new, r.status_code)
 
 
-# Programming / IT content was removed (Oct 2026). Keep these deactivated — never deleted,
-# so their questions and posts stay recoverable — and out of every generator and game.
+# Removed content (Oct 2026): Programming / IT, and English Language. Keep these deactivated —
+# never deleted, so their questions and posts stay recoverable — and out of every generator and game.
 DEACTIVATED_TOPICS    = {"Programming"}
-DEACTIVATED_SUBTOPICS = {"Computer Science"}
+DEACTIVATED_SUBTOPICS = {"Computer Science", "English Language"}
 
 
 def _apply_deactivations() -> None:
