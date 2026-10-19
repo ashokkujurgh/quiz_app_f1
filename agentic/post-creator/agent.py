@@ -22,6 +22,8 @@ from filter_client import is_content_allowed
 from notifier import send_approval_email
 from config import POSTS_PER_RUN, IMAGE_ENABLED
 
+MAX_RETRIES = 2  # other subjects to try when a post is rejected
+
 logger = logging.getLogger(__name__)
 
 
@@ -43,10 +45,15 @@ def run_agent() -> None:
         return
 
     # 2. Pick with diversity
-    selected = pick_subtopics_with_priority(subtopics, POSTS_PER_RUN)
-    logger.info("Selected %d subtopics: %s", len(selected), [s["name"] for s in selected])
+    # Extra candidates: if a post is rejected (e.g. by the fact-check), try another subject
+    # so the run still delivers POSTS_PER_RUN posts.
+    selected = pick_subtopics_with_priority(subtopics, POSTS_PER_RUN + MAX_RETRIES)
+    logger.info("Candidates (%d needed): %s", POSTS_PER_RUN, [s["name"] for s in selected])
+    created = 0
 
     for subtopic in selected:
+        if created >= POSTS_PER_RUN:
+            break
         topic_name    = subtopic["topicName"]
         subtopic_name = subtopic["name"]
 
@@ -146,6 +153,7 @@ def run_agent() -> None:
             },
         )
 
+        created += 1
         logger.info(
             "✅ [%s/%s] Post created: '%s' (%s > %s)",
             mode.upper(),
@@ -155,4 +163,6 @@ def run_agent() -> None:
             subtopic_name,
         )
 
-    logger.info("=== Post-creator agent finished ===")
+    if created < POSTS_PER_RUN:
+        logger.warning("Only %d of %d post(s) created this run.", created, POSTS_PER_RUN)
+    logger.info("=== Post-creator agent finished (%d post(s) created) ===", created)
