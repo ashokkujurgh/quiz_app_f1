@@ -2,14 +2,16 @@ import { useState, useRef, useEffect, lazy, Suspense } from 'react';
 import {
   Box, Stack, Button, Chip, Card, CardContent,
   Avatar, Dialog, DialogTitle, DialogContent, DialogActions,
-  TextField, MenuItem, IconButton, CircularProgress, Alert, Typography, Skeleton,
+  TextField, MenuItem, IconButton, CircularProgress, Alert, Typography, Skeleton, useMediaQuery,
 } from '@mui/material';
+import type { Theme } from '@mui/material/styles';
 import { Add, Image, Close, Login, PersonAdd, EditNote } from '@mui/icons-material';
 import { useNavigate } from 'react-router';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import { setActiveTopic, addPost, setPosts, setLoading } from '../../store/slices/postsSlice';
 import { useIsOnline } from '../../context/OnlineUsersContext';
 import { PostCard } from '../shared/PostCard';
+import { LiveGamesSection } from '../layout/RightSidebar';
 import { PostSkeleton } from '../shared/LoadingSkeleton';
 import { EmptyState } from '../shared/EmptyState';
 import { Inbox } from '@mui/icons-material';
@@ -35,6 +37,8 @@ export function HomePage() {
   const selfOnline = useIsOnline(user?.id);
   const isGuest = !accessToken;
   const displayName = user?.name?.split(' ')[0] ?? 'there';
+  // Below lg the right sidebar is hidden, so Live Games moves to the top of the feed
+  const sidebarHidden = useMediaQuery((t: Theme) => t.breakpoints.down('lg'));
 
   // ── Topics & subtopics from API ───────────────────────────────────────────────
   const [topics, setTopics]             = useState<ApiTopic[]>([]);
@@ -238,6 +242,8 @@ export function HomePage() {
 
   return (
     <Box>
+      {sidebarHidden && <Box sx={{ mb: 2 }}><LiveGamesSection /></Box>}
+
       {/* Create Post / Guest Banner */}
       {isGuest ? (
         <Card sx={{

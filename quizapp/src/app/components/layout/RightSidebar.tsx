@@ -26,7 +26,7 @@ interface ApiQuiz {
 interface ApiSubTopic { _id: string; name: string; topic: string }
 
 // ── Live / Active Games ───────────────────────────────────────────────────────
-function LiveGamesSection() {
+export function LiveGamesSection() {
   const navigate = useNavigate();
   const accessToken = useAppSelector((s) => s.auth.accessToken);
   const [allGames, setAllGames] = useState<ApiQuiz[]>([]);
