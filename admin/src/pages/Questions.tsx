@@ -275,8 +275,8 @@ export default function Questions() {
   const [search, setSearch]             = useState('');
   // Pending approval = inactive questions (e.g. current-affairs questions awaiting review)
   const [showPending, setShowPending]   = useState(false);
-  // Paging: the API returns 100 at a time plus the real total
-  const PAGE_SIZE = 100;
+  // Paging: the API returns up to 200 at a time (its maximum) plus the real total
+  const PAGE_SIZE = 200;
   const [total, setTotal]               = useState(0);
   const [page, setPage]                 = useState(1);
   const [loadingMore, setLoadingMore]   = useState(false);
