@@ -80,13 +80,13 @@ EMBED_DIM           = 1536
 # Duplicate threshold — cosine similarity above this = already exists
 SIMILARITY_THRESHOLD = 0.90
 
-# 1 post per run × 2 runs = 2 posts per day
+# 1 post per run × 4 runs = 4 posts per day
 POSTS_PER_RUN       = int(os.getenv("POSTS_PER_RUN", "1"))
 
-# Schedule (IST → UTC, IST = UTC+5:30):
-#   08:00 IST = 02:30 UTC  (morning)
-#   19:00 IST = 13:30 UTC  (evening)
+# Schedule (IST → UTC, IST = UTC+5:30), spread through the day:
 CRON_SCHEDULE_UTC = [
     (2,  30),   # 08:00 IST — morning
-    (13, 30),   # 19:00 IST — evening
+    (6,  30),   # 12:00 IST — noon
+    (10, 30),   # 16:00 IST — afternoon
+    (14, 30),   # 20:00 IST — evening
 ]
