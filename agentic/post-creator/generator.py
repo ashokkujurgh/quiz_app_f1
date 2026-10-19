@@ -130,8 +130,11 @@ VOICE — NATURAL INDIAN ENGLISH, WRITTEN LIKE A GOOD TEACHER (very important):
 - No list-of-three padding in every sentence, no dramatic one-word sentences ("Revolutionary."),
   and no preachy moral at the end (the "Key points to remember" list is the only summary).
 - When unsure of an exact count, date or figure, describe it in words rather than state a number.
-- Light Indian context is welcome where it fits naturally (board exams, competitive exam prep,
-  everyday Indian examples) — never forced, never stereotyped.
+- Light Indian context is welcome where it fits naturally (everyday Indian examples) — never forced,
+  never stereotyped.
+- Write only about the subject itself. NEVER mention exams, exam relevance, aspirants, students preparing,
+  or exam names (SSC, banking, UPSC, GATE, PSU…) in the post — no "this is important for exams" or
+  "frequently tested" sentences, no addressing the reader as an exam-taker.
 """
 
 # Appended to every mode's system prompt
@@ -252,13 +255,13 @@ def _audience_clause(topic_name: str, subtopic_name: str) -> str:
     if not aud:
         return ""
     clause = (
-        f"\nREADERS: {aud['readers']}. Teach what such an aspirant actually needs to understand and remember. "
-        "You may mention exam relevance once, naturally, in a sentence — never as a list of tags or hashtags."
+        f"\nREADERS: {aud['readers']}. Teach what such a reader actually needs to understand and remember. "
+        "This only guides depth and choice of facts — do NOT mention exams, aspirants or exam relevance anywhere in the post."
     )
     if topic_name.strip().lower() == "aptitude & reasoning":
         clause += (
             "\nInclude one or two fully worked examples with clean numbers, showing each step, plus a quick shortcut "
-            "aspirants can use in the exam. Double-check every calculation."
+            "method. Double-check every calculation."
         )
     return clause
 
@@ -470,6 +473,10 @@ _US_SPELLINGS     = {"color": "colour", "colors": "colours", "favorite": "favour
                      "analyze": "analyse", "analyzed": "analysed", "organization": "organisation",
                      "organizations": "organisations", "center": "centre", "centers": "centres",
                      "labor": "labour", "meter": "metre", "meters": "metres", "neighbor": "neighbour"}
+# Exam-relevance filler ("important for SSC and banking exams…") — the post must stay on the subject
+_EXAM_TALK_RE     = re.compile(r"\b(exams?|examinations?|aspirants?|competitive|frequently (?:tested|asked)|"
+                               r"students preparing|recruitment tests?)\b", re.I)
+_EXAM_NAMES_RE    = re.compile(r"\b(SSC|UPSC|IBPS|GATE|PSUs?|CGL|Bank PO|RRB)\b")  # case-sensitive: skips "logic gate"
 _HYPOTHETICAL_OPENERS = ["imagine you", "imagine standing", "imagine a world", "imagine a", "picture yourself", "picture this"]
 
 
@@ -482,6 +489,11 @@ def _quality_violations(content: str) -> list[str]:
     for phrase in _BANNED_PHRASES:
         if phrase in text:
             violations.append(f'contains banned phrase "{phrase}"')
+    exam_talk = sorted({m.group(0) for m in _EXAM_TALK_RE.finditer(content)}
+                       | {m.group(0) for m in _EXAM_NAMES_RE.finditer(content)})
+    if exam_talk:
+        violations.append("mentions exams/aspirants (" + ", ".join(exam_talk) + ") — remove every sentence about exam "
+                          "relevance or exam names; keep only subject content")
     if "key points to remember" not in text:
         violations.append('missing the "Key points to remember" list at the end (4-6 lines starting with "- ")')
     paras = [len(p.split()) for p in content.split("\n") if p.strip()]
