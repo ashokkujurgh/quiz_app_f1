@@ -144,10 +144,14 @@ export const renderPostPage: RequestHandler = async (req: Request, res: Response
   }
 };
 
-// ── Static info pages (About, Privacy Policy, Contact) ───────────────────────
+// ── Static info pages (Home, About, Privacy Policy, Contact) ─────────────────
 // Indexable, with their own title/description/canonical; same HTML for everyone.
 
 const STATIC_PAGES: Record<string, { title: string; description: string }> = {
+  'home': {
+    title: 'Meenzo — Daily Quizzes and Study Posts for Government Exams',
+    description: 'Meenzo — free daily quizzes and study posts for GATE, PSU, SSC, State SSC, Banking, Police, State and Central Government exams.',
+  },
   'about': {
     title: 'About Us — Meenzo',
     description: 'Meenzo helps Indian students and job seekers prepare for GATE, PSU, SSC, Banking, Police and Government exams with daily quizzes and study posts.',
