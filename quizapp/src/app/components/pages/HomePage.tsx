@@ -242,8 +242,6 @@ export function HomePage() {
 
   return (
     <Box>
-      {sidebarHidden && <Box sx={{ mb: 2 }}><LiveGamesSection /></Box>}
-
       {/* Create Post / Guest Banner */}
       {isGuest ? (
         <Card sx={{
@@ -311,6 +309,9 @@ export function HomePage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Live Games — only here when the right sidebar is hidden */}
+      {sidebarHidden && <Box sx={{ mb: 2 }}><LiveGamesSection /></Box>}
 
       {/* Subtopic filter chips */}
       <Box sx={{ mb: 2, overflowX: 'auto', pb: 0.5 }}>
