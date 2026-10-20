@@ -5,6 +5,7 @@ import { useAppSelector } from '../store/hooks';
 import { AppLayout } from '../components/layout/AppLayout';
 import { NavOnlyLayout } from '../components/layout/NavOnlyLayout';
 import { PageErrorBoundary, RouteErrorPage, NotFoundPage } from '../components/shared/ErrorBoundary';
+import { SHOW_LEADERBOARD } from '../utils/features';
 
 // ── Route-level code splitting ────────────────────────────────────────────────
 // Each page is its own chunk, downloaded the first time its route is visited.
@@ -101,7 +102,7 @@ const routes: RouteObject[] = [
       { path: 'contact',        element: page(<ContactPage />) },
       { path: 'friends',       element: page(<RequireAuth><FriendsPage /></RequireAuth>) },
       { path: 'messages',      element: page(<RequireAuth><MessagesPage /></RequireAuth>) },
-      { path: 'leaderboard',   element: page(<RequireAuth><LeaderboardPage /></RequireAuth>) },
+      { path: 'leaderboard',   element: SHOW_LEADERBOARD ? page(<RequireAuth><LeaderboardPage /></RequireAuth>) : <Navigate to="/home" replace /> },
       { path: 'profile',           element: page(<RequireAuth><ProfilePage /></RequireAuth>) },
       { path: 'profile/:userId',   element: page(<RequireAuth><UserProfilePage /></RequireAuth>) },
       { path: 'posts',         element: page(<RequireAuth><PostsPage /></RequireAuth>) },

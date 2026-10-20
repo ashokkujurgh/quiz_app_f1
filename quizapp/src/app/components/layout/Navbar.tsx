@@ -16,6 +16,7 @@ import { toggleTheme } from '../../store/slices/themeSlice';
 import { logout } from '../../store/slices/authSlice';
 import { UserAvatar } from '../shared/UserAvatar';
 import { apiFetch } from '../../utils/apiFetch';
+import { SHOW_LEADERBOARD } from '../../utils/features';
 
 const DRAWER_WIDTH = 260;
 
@@ -289,10 +290,12 @@ export function Navbar({ onMenuToggle }: Props) {
             <ListItemIcon><Person fontSize="small" /></ListItemIcon>
             Profile
           </MenuItem>
-          <MenuItem onClick={() => { navigate('/leaderboard'); setProfileAnchor(null); }}>
-            <ListItemIcon><EmojiEvents fontSize="small" /></ListItemIcon>
-            Leaderboard
-          </MenuItem>
+          {SHOW_LEADERBOARD && (
+            <MenuItem onClick={() => { navigate('/leaderboard'); setProfileAnchor(null); }}>
+              <ListItemIcon><EmojiEvents fontSize="small" /></ListItemIcon>
+              Leaderboard
+            </MenuItem>
+          )}
           <MenuItem onClick={() => { navigate('/settings'); setProfileAnchor(null); }}>
             <ListItemIcon><Settings fontSize="small" /></ListItemIcon>
             Settings

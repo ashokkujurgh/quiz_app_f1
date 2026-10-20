@@ -262,7 +262,7 @@ export function HomePage() {
               Welcome to Meenzo 👋
             </Typography>
             <Typography variant="body2" color="text.secondary" mb={2.5}>
-              Join the community — share posts, take quizzes, and compete on the leaderboard.
+              Join the community — share posts, take quizzes, and compete with others.
             </Typography>
             <Stack direction="row" spacing={1.5}>
               <Button variant="contained" startIcon={<Login />} onClick={() => navigate('/login')} size="small">

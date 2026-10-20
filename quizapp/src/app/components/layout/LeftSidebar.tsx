@@ -12,6 +12,7 @@ import { useState, useEffect } from 'react';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import { UserAvatar } from '../shared/UserAvatar';
 import { fetchIncoming } from '../../store/slices/friendsSlice';
+import { SHOW_LEADERBOARD } from '../../utils/features';
 
 const DRAWER_WIDTH = 260;
 
@@ -20,7 +21,7 @@ const navItems = [
   { label: 'Quizzes',     icon: Quiz,       path: '/quizzes',     auth: false },
   { label: 'Friends',     icon: People,     path: '/friends',     auth: true },
   { label: 'Messages',    icon: Message,    path: '/messages',    auth: true },
-  { label: 'Leaderboard', icon: EmojiEvents,path: '/leaderboard', auth: true },
+  ...(SHOW_LEADERBOARD ? [{ label: 'Leaderboard', icon: EmojiEvents, path: '/leaderboard', auth: true }] : []),
   { label: 'My Posts',    icon: Article,    path: '/posts',       auth: true },
   { label: 'History',     icon: History,    path: '/history',     auth: true },
   { label: 'Profile',     icon: Person,     path: '/profile',     auth: true },
