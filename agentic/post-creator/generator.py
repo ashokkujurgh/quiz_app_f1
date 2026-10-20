@@ -23,7 +23,7 @@ import requests
 import base64
 from openai import OpenAI, RateLimitError
 from config import (
-    OPENAI_API_KEY, CHAT_MODEL, CHAT_FALLBACK_MODELS, FACT_CHECK_MODEL, EMBED_MODEL, EMBED_DIM, IMAGE_MODELS,
+    OPENAI_API_KEY, CHAT_MODEL, CHAT_FALLBACK_MODELS, FACT_CHECK_MODEL, HINDI_POST_MODEL, EMBED_MODEL, EMBED_DIM, IMAGE_MODELS,
     KIE_API_KEY, KIE_API_URL, KIE_IMAGE_MODEL, KIE_TIMEOUT_SECONDS,
     OPENART_ENABLED, OPENART_IMAGE_MODEL, OPENART_TIMEOUT,
 )
@@ -148,6 +148,23 @@ SOURCE RULES — TEXTBOOK KNOWLEDGE ONLY (most important rule):
 - Only state exact numbers, dates and names that are widely documented textbook facts. If you are not
   certain of an exact figure, describe it qualitatively instead of guessing.
 - Never invent statistics, quotes, studies, people or sources.
+"""
+
+# Hindi posts: replaces _VOICE_RULES (which is about Indian *English*) and renames the closing list
+HINDI_KEY_POINTS = "याद रखने योग्य मुख्य बिंदु"
+_VOICE_RULES_HI = f"""
+LANGUAGE — HINDI (very important):
+- Write the ENTIRE post — title, headings, body, key points and SEO fields — in clear, standard Hindi in
+  Devanagari, the way a good NCERT Hindi-medium textbook explains things: simple, correct, natural.
+- Use the standard Hindi terms students meet in Hindi-medium books and exam papers (e.g. "अनुच्छेद" for a
+  constitutional Article, "मौलिक अधिकार", "प्रकाश संश्लेषण"). You may add the English term in brackets once,
+  the first time a technical word appears, e.g. "प्रकाश संश्लेषण (Photosynthesis)". Otherwise no English.
+- Use lakh and crore, ₹, metric units and dates like "26 जनवरी 1950".
+- Vary sentence and paragraph length naturally; include at least two short paragraphs.
+- Do NOT invent personal stories, quotes or anecdotes. No machine-sounding filler.
+- Write only about the subject itself. NEVER mention exams, exam relevance or aspirants
+  ("परीक्षा", "प्रतियोगी", "अभ्यर्थी", SSC, UPSC …) anywhere in the post.
+- The closing heading must be exactly <h2>{HINDI_KEY_POINTS}</h2> (instead of "Key points to remember").
 """
 
 _SYSTEM_BASIC = """\
@@ -340,9 +357,11 @@ def generate_post(
     trending_hint: str | None = None,
     region: str = "world",
     recent_titles: list[str] | None = None,
+    language: str = "en",
 ) -> dict | None:
     """
     Generate a post with the given mode, reading level and region ("india" / "world").
+    language "hi" writes the whole post in Hindi (with Hindi rules and checks) and adds an English URL slug.
     Returns { title, content, seo, mode, level } or None on failure.
     """
     system_map = {
@@ -351,7 +370,11 @@ def generate_post(
         "fun":      _SYSTEM_FUN,
         "question": _SYSTEM_QUESTION,
     }
-    system_prompt = system_map.get(mode, _SYSTEM_BASIC) + _level_clause(level) + _VOICE_RULES + _TEXTBOOK_RULES
+    hindi = language == "hi"
+    # Hindi posts: gpt-4.1 invented places and facts when writing Hindi; HINDI_POST_MODEL also fact-checks them
+    gen_model = HINDI_POST_MODEL if hindi else None
+    system_prompt = (system_map.get(mode, _SYSTEM_BASIC) + _level_clause(level)
+                     + (_VOICE_RULES_HI if hindi else _VOICE_RULES) + _TEXTBOOK_RULES)
 
     aud          = _audience(topic_name)
     # Region focus only where it makes sense (not for Aptitude)
@@ -385,10 +408,11 @@ The post must focus on teaching this subject deeply — not on current events or
 Title should be a {title_hint}.
 IMPORTANT: The content must be 650-900 words in total — never fewer than 600 or more than 1000. Add depth, don't pad.
 
+{"WRITE THE WHOLE POST IN HINDI (Devanagari) — title, headings, content and SEO fields." if hindi else ""}
 Return ONLY valid JSON — no markdown, no code fences:
 
 {{
-  "title": "<{title_hint}, max 100 chars>",
+  "title": "<{title_hint}, max 100 chars>",{chr(10) + '  "slug": "<4-8 English words for the URL, lowercase, hyphen-separated>",' if hindi else ""}
   "content": "<post body — see system instructions for length and rules>",
   "seo": {{
     "metaTitle": "<SEO title with primary keyword, max 60 chars>",
@@ -407,9 +431,9 @@ Return ONLY valid JSON — no markdown, no code fences:
     ]
 
     try:
-        data = _generate_once(messages)
+        data = _generate_once(messages, gen_model)
         for attempt in range(2):
-            violations = _quality_violations(html_to_text(data["content"]))
+            violations = _quality_violations(html_to_text(data["content"]), language)
             if not violations:
                 break
             logger.warning("[%s] Quality check failed (%s) — requesting rewrite (%d/2).", mode, "; ".join(violations), attempt + 1)
@@ -425,11 +449,11 @@ Return ONLY valid JSON — no markdown, no code fences:
                 "reference a specific fact/name from the content, not a generic template. Keep the content "
                 f"between {MIN_POST_WORDS} and {MAX_POST_WORDS} words (add explanation and examples if it is shorter, "
                 "trim the least important sentences if it is longer), and keep the "
-                "same JSON format."
+                "same JSON format." + (f" Keep the whole post in Hindi, ending with <h2>{HINDI_KEY_POINTS}</h2>." if hindi else "")
             )})
-            data = _generate_once(messages)
+            data = _generate_once(messages, gen_model)
         else:
-            remaining = _quality_violations(html_to_text(data["content"]))
+            remaining = _quality_violations(html_to_text(data["content"]), language)
             if _hard_violations(remaining):
                 logger.error("[%s] Still breaks a hard rule after 2 rewrites (%s) — not publishing.",
                              mode, "; ".join(_hard_violations(remaining)))
@@ -439,9 +463,11 @@ Return ONLY valid JSON — no markdown, no code fences:
 
         if not _is_html(data["content"]):          # legacy plain-text output only
             data["content"] = _tidy_bookish(data["content"])
+        if hindi and (data.get("slug") or "").strip():
+            data["slug"] = re.sub(r"[^a-z0-9-]+", "-", data["slug"].strip().lower()).strip("-")[:80] or None
 
         # Fact-check pass: a strict, independent review of specific claims; fix anything wrong
-        issues = _fact_check(data.get("title") or "", html_to_text(data["content"]))
+        issues = _fact_check(data.get("title") or "", html_to_text(data["content"]), gen_model)
         if issues:
             logger.warning("[%s] Fact-check flagged %d claim(s): %s — rewriting.", mode, len(issues),
                            " | ".join(f"{i.get('claim', '')[:60]} → {i.get('correction', '')[:60]}" for i in issues))
@@ -451,14 +477,14 @@ Return ONLY valid JSON — no markdown, no code fences:
                 "if you are not certain), and change nothing else. Keep the same JSON format:\n" +
                 "\n".join(f"- WRONG: {i.get('claim')}  CORRECT: {i.get('correction')}" for i in issues)
             )})
-            data = _generate_once(messages)
+            data = _generate_once(messages, gen_model)
             if not _is_html(data["content"]):
                 data["content"] = _tidy_bookish(data["content"])
-            still = _fact_check(data.get("title") or "", html_to_text(data["content"]))
+            still = _fact_check(data.get("title") or "", html_to_text(data["content"]), gen_model)
             if still:
                 logger.error("[%s] Fact-check still flags %d claim(s) after the fix — not publishing.", mode, len(still))
                 return None
-            hard = _hard_violations(_quality_violations(html_to_text(data["content"])))
+            hard = _hard_violations(_quality_violations(html_to_text(data["content"]), language))
             if hard:  # the fact-fix rewrite must not reintroduce exam talk or leave the length range
                 logger.error("[%s] Fact-fixed draft breaks a hard rule (%s) — not publishing.", mode, "; ".join(hard))
                 return None
@@ -467,6 +493,7 @@ Return ONLY valid JSON — no markdown, no code fences:
         logger.info("[%s/%s] Generated %d words for content.", mode, level, word_count)
         data["mode"] = mode
         data["level"] = level
+        data["language"] = language
         return data
     except Exception as exc:
         logger.error("[%s] Content generation failed: %s", mode, exc)
@@ -500,8 +527,13 @@ def _hard_violations(violations: list[str]) -> list[str]:
     return [v for v in violations if v.startswith("mentions exams") or v.startswith("is ") and " words — " in v]
 
 
-def _quality_violations(content: str) -> list[str]:
+# Hindi exam talk ("परीक्षा में पूछा जाता है", "अभ्यर्थी" …) — same hard rule as the English list
+_EXAM_TALK_HI_RE  = re.compile(r"(परीक्षा|परीक्षाओं|प्रतियोगी|अभ्यर्थी|परीक्षार्थी)")
+
+
+def _quality_violations(content: str, language: str = "en") -> list[str]:
     text = content.lower()
+    hindi = language == "hi"
     violations = []
     opener = text[:200]
     if any(phrase in opener for phrase in _HYPOTHETICAL_OPENERS):
@@ -510,7 +542,8 @@ def _quality_violations(content: str) -> list[str]:
         if phrase in text:
             violations.append(f'contains banned phrase "{phrase}"')
     exam_talk = sorted({m.group(0) for m in _EXAM_TALK_RE.finditer(content)}
-                       | {m.group(0) for m in _EXAM_NAMES_RE.finditer(content)})
+                       | {m.group(0) for m in _EXAM_NAMES_RE.finditer(content)}
+                       | ({m.group(0) for m in _EXAM_TALK_HI_RE.finditer(content)} if hindi else set()))
     if exam_talk:
         violations.append("mentions exams/aspirants (" + ", ".join(exam_talk) + ") — remove every sentence about exam "
                           "relevance or exam names; keep only subject content")
@@ -520,7 +553,14 @@ def _quality_violations(content: str) -> list[str]:
     elif words < MIN_POST_WORDS:
         violations.append(f"is {words} words — expand it to at least {MIN_POST_WORDS} words with more explanation "
                           "and examples, without repeating any point")
-    if "key points to remember" not in text:
+    if hindi:
+        if HINDI_KEY_POINTS not in content:
+            violations.append(f'missing the "{HINDI_KEY_POINTS}" list at the end (4-6 short points)')
+        deva = len(re.findall(r"[\u0900-\u097F]", content))
+        latin = len(re.findall(r"[A-Za-z]", content))
+        if deva < 4 * max(latin, 1):
+            violations.append("too much English — write the post in Hindi (English terms only once, in brackets)")
+    elif "key points to remember" not in text:
         violations.append('missing the "Key points to remember" list at the end (4-6 lines starting with "- ")')
     paras = [len(p.split()) for p in content.split("\n") if p.strip()]
     if len(paras) >= 4 and sum(1 for n in paras if n <= 50) < 2:
@@ -528,7 +568,7 @@ def _quality_violations(content: str) -> list[str]:
     not_just = text.count("not just") + text.count("not only")
     if not_just > 1:
         violations.append(f'uses the "not just… / not only…" construction {not_just} times (max once)')
-    us = sorted({w for w in re.findall(r"[a-z]+", text) if w in _US_SPELLINGS})
+    us = sorted({w for w in re.findall(r"[a-z]+", text) if w in _US_SPELLINGS}) if not hindi else []
     if us:
         violations.append("uses US spelling (" + ", ".join(f"{w}→{_US_SPELLINGS[w]}" for w in us) + ") — use Indian/British English")
     analogy_count = sum(text.count(marker) for marker in _ANALOGY_MARKERS)
@@ -572,16 +612,17 @@ def _tidy_bookish(content: str) -> str:
     return "\n".join(lines).strip()
 
 
-def _fact_check(title: str, content: str) -> list[dict]:
+def _fact_check(title: str, content: str, model: str | None = None) -> list[dict]:
     """
     Independent check of specific factual claims (numbers, dates, names, counts) against standard
     textbook knowledge. Returns [{claim, correction}] for errors; [] if clean or if the check can't run.
     """
+    model = model or FACT_CHECK_MODEL
     try:
         resp = _client.chat.completions.create(
-            model=FACT_CHECK_MODEL,
-            temperature=0,
+            model=model,
             response_format={"type": "json_object"},
+            **_sampling(model, 0, 2048),
             messages=[
                 {"role": "system", "content": (
                     "You are a strict fact-checker for Indian competitive-exam study material. Check every specific "
@@ -601,16 +642,23 @@ def _fact_check(title: str, content: str) -> list[dict]:
         return []
 
 
-def _generate_once(messages: list[dict]) -> dict:
-    models = [CHAT_MODEL] + [m for m in CHAT_FALLBACK_MODELS if m != CHAT_MODEL]
+def _sampling(model: str, temperature: float, max_tokens: int) -> dict:
+    """gpt-5 / o-series models take only the default temperature and use max_completion_tokens."""
+    if model.startswith(("gpt-5", "o")):
+        return {"max_completion_tokens": max_tokens * 4}   # room for reasoning tokens too
+    return {"temperature": temperature, "max_tokens": max_tokens}
+
+
+def _generate_once(messages: list[dict], model: str | None = None) -> dict:
+    first = model or CHAT_MODEL
+    models = [first] + [m for m in CHAT_FALLBACK_MODELS if m != first]
     for i, model in enumerate(models):
         try:
             resp = _client.chat.completions.create(
                 model=model,
                 messages=messages,
-                temperature=0.85,
-                max_tokens=4096,
                 response_format={"type": "json_object"},
+                **_sampling(model, 0.85, 4096),
             )
             break
         except RateLimitError:

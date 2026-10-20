@@ -21,6 +21,7 @@ from apscheduler.triggers.cron import CronTrigger
 from flask import Flask, jsonify, request
 from apscheduler.triggers.interval import IntervalTrigger
 from config import (CRON_SCHEDULE_UTC, DAILY_GAMES_ENABLED, GAME_PREPARE_IST, MEMES_ENABLED, MEME_SCHEDULE_IST,
+                    HINDI_POSTS_ENABLED, HINDI_POST_SCHEDULE_IST,
                     JOBS_ENABLED, JOBS_SCHEDULE_IST, JOB_SERIES_CHECK_MINUTES)
 from agent import run_agent
 from daily_games import run_daily_games
@@ -48,13 +49,16 @@ def health():
 
 @app.post("/trigger")
 def trigger():
-    # Optional JSON body {"subtopics": ["Rajasthan GK", …]}: one post for each named subject
-    only = (request.get_json(silent=True) or {}).get("subtopics") or None
+    # Optional JSON body {"subtopics": ["Rajasthan GK", …]}: one post for each named subject;
+    # {"language": "hi"} writes the Hindi post instead
+    body = request.get_json(silent=True) or {}
+    only = body.get("subtopics") or None
+    language = "hi" if body.get("language") == "hi" else "en"
     if not _agent_lock.acquire(blocking=False):
         return jsonify({"status": "busy", "message": "Agent is already running"}), 409
     def _run():
         try:
-            run_agent(only)
+            run_agent(only, language)
         finally:
             _agent_lock.release()
     threading.Thread(target=_run, daemon=True).start()
@@ -130,6 +134,17 @@ def trigger_jobs():
     return jsonify({"status": "started", "message": "Jobs agent triggered"}), 202
 
 
+def _scheduled_hindi_post() -> None:
+    # Shares the post-run lock with /trigger, so it never overlaps a manual run
+    if not _agent_lock.acquire(blocking=False):
+        logger.info("Post agent already running — skipping the Hindi post run.")
+        return
+    try:
+        run_agent(language="hi")
+    finally:
+        _agent_lock.release()
+
+
 def _ist_to_utc(ist_time: str) -> tuple[int, int]:
     ist_h, ist_m = (int(x) for x in ist_time.split(":"))
     return divmod((ist_h * 60 + ist_m - 330) % (24 * 60), 60)
@@ -172,6 +187,19 @@ def main() -> None:
                 max_instances=1,
             )
             logger.info("Scheduled daily games @ %02d:%02d UTC  (%s IST)", utc_h, utc_m, ist_time)
+
+    if HINDI_POSTS_ENABLED:
+        for ist_time in HINDI_POST_SCHEDULE_IST:
+            utc_h, utc_m = _ist_to_utc(ist_time)
+            scheduler.add_job(
+                _scheduled_hindi_post,
+                trigger=CronTrigger(hour=utc_h, minute=utc_m, timezone="UTC"),
+                id=f"hindi_post_{utc_h:02d}{utc_m:02d}",
+                name=f"Hindi post @ {utc_h:02d}:{utc_m:02d} UTC ({ist_time} IST)",
+                replace_existing=True,
+                max_instances=1,
+            )
+            logger.info("Scheduled Hindi post @ %02d:%02d UTC  (%s IST)", utc_h, utc_m, ist_time)
 
     if MEMES_ENABLED:
         for ist_time in MEME_SCHEDULE_IST:

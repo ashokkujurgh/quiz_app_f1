@@ -83,6 +83,13 @@ SIMILARITY_THRESHOLD = 0.90
 # 2 posts per run × 4 runs = up to 8 posts per day (each waits for approval)
 POSTS_PER_RUN       = int(os.getenv("POSTS_PER_RUN", "2"))
 
+# One Hindi post a day (General Studies subjects), at its own time, on top of the English runs
+HINDI_POSTS_ENABLED = os.getenv("HINDI_POSTS_ENABLED", "true").lower() == "true"
+HINDI_POSTS_PER_RUN = int(os.getenv("HINDI_POSTS_PER_RUN", "1"))
+HINDI_POST_SCHEDULE_IST = [t.strip() for t in os.getenv("HINDI_POST_SCHEDULE_IST", "15:00").split(",") if t.strip()]
+# Writes and fact-checks the Hindi post: gpt-4.1 invented places/facts in Hindi (1 of 3 test posts passed)
+HINDI_POST_MODEL    = os.getenv("HINDI_POST_MODEL", "gpt-5.6-sol")
+
 # ── Meme posts (meme_creator.py) ──────────────────────────────────────────────
 # Funny educational memes, each in Hindi or English; each waits for approval like any post.
 MEMES_ENABLED       = os.getenv("MEMES_ENABLED", "true").lower() == "true"

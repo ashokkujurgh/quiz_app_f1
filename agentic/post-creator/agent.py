@@ -22,7 +22,7 @@ from pinecone_client import post_exists, upsert_post
 from post_client import save_post
 from filter_client import is_content_allowed
 from notifier import send_approval_email
-from config import POSTS_PER_RUN, IMAGE_ENABLED, POST_API_URL
+from config import POSTS_PER_RUN, HINDI_POSTS_PER_RUN, IMAGE_ENABLED, POST_API_URL
 
 MAX_RETRIES = 2  # other subjects to try when a post is rejected
 
@@ -66,9 +66,16 @@ def _pick_candidates(subtopics: list[dict], n: int) -> list[dict]:
 logger = logging.getLogger(__name__)
 
 
-def run_agent(only_subtopics: list[str] | None = None) -> None:
-    """One run. only_subtopics (names, any case) targets those subjects — one post each — instead of a random pick."""
-    logger.info("=== Post-creator agent started ===")
+# Hindi posts (language="hi"): General Studies subjects only — Engineering and Aptitude stay English,
+# and "GK in Hindi" (quiz-only for English posts) is a natural fit here
+HINDI_TOPICS = {"general studies"}
+
+
+def run_agent(only_subtopics: list[str] | None = None, language: str = "en") -> None:
+    """One run. only_subtopics (names, any case) targets those subjects — one post each — instead of a random pick.
+    language "hi" writes HINDI_POSTS_PER_RUN post(s) in Hindi instead of the usual English posts."""
+    hindi = language == "hi"
+    logger.info("=== Post-creator agent started%s ===", " (Hindi)" if hindi else "")
 
     # 1. Fetch subtopics
     try:
@@ -78,8 +85,11 @@ def run_agent(only_subtopics: list[str] | None = None) -> None:
         return
 
     # Current affairs have their own fact-checked, approval-gated pipeline — no posts from memory
-    subtopics = [s for s in subtopics if s.get("topicName", "").strip().lower() != "current affairs"
-                 and s.get("name", "").strip().lower() not in QUIZ_ONLY_SUBTOPICS]
+    if hindi:
+        subtopics = [s for s in subtopics if s.get("topicName", "").strip().lower() in HINDI_TOPICS]
+    else:
+        subtopics = [s for s in subtopics if s.get("topicName", "").strip().lower() != "current affairs"
+                     and s.get("name", "").strip().lower() not in QUIZ_ONLY_SUBTOPICS]
 
     if not subtopics:
         logger.warning("No active subtopics found. Skipping.")
@@ -92,6 +102,9 @@ def run_agent(only_subtopics: list[str] | None = None) -> None:
         wanted = {n.strip().lower() for n in only_subtopics}
         selected = [s for s in subtopics if s["name"].strip().lower() in wanted]
         posts_needed = len(selected)
+    elif hindi:
+        selected = random.sample(subtopics, min(len(subtopics), HINDI_POSTS_PER_RUN + MAX_RETRIES))
+        posts_needed = HINDI_POSTS_PER_RUN
     else:
         selected = _pick_candidates(subtopics, POSTS_PER_RUN + MAX_RETRIES)
         posts_needed = POSTS_PER_RUN
@@ -123,7 +136,8 @@ def run_agent(only_subtopics: list[str] | None = None) -> None:
             level=level,
             web_context=web_context or None,
             recent_titles=_recent_titles(subtopic_name),
-            region=region,
+            region="india" if hindi else region,
+            language=language,
         )
         if not generated:
             logger.warning("Content generation failed for '%s'. Skipping.", subtopic_name)
@@ -176,6 +190,7 @@ def run_agent(only_subtopics: list[str] | None = None) -> None:
             topic_name=topic_name,
             subtopic_name=subtopic_name,
             seo=seo,
+            slug=generated.get("slug"),   # Hindi titles give no URL slug of their own
         )
         if not post:
             logger.error("MongoDB save failed for '%s'. Skipping Pinecone upsert.", subtopic_name)
