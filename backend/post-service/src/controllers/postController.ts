@@ -313,8 +313,8 @@ export const createPost: RequestHandler = async (req: AuthRequest, res: Response
 // ── POST /api/posts/internal (service-to-service, no user JWT required) ──────
 export const createInternalPost: RequestHandler = async (req: AuthRequest, res: Response) => {
   try {
-    const { title, content, image, topic, subTopic, quizResult, authorName, authorUsername, authorAvatar, authorUserId, seo, isAiImage } = req.body as {
-      title?: string; content?: string; image?: string; topic?: string; subTopic?: string;
+    const { title, slug: slugHint, content, image, topic, subTopic, quizResult, authorName, authorUsername, authorAvatar, authorUserId, seo, isAiImage } = req.body as {
+      title?: string; slug?: string; content?: string; image?: string; topic?: string; subTopic?: string;
       quizResult?: IQuizResult; authorName?: string; authorUsername?: string;
       authorAvatar?: string; authorUserId?: string; isAiImage?: boolean;
       seo?: { metaTitle?: string; metaDescription?: string; keywords?: string[]; ogTitle?: string; ogDescription?: string; ogImage?: string | null; canonical?: string | null };
@@ -325,7 +325,8 @@ export const createInternalPost: RequestHandler = async (req: AuthRequest, res: 
 
     const safeContent = sanitizePostContent(content);
     const titleText = title?.trim() || toPlainText(safeContent).split(/\s+/).slice(0, 10).join(' ');
-    const slug = await uniqueSlug(generateSlug(titleText));
+    // Slugs keep only a-z/0-9, so a Hindi-only title would give an empty one — agents can pass an English slug
+    const slug = await uniqueSlug(generateSlug(slugHint?.trim() || titleText) || generateSlug(titleText));
 
     const post = await Post.create({
       author: {

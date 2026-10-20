@@ -1,7 +1,8 @@
 FROM python:3.11-slim
 
+# libfribidi0: lets Pillow's bundled libraqm shape Hindi (Devanagari) text on meme images
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc g++ libffi-dev && \
+    gcc g++ libffi-dev libfribidi0 && \
     rm -rf /var/lib/apt/lists/*
 
 # OpenArt CLI (image generation) — pinned release, checksum-verified.

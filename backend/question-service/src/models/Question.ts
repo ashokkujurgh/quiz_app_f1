@@ -14,6 +14,7 @@ export interface IQuestion extends Document {
   subTopic: Types.ObjectId | null;
   difficulty: 'easy' | 'medium' | 'hard';
   isActive: boolean;
+  origin: string | null;   // e.g. "job_practice": made for one quiz, never in the shared bank
   createdAt: Date;
   updatedAt: Date;
 }
@@ -68,6 +69,10 @@ const questionSchema = new Schema<IQuestion>(
     isActive: {
       type: Boolean,
       default: true,
+    },
+    origin: {
+      type: String,
+      default: null,
     },
   },
   { timestamps: true }

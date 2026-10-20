@@ -86,6 +86,7 @@ export const createQuestion: RequestHandler = async (req: Request, res: Response
       subTopic,
       difficulty,
       isActive,
+      origin,
     } = req.body as {
       text?: string;
       description?: string;
@@ -95,6 +96,7 @@ export const createQuestion: RequestHandler = async (req: Request, res: Response
       subTopic?: string;
       difficulty?: Difficulty;
       isActive?: boolean; // false = saved pending approval (e.g. current-affairs questions)
+      origin?: string;    // "job_practice": inactive on purpose, used only by its own quiz
     };
 
     if (!text?.trim()) {
@@ -128,6 +130,7 @@ export const createQuestion: RequestHandler = async (req: Request, res: Response
       subTopic: subTopic ?? null,
       difficulty: difficulty ?? 'medium',
       ...(isActive === false && { isActive: false }),
+      ...(origin && { origin: String(origin).slice(0, 40) }),
     });
 
     res.status(201).json({ success: true, question });
@@ -240,8 +243,10 @@ export const getStats: RequestHandler = async (_req: Request, res: Response) => 
 export const getPendingQuestions: RequestHandler = async (req: Request, res: Response) => {
   try {
     const limit = Math.min(200, Math.max(1, parseInt(String(req.query.limit ?? '100'), 10) || 100));
-    const questions = await Question.find({ isActive: false }).sort({ createdAt: -1 }).limit(limit).lean();
-    res.json({ success: true, questions, total: await Question.countDocuments({ isActive: false }) });
+    // Job-practice questions are inactive on purpose (they belong to one quiz) — not awaiting approval
+    const pending = { isActive: false, origin: { $ne: 'job_practice' } };
+    const questions = await Question.find(pending).sort({ createdAt: -1 }).limit(limit).lean();
+    res.json({ success: true, questions, total: await Question.countDocuments(pending) });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: 'Failed to fetch pending questions.' });

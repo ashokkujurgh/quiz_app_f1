@@ -83,6 +83,37 @@ SIMILARITY_THRESHOLD = 0.90
 # 2 posts per run × 4 runs = up to 8 posts per day (each waits for approval)
 POSTS_PER_RUN       = int(os.getenv("POSTS_PER_RUN", "2"))
 
+# ── Meme posts (meme_creator.py) ──────────────────────────────────────────────
+# Funny educational memes, each in Hindi or English; each waits for approval like any post.
+MEMES_ENABLED       = os.getenv("MEMES_ENABLED", "true").lower() == "true"
+MEMES_PER_RUN       = int(os.getenv("MEMES_PER_RUN", "1"))
+# Humour needs the stronger model; at a couple of memes a day the extra cost is small
+MEME_CHAT_MODEL     = os.getenv("MEME_CHAT_MODEL", "gpt-4.1")
+# Jokes brainstormed per subject (the editor keeps the best), and brainstorm rounds before giving up
+MEME_CANDIDATES     = int(os.getenv("MEME_CANDIDATES", "5"))
+MEME_ROUNDS         = int(os.getenv("MEME_ROUNDS", "2"))
+# Comma-separated IST times — 3 memes a day: morning, lunch break and evening, when students scroll
+MEME_SCHEDULE_IST   = [t.strip() for t in os.getenv("MEME_SCHEDULE_IST", "10:00,14:00,21:30").split(",") if t.strip()]
+# Share of memes written in Hindi; the rest are in English
+MEME_HINDI_SHARE    = float(os.getenv("MEME_HINDI_SHARE", "0.5"))
+
+# ── Government-jobs agent (jobs_agent.py) ─────────────────────────────────────
+# New central/state recruitment notifications from news headlines → a job post (waits for approval)
+# → once approved, a daily practice quiz for that exam: same title, open 24 h, new questions each day.
+JOBS_ENABLED           = os.getenv("JOBS_ENABLED", "true").lower() == "true"
+JOBS_SCHEDULE_IST      = [t.strip() for t in os.getenv("JOBS_SCHEDULE_IST", "09:00,18:00").split(",") if t.strip()]
+JOBS_PER_RUN           = int(os.getenv("JOBS_PER_RUN", "2"))
+JOBS_MODEL             = os.getenv("JOBS_MODEL", "gpt-4.1")   # extraction accuracy matters most here
+# Reviews the state-language half of bilingual questions; gpt-4.1's Tamil used wrong exam terms
+# ("கட்டுரை", an essay, for a constitutional Article) where this model used the official ones
+JOBS_TRANSLATE_MODEL   = os.getenv("JOBS_TRANSLATE_MODEL", "gpt-5.6-sol")
+JOBS_TOPIC             = os.getenv("JOBS_TOPIC", "Government Jobs")
+# How often to check whether an approved job post needs its first / next 24-hour quiz
+JOB_SERIES_CHECK_MINUTES = int(os.getenv("JOB_SERIES_CHECK_MINUTES", "30"))
+JOB_SERIES_DAYS        = int(os.getenv("JOB_SERIES_DAYS", "14"))
+JOB_QUIZ_QUESTIONS     = int(os.getenv("JOB_QUIZ_QUESTIONS", "15"))
+JOB_QUIZ_MIN_QUESTIONS = int(os.getenv("JOB_QUIZ_MIN_QUESTIONS", "10"))
+
 # Schedule (IST → UTC, IST = UTC+5:30), spread through the day:
 CRON_SCHEDULE_UTC = [
     (2,  30),   # 08:00 IST — morning

@@ -20,6 +20,7 @@ def save_post(
     topic_name: str,
     subtopic_name: str,
     seo: dict | None = None,
+    slug: str | None = None,
 ) -> dict | None:
     if seo and image_url and not seo.get("ogImage"):
         seo["ogImage"] = image_url
@@ -35,6 +36,8 @@ def save_post(
         "authorUserId":   ADMIN_USER_ID or None,
         "seo":            seo,
     }
+    if slug:
+        payload["slug"] = slug   # English URL slug when the title isn't in English
     if image_url:
         payload["image"]  = image_url
         payload["images"] = [image_url]
