@@ -120,6 +120,9 @@ router.get('/blocked', protect, async (req: AuthRequest, res: Response): Promise
 router.post('/fcm-token', protect, async (req: AuthRequest, res: Response): Promise<void> => {
   const { token } = req.body as { token?: string };
   if (!token) { res.status(400).json({ success: false, message: 'token is required.' }); return; }
+  // A device token belongs to one account at a time — when someone else logs in on
+  // the same phone, stop sending them the previous account's pushes
+  await User.updateMany({ _id: { $ne: req.user!._id }, fcmTokens: token }, { $pull: { fcmTokens: token } });
   await User.findByIdAndUpdate(req.user!._id, { $addToSet: { fcmTokens: token } });
   res.json({ success: true });
 });
