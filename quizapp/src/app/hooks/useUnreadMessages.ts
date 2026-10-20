@@ -22,6 +22,7 @@ export const useUnreadMessages = () => {
     const refresh = () => { dispatch(fetchConversations()); };
     socket.on('message:new', refresh);
     socket.on('conversation:updated', refresh);
+    socket.on('group:updated', refresh);   // new group, or one you were added to / removed from
     return () => { socket.disconnect(); };
   }, [token, onMessagesPage, dispatch]);
 };

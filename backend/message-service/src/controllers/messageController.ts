@@ -68,8 +68,10 @@ export async function getOrCreateConversation(req: AuthRequest, res: Response): 
   const me     = req.user!.id;
   const { userId } = req.params;
 
+  // The 1-to-1 chat only — a group with both people in it must never be returned here
   let conv = await Conversation.findOne({
-    participants: { $all: [new mongoose.Types.ObjectId(me), new mongoose.Types.ObjectId(userId)] },
+    isGroup: { $ne: true },
+    participants: { $all: [new mongoose.Types.ObjectId(me), new mongoose.Types.ObjectId(userId)], $size: 2 },
   });
   if (!conv) {
     conv = await Conversation.create({ participants: [me, userId] });

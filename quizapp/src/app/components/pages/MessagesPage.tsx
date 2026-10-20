@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import {
   Box, Stack, Typography, TextField, IconButton, Divider,
-  Avatar, CircularProgress, useMediaQuery, useTheme, Badge,
+  Avatar, CircularProgress, useMediaQuery, useTheme, Badge, Button,
 } from '@mui/material';
-import { Send, ArrowBack, Message as MessageIcon, Image as ImageIcon, Close } from '@mui/icons-material';
+import { Send, ArrowBack, Message as MessageIcon, Image as ImageIcon, Close, Groups, GroupAdd, InfoOutlined } from '@mui/icons-material';
 import { io, Socket } from 'socket.io-client';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import {
@@ -12,6 +12,7 @@ import {
   type Conversation,
 } from '../../store/slices/messagesSlice';
 import { EmptyState } from '../shared/EmptyState';
+import { CreateGroupDialog, GroupInfoDialog } from '../messages/GroupDialogs';
 import { useIsOnline } from '../../context/OnlineUsersContext';
 import { apiFetch } from '../../utils/apiFetch';
 import { formatDistanceToNow } from 'date-fns';
@@ -31,12 +32,36 @@ function OnlineAvatar({ src, username, userId, size = 44 }: { src?: string; user
   );
 }
 
+function GroupAvatar({ conv, size }: { conv: Conversation; size: number }) {
+  return (
+    <Avatar src={conv.icon ?? undefined} sx={{ width: size, height: size, bgcolor: 'secondary.main', flexShrink: 0 }}>
+      <Groups sx={{ fontSize: size * 0.55 }} />
+    </Avatar>
+  );
+}
+
+// "Asha: see you there" — in groups the list shows who sent the last message
+function lastMessagePreview(conv: Conversation, myId?: string): string {
+  const m = conv.lastMessage;
+  if (!m) return '';
+  const body = m.imageUrl && !m.text ? '📷 Photo' : m.text;
+  if (!conv.isGroup) return body;
+  if (m.sender === myId) return `You: ${body}`;
+  const who = conv.participantUsers?.find((u) => u._id === m.sender);
+  return who ? `${who.name || who.username}: ${body}` : body;
+}
+
 function ConvItem({ conv, active, onClick }: { conv: Conversation; active: boolean; onClick: () => void }) {
   const unreadCount = useAppSelector((s) => s.messages.unreadByConv[conv._id] ?? 0);
+  const myId = useAppSelector((s) => s.auth.user?.id);
   return (
     <Stack direction="row" spacing={1.5} alignItems="center" px={2} py={1.5} onClick={onClick}
       sx={{ cursor: 'pointer', bgcolor: active ? 'action.selected' : 'transparent', '&:hover': { bgcolor: 'action.hover' }, borderBottom: '1px solid', borderColor: 'divider' }}>
-      {conv.otherUser ? (
+      {conv.isGroup ? (
+        <Badge badgeContent={unreadCount > 0 ? unreadCount : undefined} color="error" overlap="circular" anchorOrigin={{ vertical: 'top', horizontal: 'right' }}>
+          <GroupAvatar conv={conv} size={44} />
+        </Badge>
+      ) : conv.otherUser ? (
         <Badge badgeContent={unreadCount > 0 ? unreadCount : undefined} color="error" overlap="circular" anchorOrigin={{ vertical: 'top', horizontal: 'right' }}>
           <OnlineAvatar src={conv.otherUser.avatar ?? undefined} username={conv.otherUser.username} userId={conv.otherUser._id} size={44} />
         </Badge>
@@ -45,11 +70,15 @@ function ConvItem({ conv, active, onClick }: { conv: Conversation; active: boole
       )}
       <Box flex={1} minWidth={0}>
         <Typography fontWeight={unreadCount > 0 ? 700 : 600} fontSize={14} noWrap>
-          {conv.otherUser?.username ?? 'Unknown'}
+          {conv.isGroup ? (conv.name ?? 'Group') : (conv.otherUser?.username ?? 'Unknown')}
         </Typography>
-        {conv.lastMessage && (
-          <Typography variant="caption" color={unreadCount > 0 ? 'text.primary' : 'text.secondary'} fontWeight={unreadCount > 0 ? 600 : 400} noWrap>
-            {conv.lastMessage.imageUrl && !conv.lastMessage.text ? '📷 Photo' : conv.lastMessage.text}
+        {conv.lastMessage ? (
+          <Typography variant="caption" color={unreadCount > 0 ? 'text.primary' : 'text.secondary'} fontWeight={unreadCount > 0 ? 600 : 400} noWrap component="div">
+            {lastMessagePreview(conv, myId)}
+          </Typography>
+        ) : conv.isGroup && (
+          <Typography variant="caption" color="text.secondary" noWrap component="div">
+            {conv.participants.length} members
           </Typography>
         )}
       </Box>
@@ -75,6 +104,8 @@ export function MessagesPage() {
   const [imageFile, setImageFile]   = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [uploading, setUploading]   = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [infoOpen, setInfoOpen]     = useState(false);
 
   const messagesEndRef  = useRef<HTMLDivElement>(null);
   const socketRef       = useRef<Socket | null>(null);
@@ -82,7 +113,10 @@ export function MessagesPage() {
   const fileInputRef    = useRef<HTMLInputElement>(null);
 
   const activeConv  = conversations.find((c) => c._id === activeConvId) ?? null;
-  const otherUser   = activeConv?.otherUser ?? null;
+  const isGroup     = !!activeConv?.isGroup;
+  const otherUser   = isGroup ? null : (activeConv?.otherUser ?? null);
+  // Group chats label others' messages with the sender's name
+  const memberById  = new Map((activeConv?.participantUsers ?? []).map((u) => [u._id, u]));
   const otherOnline = useIsOnline(otherUser?._id);
 
   useEffect(() => { dispatch(fetchConversations()); }, [dispatch]);
@@ -99,6 +133,8 @@ export function MessagesPage() {
       dispatch(upsertConversation({ _id: conversationId, lastMessage, updatedAt: new Date().toISOString() } as Conversation));
       dispatch(fetchConversations());
     });
+    // A group was created, renamed, deleted or its members changed
+    socket.on('group:updated', () => { dispatch(fetchConversations()); });
     return () => { socket.disconnect(); };
   }, [token, dispatch]);
 
@@ -172,11 +208,16 @@ export function MessagesPage() {
       {/* Conversation list */}
       {showSidebar && (
         <Box sx={{ width: isMobile ? '100%' : 300, borderRight: isMobile ? 'none' : '1px solid', borderColor: 'divider', overflowY: 'auto', flexShrink: 0 }}>
-          <Typography fontWeight={700} p={2} fontSize={16}>Messages</Typography>
+          <Stack direction="row" alignItems="center" justifyContent="space-between" px={2} py={1.25}>
+            <Typography fontWeight={700} fontSize={16}>Messages</Typography>
+            <Button size="small" startIcon={<GroupAdd />} onClick={() => setCreateOpen(true)} sx={{ fontWeight: 700 }}>
+              New group
+            </Button>
+          </Stack>
           <Divider />
           {loadingConvs && <Box textAlign="center" py={3}><CircularProgress size={24} /></Box>}
           {!loadingConvs && conversations.length === 0 && (
-            <EmptyState icon={MessageIcon} title="No messages" description="Start a conversation from the Friends page" />
+            <EmptyState icon={MessageIcon} title="No messages" description="Start a conversation from the Friends page, or create a group" />
           )}
           {conversations.map((conv) => (
             <ConvItem key={conv._id} conv={conv} active={conv._id === activeConvId} onClick={() => handleSelectConv(conv._id)} />
@@ -199,15 +240,27 @@ export function MessagesPage() {
                 {isMobile && (
                   <IconButton size="small" onClick={() => dispatch(setActiveConv(null))}><ArrowBack /></IconButton>
                 )}
-                {otherUser ? (
+                {isGroup && activeConv ? (
+                  <GroupAvatar conv={activeConv} size={40} />
+                ) : otherUser ? (
                   <OnlineAvatar src={otherUser.avatar ?? undefined} username={otherUser.username} userId={otherUser._id} size={40} />
                 ) : (
                   <Avatar sx={{ width: 40, height: 40 }}>?</Avatar>
                 )}
-                <Box>
-                  <Typography fontWeight={600} fontSize={14}>{otherUser?.username ?? 'Chat'}</Typography>
+                <Box flex={1} minWidth={0}>
+                  <Typography fontWeight={600} fontSize={14} noWrap>
+                    {isGroup ? (activeConv?.name ?? 'Group') : (otherUser?.username ?? 'Chat')}
+                  </Typography>
                   {typingUsers.length > 0 ? (
-                    <Typography variant="caption" color="primary.main" fontStyle="italic">typing…</Typography>
+                    <Typography variant="caption" color="primary.main" fontStyle="italic">
+                      {isGroup
+                        ? `${typingUsers.map((id) => memberById.get(id)?.username).filter(Boolean).join(', ') || 'Someone'} typing…`
+                        : 'typing…'}
+                    </Typography>
+                  ) : isGroup ? (
+                    <Typography variant="caption" color="text.secondary" noWrap component="div">
+                      {(activeConv?.participantUsers ?? []).map((u) => (u._id === myId ? 'You' : (u.name || u.username))).join(', ')}
+                    </Typography>
                   ) : (
                     <Stack direction="row" alignItems="center" spacing={0.5}>
                       <Circle sx={{ fontSize: 9, color: otherOnline ? 'success.main' : 'text.disabled' }} />
@@ -217,6 +270,9 @@ export function MessagesPage() {
                     </Stack>
                   )}
                 </Box>
+                {isGroup && (
+                  <IconButton onClick={() => setInfoOpen(true)} aria-label="Group info"><InfoOutlined /></IconButton>
+                )}
               </Stack>
 
               {/* Messages */}
@@ -224,8 +280,14 @@ export function MessagesPage() {
                 {loadingMsgs && <Box textAlign="center"><CircularProgress size={20} /></Box>}
                 {messages.map((msg) => {
                   const isMe = msg.sender === myId;
+                  const sender = isGroup && !isMe ? memberById.get(msg.sender) : undefined;
                   return (
                     <Box key={msg._id} alignSelf={isMe ? 'flex-end' : 'flex-start'} sx={{ maxWidth: '75%', display: 'flex', flexDirection: 'column', alignItems: isMe ? 'flex-end' : 'flex-start', gap: 0.25 }}>
+                      {isGroup && !isMe && (
+                        <Typography variant="caption" fontWeight={700} color="secondary.main" px={0.5}>
+                          {sender ? (sender.name || sender.username) : 'Former member'}
+                        </Typography>
+                      )}
                       <Box sx={{ px: msg.imageUrl && !msg.text ? 0.5 : 2, py: msg.imageUrl && !msg.text ? 0.5 : 1, bgcolor: isMe ? 'primary.main' : 'action.hover', color: isMe ? 'primary.contrastText' : 'text.primary', borderRadius: isMe ? '18px 18px 4px 18px' : '18px 18px 18px 4px', overflow: 'hidden' }}>
                         {msg.imageUrl && (
                           <Box component="img" src={msg.imageUrl} alt="sent image"
@@ -285,6 +347,11 @@ export function MessagesPage() {
             </>
           )}
         </Box>
+      )}
+
+      <CreateGroupDialog open={createOpen} onClose={() => setCreateOpen(false)} />
+      {isGroup && activeConv && (
+        <GroupInfoDialog conv={activeConv} open={infoOpen} onClose={() => setInfoOpen(false)} />
       )}
     </Box>
   );

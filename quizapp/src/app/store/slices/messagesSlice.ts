@@ -3,6 +3,7 @@ import { apiFetch } from '../../utils/apiFetch';
 
 export interface MsgUser {
   _id: string;
+  name?: string;
   username: string;
   avatar: string | null;
 }
@@ -21,9 +22,15 @@ export interface Conversation {
   _id: string;
   participants: string[];
   lastMessage: Message | null;
-  otherUser: MsgUser | null;
+  otherUser: MsgUser | null;          // 1-to-1 chats
   updatedAt: string;
   unreadCount?: number;
+  // Group chats
+  isGroup?: boolean;
+  name?: string | null;
+  icon?: string | null;
+  admins?: string[];
+  participantUsers?: MsgUser[];
 }
 
 interface MessagesState {
@@ -121,6 +128,11 @@ const messagesSlice = createSlice({
       .addCase(fetchConversations.fulfilled, (state, a) => {
         state.loadingConvs = false;
         state.conversations = a.payload;
+        // The open chat is gone (group deleted, or you were removed / left) — close it
+        if (state.activeConvId && !a.payload.some((c) => c._id === state.activeConvId)) {
+          state.activeConvId = null;
+          state.messages = [];
+        }
         // Seed unread counts from server — skip the currently open conversation (already cleared)
         for (const conv of a.payload) {
           if (conv._id === state.activeConvId) continue;

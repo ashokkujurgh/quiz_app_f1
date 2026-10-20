@@ -50,6 +50,7 @@ export async function createGroup(req: AuthRequest, res: Response): Promise<void
     createdBy: me,
   });
 
+  broadcastGroupUpdated(conv);   // the new group appears in every member's list straight away
   const participantUsers = await populateParticipants(conv.participants);
   res.status(201).json({ success: true, data: { ...conv.toObject(), participantUsers } });
 }
