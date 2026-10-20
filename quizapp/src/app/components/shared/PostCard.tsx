@@ -1,5 +1,5 @@
 import { memo, useMemo, useState, useEffect } from 'react';
-import { useNavigate } from 'react-router';
+import { Link as RouterLink } from 'react-router';
 import {
   Card, CardContent, CardActions, Box, Typography, IconButton,
   Button, Stack, Divider, Tooltip, Avatar, TextField, CircularProgress,
@@ -186,7 +186,6 @@ interface Props {
 const API = import.meta.env.VITE_API_URL ?? '';
 
 function PostCardImpl({ post }: Props) {
-  const navigate = useNavigate();
   const dispatch = useAppDispatch();
   // Narrow selectors: re-render on the user/token changing, not on any auth-slice update
   const user        = useAppSelector((s) => s.auth.user);
@@ -355,11 +354,12 @@ function PostCardImpl({ post }: Props) {
           </IconButton>
         </Stack>
 
-        {/* Content — 3-line clamp, click to open detail */}
+        {/* Content — 3-line clamp; a real link to the detail page, so crawlers can follow it */}
         {!(isOfficial && post.quizResult) && (
-          <Box onClick={() => navigate(`/posts/${post.slug ?? post.id}`)} sx={{ cursor: 'pointer' }}>
+          <Box component={RouterLink} to={`/posts/${post.slug ?? post.id}`}
+            sx={{ display: 'block', color: 'inherit', textDecoration: 'none', cursor: 'pointer' }}>
             {post.title && (
-              <Typography variant="subtitle2" fontWeight={700} mb={0.5}>
+              <Typography variant="subtitle2" component="h2" fontWeight={700} mb={0.5}>
                 {post.title}
               </Typography>
             )}

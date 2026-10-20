@@ -7,7 +7,7 @@ export function PrivacyPolicyPage() {
     <InfoPage
       title="Privacy Policy"
       path="/privacy-policy"
-      updated="18 October 2026"
+      updated="20 October 2026"
       description="How Meenzo collects, uses, shares and protects your information, and the choices you have."
     >
       <InfoSection title="Overview">
@@ -63,6 +63,7 @@ export function PrivacyPolicyPage() {
           <li><strong>Cloudflare</strong> — content delivery and security for our website.</li>
           <li><strong>DigitalOcean</strong> — storage of uploaded and generated images.</li>
           <li><strong>Google (Firebase and Google Analytics)</strong> — Google sign-in, push notifications and usage analytics.</li>
+          <li><strong>Google AdSense</strong> — showing advertisements on our website (see “Advertising” below).</li>
           <li><strong>OpenAI</strong> — automated checks of posts and uploaded images for safety and topic relevance, and generation of some learning content.</li>
           <li><strong>Hostinger</strong> — sending our emails.</li>
         </ul>
@@ -72,11 +73,27 @@ export function PrivacyPolicyPage() {
         </p>
       </InfoSection>
 
+      <InfoSection title="Advertising">
+        <p>
+          We use Google AdSense to show advertisements on meenzo.com. Third-party vendors, including Google,
+          use cookies to serve ads based on your previous visits to this website and other websites.
+        </p>
+        <p>
+          Google’s use of advertising cookies enables it and its partners to serve ads to you based on your
+          visits to our site and/or other sites on the Internet. You can opt out of personalised advertising
+          by visiting <a href="https://adssettings.google.com" target="_blank" rel="noopener noreferrer">Google Ads Settings</a>,
+          or opt out of some third-party vendors’ use of cookies for personalised advertising at{' '}
+          <a href="https://www.aboutads.info/choices" target="_blank" rel="noopener noreferrer">www.aboutads.info</a>.
+          Learn more in <a href="https://policies.google.com/technologies/ads" target="_blank" rel="noopener noreferrer">how Google uses cookies in advertising</a>.
+        </p>
+      </InfoSection>
+
       <InfoSection title="Cookies">
         <p>
           We use cookies and similar technologies to keep you signed in, remember preferences such as dark
-          mode, and measure usage with Google Analytics. You can block or delete cookies in your browser
-          settings; some features, such as staying signed in, may then stop working.
+          mode, measure usage with Google Analytics and, through Google AdSense, show and measure
+          advertisements. You can block or delete cookies in your browser settings; some features, such as
+          staying signed in, may then stop working.
         </p>
       </InfoSection>
 

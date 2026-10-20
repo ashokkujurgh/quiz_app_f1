@@ -257,7 +257,7 @@ export function HomePage() {
           border: '1px solid', borderColor: 'primary.main', borderOpacity: 0.3,
         }}>
           <CardContent sx={{ py: 3 }}>
-            <Typography variant="h6" fontWeight={800} gutterBottom>
+            <Typography variant="h6" component="h1" fontWeight={800} gutterBottom>
               Welcome to Meenzo 👋
             </Typography>
             <Typography variant="body2" color="text.secondary" mb={2.5}>
