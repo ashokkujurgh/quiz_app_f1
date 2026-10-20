@@ -6,6 +6,7 @@ import { LeftSidebar } from './LeftSidebar';
 import { RightSidebar } from './RightSidebar';
 import { MobileBottomNav } from './MobileBottomNav';
 import { usePresence } from '../../hooks/usePresence';
+import { useUnreadMessages } from '../../hooks/useUnreadMessages';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { loginSuccess } from '../../store/slices/authSlice';
 
@@ -16,6 +17,7 @@ export function AppLayout() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   usePresence();
+  useUnreadMessages();
   const dispatch = useAppDispatch();
   const accessToken = useAppSelector((s) => s.auth.accessToken);
   const user = useAppSelector((s) => s.auth.user);
