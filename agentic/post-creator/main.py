@@ -3,6 +3,7 @@ Post-creator entry point.
 - Scheduler: runs agent at 07:00 and 19:00 IST (01:30 and 13:30 UTC) every day.
 - Daily games: prepared at 23:00 IST (safety run 00:05), open all day 00:00–23:59 IST.
 - HTTP server: POST /trigger        — manually trigger a post run
+                                 (optional body {"subtopics": [...]}: one post per named subject)
                POST /trigger-games  — manually create today's (or tomorrow's) games
                GET  /health         — liveness check
 Run: python main.py
@@ -14,7 +15,7 @@ import sys
 import threading
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from config import CRON_SCHEDULE_UTC, DAILY_GAMES_ENABLED, GAME_PREPARE_IST
 from agent import run_agent
 from daily_games import run_daily_games
@@ -40,11 +41,13 @@ def health():
 
 @app.post("/trigger")
 def trigger():
+    # Optional JSON body {"subtopics": ["Rajasthan GK", …]}: one post for each named subject
+    only = (request.get_json(silent=True) or {}).get("subtopics") or None
     if not _agent_lock.acquire(blocking=False):
         return jsonify({"status": "busy", "message": "Agent is already running"}), 409
     def _run():
         try:
-            run_agent()
+            run_agent(only)
         finally:
             _agent_lock.release()
     threading.Thread(target=_run, daemon=True).start()

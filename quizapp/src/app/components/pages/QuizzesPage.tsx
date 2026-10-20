@@ -1,5 +1,5 @@
 import { memo, useCallback, useState, useEffect, useRef } from 'react';
-import { useNavigate, useLocation } from 'react-router';
+import { useNavigate, useLocation, Link as RouterLink } from 'react-router';
 import {
   Box, Grid, Typography, TextField, InputAdornment,
   CircularProgress, Alert, Button, Chip, Stack, Card, CardContent,
@@ -15,6 +15,7 @@ import type { Quiz, QuizQuestion, QuizTopic } from '../../types';
 import { formatDuration } from '../../utils/formatDuration';
 import { QuizTypeSwitch } from '../shared/QuizTypeSwitch';
 import { useQuizType, useEngineeringTopicIds, quizTypeOf } from '../../utils/quizType';
+import { QUIZ_TOPICS } from '../../data/quizTopics';
 
 const SOCKET_URL = import.meta.env.VITE_API_URL || window.location.origin;
 const API = import.meta.env.VITE_API_URL ?? '';
@@ -400,6 +401,14 @@ export function QuizzesPage() {
             Create Quiz
           </Button>
         )}
+      </Stack>
+
+      {/* Practice by topic — links to the public topic pages */}
+      <Stack direction="row" flexWrap="wrap" alignItems="center" gap={1} mb={2}>
+        <Typography variant="body2" fontWeight={600} color="text.secondary" mr={0.5}>Practice by topic:</Typography>
+        {QUIZ_TOPICS.map((t) => (
+          <Chip key={t.slug} label={t.name} size="small" component={RouterLink} to={`/quizzes/${t.slug}`} clickable color="primary" variant="outlined" />
+        ))}
       </Stack>
 
       {/* Live game alert */}

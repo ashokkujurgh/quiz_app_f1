@@ -73,6 +73,24 @@ _EXAM_STYLE = {
         "be solved in under a minute without a calculator, and put the short working in the description."
     ),
 }
+# Extra guidance per subtopic (by subtopic name, lower-case), added after the topic's exam style.
+_SUBTOPIC_STYLE = {
+    "rajasthan gk": (
+        "Ask only about Rajasthan — its history, rulers and forts, geography, rivers and lakes, districts, art, "
+        "culture, festivals, folk music and dance, and state-level facts, as asked in RPSC, RSMSSB, Rajasthan "
+        "Patwari and Rajasthan Police exams."
+    ),
+    "gk in hindi": (
+        "Language: write the question, all four options and the description entirely in Hindi (Devanagari "
+        "script), in the simple Hindi used in Hindi-medium SSC, Railway and state exam papers. This overrides the "
+        "English-spelling rule below. Cover Indian history, geography, polity, science and general facts."
+    ),
+    "english language": (
+        "Test English usage as in SSC and banking papers: synonyms, antonyms, idioms and phrases, one-word "
+        "substitution, spotting the error, fill in the blank or sentence improvement. Quote the word or sentence "
+        "being tested inside the question."
+    ),
+}
 # Subtopics whose answers are re-solved independently before saving
 _VERIFY_SUBTOPICS = {"quantitative aptitude", "logical reasoning"}
 
@@ -114,6 +132,9 @@ def generate_question(topic_name: str, subtopic_name: str) -> dict | None:
 
     style = _EXAM_STYLE.get(topic_name.strip().lower())
     exam_instruction = f"Exam style: {style}\n" if style else ""
+    extra = _SUBTOPIC_STYLE.get(subtopic_name.strip().lower())
+    if extra:
+        exam_instruction += f"{extra}\n"
 
     try:
         data = _chain.invoke({

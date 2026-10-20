@@ -195,6 +195,61 @@ export const renderStaticPage: RequestHandler = async (req: Request, res: Respon
   res.send(injectHead(shell, head));
 };
 
+// ── Quiz-topic pages (/quizzes/:slug) ────────────────────────────────────────
+// Keep in sync with quizapp/src/app/data/quizTopics.ts.
+
+const QUIZ_TOPIC_PAGES: Record<string, { title: string; description: string }> = {
+  'rajasthan-gk': {
+    title: 'Rajasthan GK Quiz — Free Practice Questions with Answers — Meenzo',
+    description: 'Free Rajasthan GK quiz with answers and explanations: history, forts, geography, rivers, districts, art and culture of Rajasthan for RPSC, RSMSSB, Patwari and Rajasthan Police exams.',
+  },
+  'gk-in-hindi': {
+    title: 'GK Quiz in Hindi — सामान्य ज्ञान प्रश्न और उत्तर — Meenzo',
+    description: 'हिंदी में सामान्य ज्ञान क्विज़: इतिहास, भूगोल, राजव्यवस्था और विज्ञान के प्रश्न, सही उत्तर और व्याख्या के साथ। SSC, Railway, Police और राज्य परीक्षाओं की तैयारी के लिए मुफ़्त।',
+  },
+  'science': {
+    title: 'General Science Quiz — Physics, Chemistry and Biology Questions — Meenzo',
+    description: 'Free general science quiz with answers: physics, chemistry and biology questions with explanations, at the level asked in SSC, Railway, Banking, Police and State exams.',
+  },
+  'maths': {
+    title: 'Maths Quiz — Quantitative Aptitude Questions with Solutions — Meenzo',
+    description: 'Free maths quiz with step-by-step solutions: percentages, profit and loss, ratio, time and work, speed and distance and more, as asked in SSC, Banking and Police exams.',
+  },
+  'english': {
+    title: 'English Quiz — Grammar and Vocabulary Questions with Answers — Meenzo',
+    description: 'Free English quiz with answers: synonyms, antonyms, idioms, one-word substitution, error spotting and sentence improvement for SSC and Banking exams.',
+  },
+};
+
+// GET /seo/quiz-topics/:slug
+export const renderQuizTopicPage: RequestHandler = async (req: Request, res: Response) => {
+  const page = QUIZ_TOPIC_PAGES[req.params.slug];
+  let shell: string;
+  try {
+    shell = await getShell();
+  } catch (err) {
+    console.error('[seo] could not load index.html:', err);
+    res.status(502).send('Bad gateway');
+    return;
+  }
+  res.set('Content-Type', 'text/html; charset=utf-8');
+  res.set('Cache-Control', 'no-cache');
+  if (!page) { res.status(404).send(shell); return; }
+  const url = `${SITE_URL}/quizzes/${req.params.slug}`;
+  const head = [
+    `<title>${escAttr(page.title)}</title>`,
+    `<meta name="description" content="${escAttr(page.description)}" />`,
+    `<meta name="robots" content="index, follow" />`,
+    `<link rel="canonical" href="${escAttr(url)}" />`,
+    `<meta property="og:type" content="website" />`,
+    `<meta property="og:site_name" content="Meenzo" />`,
+    `<meta property="og:url" content="${escAttr(url)}" />`,
+    `<meta property="og:title" content="${escAttr(page.title)}" />`,
+    `<meta property="og:description" content="${escAttr(page.description)}" />`,
+  ].join('\n    ');
+  res.send(injectHead(shell, head));
+};
+
 // GET /seo/sitemap.xml — every approved, active post
 export const sitemap: RequestHandler = async (_req: Request, res: Response) => {
   try {
@@ -208,8 +263,11 @@ export const sitemap: RequestHandler = async (_req: Request, res: Response) => {
 
     const pageUrls = Object.keys(STATIC_PAGES)
       .map((name) => `  <url>\n    <loc>${escXml(`${SITE_URL}/${name}`)}</loc>\n  </url>`);
+    const quizTopicUrls = Object.keys(QUIZ_TOPIC_PAGES)
+      .map((slug) => `  <url>\n    <loc>${escXml(`${SITE_URL}/quizzes/${slug}`)}</loc>\n  </url>`);
     const urls = [
       ...pageUrls,
+      ...quizTopicUrls,
       ...posts.map((p) => `  <url>\n    <loc>${escXml(postUrl(p.slug!))}</loc>\n    <lastmod>${p.updatedAt.toISOString()}</lastmod>\n  </url>`),
     ].join('\n');
 

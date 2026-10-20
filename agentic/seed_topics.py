@@ -26,7 +26,7 @@ TOPICS = [
     },
     {
         "name": "General Studies",
-        "description": "Indian History, Geography, Polity, Economy, General Science and GK for SSC, State SSC, Banking, Police, State and Central Government exams.",
+        "description": "Indian History, Geography, Polity, Economy, General Science, GK, Rajasthan GK and GK in Hindi for SSC, State SSC, Banking, Police, State and Central Government exams.",
         "subtopics": [
             "Indian History",
             "Indian Geography",
@@ -34,14 +34,17 @@ TOPICS = [
             "Indian Economy",
             "General Science",
             "General Knowledge",
+            "Rajasthan GK",
+            "GK in Hindi",
         ],
     },
     {
         "name": "Aptitude & Reasoning",
-        "description": "Quantitative Aptitude and Logical Reasoning for SSC, Banking, Police, PSU and private-company recruitment tests.",
+        "description": "Quantitative Aptitude, Logical Reasoning and English Language for SSC, Banking, Police, PSU and private-company recruitment tests.",
         "subtopics": [
             "Quantitative Aptitude",
             "Logical Reasoning",
+            "English Language",
         ],
     },
     {
@@ -81,10 +84,13 @@ def _apply_renames() -> None:
                 logger.info("  Renamed subtopic %s → %s (%s)", old, new, r.status_code)
 
 
-# Removed content (Oct 2026): Programming / IT, and English Language. Keep these deactivated —
-# never deleted, so their questions and posts stay recoverable — and out of every generator and game.
+# Removed content (Oct 2026): Programming / IT. Keep these deactivated — never deleted, so their
+# questions and posts stay recoverable — and out of every generator and game.
+# (English Language was hidden on 19 Oct and brought back on 20 Oct as a quiz-topic page.)
 DEACTIVATED_TOPICS    = {"Programming"}
-DEACTIVATED_SUBTOPICS = {"Computer Science", "English Language"}
+DEACTIVATED_SUBTOPICS = {"Computer Science"}
+# Every subtopic listed in TOPICS is active; this re-enables any that were switched off earlier.
+SEEDED_SUBTOPICS = {name for t in TOPICS for name in t["subtopics"]}
 
 
 def _apply_deactivations() -> None:
@@ -100,6 +106,10 @@ def _apply_deactivations() -> None:
                 requests.patch(f"{TOPIC_API_URL}/api/topics/subtopics/{s['_id']}", json={"isActive": False},
                                headers=auth_headers(), timeout=10)
                 logger.info("  Deactivated subtopic %s", s["name"])
+            elif not off and s["name"] in SEEDED_SUBTOPICS and not s.get("isActive", True):
+                requests.patch(f"{TOPIC_API_URL}/api/topics/subtopics/{s['_id']}", json={"isActive": True},
+                               headers=auth_headers(), timeout=10)
+                logger.info("  Reactivated subtopic %s", s["name"])
 
 
 def _update_description(topic_id: str, description: str) -> None:

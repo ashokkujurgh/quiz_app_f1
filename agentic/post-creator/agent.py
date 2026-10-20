@@ -30,8 +30,9 @@ MAX_RETRIES = 2  # other subjects to try when a post is rejected
 # (Programming/IT was removed; its topic is deactivated, so it never reaches this list.)
 ENGINEERING_TOPICS = {"engineering"}
 NON_ENGINEERING_SHARE = 0.70
-# Aptitude & reasoning are practised through quizzes only — no posts
-QUIZ_ONLY_SUBTOPICS = {"logical reasoning", "quantitative aptitude"}
+# Aptitude & reasoning are practised through quizzes only — no posts. GK in Hindi is quiz-only
+# too: the post pipeline's style and fact checks are written for English.
+QUIZ_ONLY_SUBTOPICS = {"logical reasoning", "quantitative aptitude", "gk in hindi"}
 
 
 def _recent_titles(subtopic_name: str) -> list[str]:
@@ -65,7 +66,8 @@ def _pick_candidates(subtopics: list[dict], n: int) -> list[dict]:
 logger = logging.getLogger(__name__)
 
 
-def run_agent() -> None:
+def run_agent(only_subtopics: list[str] | None = None) -> None:
+    """One run. only_subtopics (names, any case) targets those subjects — one post each — instead of a random pick."""
     logger.info("=== Post-creator agent started ===")
 
     # 1. Fetch subtopics
@@ -86,12 +88,18 @@ def run_agent() -> None:
     # 2. Pick with diversity
     # Extra candidates: if a post is rejected (e.g. by the fact-check), try another subject
     # so the run still delivers POSTS_PER_RUN posts.
-    selected = _pick_candidates(subtopics, POSTS_PER_RUN + MAX_RETRIES)
-    logger.info("Candidates (%d needed): %s", POSTS_PER_RUN, [s["name"] for s in selected])
+    if only_subtopics:
+        wanted = {n.strip().lower() for n in only_subtopics}
+        selected = [s for s in subtopics if s["name"].strip().lower() in wanted]
+        posts_needed = len(selected)
+    else:
+        selected = _pick_candidates(subtopics, POSTS_PER_RUN + MAX_RETRIES)
+        posts_needed = POSTS_PER_RUN
+    logger.info("Candidates (%d needed): %s", posts_needed, [s["name"] for s in selected])
     created = 0
 
     for subtopic in selected:
-        if created >= POSTS_PER_RUN:
+        if created >= posts_needed:
             break
         topic_name    = subtopic["topicName"]
         subtopic_name = subtopic["name"]
@@ -205,6 +213,6 @@ def run_agent() -> None:
             subtopic_name,
         )
 
-    if created < POSTS_PER_RUN:
-        logger.warning("Only %d of %d post(s) created this run.", created, POSTS_PER_RUN)
+    if created < posts_needed:
+        logger.warning("Only %d of %d post(s) created this run.", created, posts_needed)
     logger.info("=== Post-creator agent finished (%d post(s) created) ===", created)

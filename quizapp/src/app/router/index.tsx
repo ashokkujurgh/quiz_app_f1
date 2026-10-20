@@ -37,6 +37,7 @@ const AdminDashboard         = lazyPage(() => import('../components/pages/AdminD
 const PostDetailPage         = lazyPage(() => import('../components/pages/PostDetailPage'), 'PostDetailPage');
 const PostsPage              = lazyPage(() => import('../components/pages/PostsPage'), 'PostsPage');
 const AboutPage              = lazyPage(() => import('../components/pages/AboutPage'), 'AboutPage');
+const QuizTopicPage          = lazyPage(() => import('../components/pages/QuizTopicPage'), 'QuizTopicPage');
 const PrivacyPolicyPage      = lazyPage(() => import('../components/pages/PrivacyPolicyPage'), 'PrivacyPolicyPage');
 const ContactPage            = lazyPage(() => import('../components/pages/ContactPage'), 'ContactPage');
 
@@ -93,6 +94,7 @@ const routes: RouteObject[] = [
     children: [
       { path: 'home',          element: page(<HomePage />) },
       { path: 'quizzes',       element: page(<QuizzesPage />) },
+      { path: 'quizzes/:slug', element: page(<QuizTopicPage />) },
       // Public info pages (linked from the bottom of the left menu)
       { path: 'about',          element: page(<AboutPage />) },
       { path: 'privacy-policy', element: page(<PrivacyPolicyPage />) },
