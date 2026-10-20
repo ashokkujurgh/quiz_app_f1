@@ -92,11 +92,12 @@ _SUBTOPIC_STYLE = {
     ),
 }
 # Subtopics whose answers are re-solved independently before saving
-_VERIFY_SUBTOPICS = {"quantitative aptitude", "logical reasoning"}
+_VERIFY_SUBTOPICS = {"quantitative aptitude", "logical reasoning", "rajasthan gk", "gk in hindi", "english language"}
 
 _verify_prompt = ChatPromptTemplate.from_messages([
     ("system", "You are a careful exam solver. Solve the question yourself, step by step, then end with a "
-               "final line exactly like: ANSWER: <0-based index of the correct option>"),
+               "final line exactly like: ANSWER: <0-based index of the correct option>. Check every option: "
+               "if more than one option is correct, or none is, end with ANSWER: NONE instead."),
     ("human", "{question}\n\nOptions:\n{options}"),
 ])
 _verify_chain = _verify_prompt | ChatOpenAI(model="gpt-4o-mini", api_key=OPENAI_API_KEY, temperature=0) | StrOutputParser()
