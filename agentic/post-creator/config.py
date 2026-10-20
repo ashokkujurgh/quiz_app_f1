@@ -80,8 +80,8 @@ EMBED_DIM           = 1536
 # Duplicate threshold — cosine similarity above this = already exists
 SIMILARITY_THRESHOLD = 0.90
 
-# 1 post per run × 4 runs = 4 posts per day
-POSTS_PER_RUN       = int(os.getenv("POSTS_PER_RUN", "1"))
+# 2 posts per run × 4 runs = up to 8 posts per day (each waits for approval)
+POSTS_PER_RUN       = int(os.getenv("POSTS_PER_RUN", "2"))
 
 # Schedule (IST → UTC, IST = UTC+5:30), spread through the day:
 CRON_SCHEDULE_UTC = [

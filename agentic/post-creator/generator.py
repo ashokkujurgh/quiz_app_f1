@@ -104,7 +104,7 @@ Rules:
 - Never say "Did you know", "In today's world", "In conclusion", or use bullet points.
 - Active voice. No jargon without explanation.
 - End with one sentence that makes the reader feel smarter for reading this.
-- Length: 500-1000 words. Multiple flowing paragraphs. No lists or headers.
+- Length: 650-1000 words. Multiple flowing paragraphs. No lists or headers.
 """ + _QUALITY_BAR
 
 # Appended to every mode's system prompt — how the writing should *sound*
@@ -161,15 +161,18 @@ FORMAT: write the "content" field as clean HTML using ONLY these tags: <p>, <h2>
 No <h1>, no inline styles, no classes, no images, no markdown.
 Structure (follow this order):
 1. Opening <p>: say plainly what the concept is (a simple definition in your own words) and why it matters for the student.
-2. Explanation: build the concept step by step, from the basics upward, under 2-4 short <h2> section headings
-   (e.g. "Types of …", "How it works", "Examples"). Use <strong> for key terms the first time they appear.
-3. Examples: at least two clear, standard textbook examples (Indian examples where they fit).
+2. Explanation: build the concept step by step, from the basics upward, under 3-5 short <h2> section headings
+   (e.g. "Types of …", "How it works", "Examples", "Common mistakes"). Use <strong> for key terms the first time
+   they appear. Go deep: explain the why behind each point, not only the what.
+3. Examples: at least three clear, standard textbook examples (Indian examples where they fit), each explained
+   in a few sentences. Where it helps, add a short worked example or a common misconception and its correction.
 4. End with <h2>Key points to remember</h2> followed by a <ul> of 4-6 short <li> points.
    The post ENDS with that list — write nothing after it.
 Rules:
 - No story openings, no news hooks, no "In 1991, X decided..." style beginnings, no current affairs.
 - Never say "Did you know" or "In conclusion".
-- Length: 350-500 words in total (headings and key points included). NEVER more than 500 words.
+- Length: 650-900 words in total (headings and key points included). Never fewer than 600 or more than 1000.
+  Reach the length with more explanation and examples — never by repeating a point.
 """ + _QUALITY_BAR
 
 _SYSTEM_FUN = """\
@@ -185,7 +188,7 @@ Rules:
 - At most one light cultural touch from the REGION FOCUS for the whole post — don't repeat it as a running gag.
 - Never lecture. Never be cringe. No "haha" or "lol", no rhetorical "spoiler:" asides — let the writing be the funny part.
 - End with a punchline or playful twist that still leaves the reader having learned something real.
-- Length: 500-1000 words. Punchy paragraphs but substantial depth. No bullet points.
+- Length: 650-1000 words. Punchy paragraphs but substantial depth. No bullet points.
 """ + _QUALITY_BAR
 
 _SYSTEM_QUESTION = """\
@@ -200,7 +203,7 @@ Rules:
 - Use context from the REGION FOCUS in the request (but don't force it).
 - End with the question directed at the reader — make them WANT to think, discuss, and learn more.
 - Never say "In conclusion", never be preachy, never use news as the main frame.
-- Active voice. Substantial paragraphs. 500-1000 words. No bullet points.
+- Active voice. Substantial paragraphs. 650-1000 words. No bullet points.
 """ + _QUALITY_BAR
 
 
@@ -380,7 +383,7 @@ Write a {mode} post on ONE specific, chapter-sized concept from the standard "{s
 overview of the whole subject. {avoid_note}{seo_note}
 The post must focus on teaching this subject deeply — not on current events or news.
 Title should be a {title_hint}.
-IMPORTANT: The content must be 350-500 words in total. NEVER more than 500 words — cut, don't pad.
+IMPORTANT: The content must be 650-900 words in total — never fewer than 600 or more than 1000. Add depth, don't pad.
 
 Return ONLY valid JSON — no markdown, no code fences:
 
@@ -420,7 +423,8 @@ Return ONLY valid JSON — no markdown, no code fences:
                 "or statistic instead. Remove any banned phrase entirely and reword naturally, the way a good "
                 "Indian teacher would say it. Fix any US spellings to British/Indian English. Make the title "
                 "reference a specific fact/name from the content, not a generic template. Keep the content "
-                f"within {MAX_POST_WORDS} words (trim the least important sentences if it is longer), and keep the "
+                f"between {MIN_POST_WORDS} and {MAX_POST_WORDS} words (add explanation and examples if it is shorter, "
+                "trim the least important sentences if it is longer), and keep the "
                 "same JSON format."
             )})
             data = _generate_once(messages)
@@ -455,7 +459,7 @@ Return ONLY valid JSON — no markdown, no code fences:
                 logger.error("[%s] Fact-check still flags %d claim(s) after the fix — not publishing.", mode, len(still))
                 return None
             hard = _hard_violations(_quality_violations(html_to_text(data["content"])))
-            if hard:  # the fact-fix rewrite must not reintroduce exam talk or overrun the length cap
+            if hard:  # the fact-fix rewrite must not reintroduce exam talk or leave the length range
                 logger.error("[%s] Fact-fixed draft breaks a hard rule (%s) — not publishing.", mode, "; ".join(hard))
                 return None
 
@@ -486,13 +490,14 @@ _US_SPELLINGS     = {"color": "colour", "colors": "colours", "favorite": "favour
 _EXAM_TALK_RE     = re.compile(r"\b(exams?|examinations?|aspirants?|competitive|frequently (?:tested|asked)|"
                                r"students preparing|recruitment tests?)\b", re.I)
 _EXAM_NAMES_RE    = re.compile(r"\b(SSC|UPSC|IBPS|GATE|PSUs?|CGL|Bank PO|RRB)\b")  # case-sensitive: skips "logic gate"
-MAX_POST_WORDS    = 500  # hard cap on post length (plain-text words)
+MIN_POST_WORDS    = 600   # hard limits on post length (plain-text words): short posts read as thin content
+MAX_POST_WORDS    = 1000
 _HYPOTHETICAL_OPENERS = ["imagine you", "imagine standing", "imagine a world", "imagine a", "picture yourself", "picture this"]
 
 
 def _hard_violations(violations: list[str]) -> list[str]:
-    """Rules a post must never break when published: no exam talk, and the word cap."""
-    return [v for v in violations if v.startswith("mentions exams") or v.startswith("is ") and " words — cut" in v]
+    """Rules a post must never break when published: no exam talk, and the word range."""
+    return [v for v in violations if v.startswith("mentions exams") or v.startswith("is ") and " words — " in v]
 
 
 def _quality_violations(content: str) -> list[str]:
@@ -512,6 +517,9 @@ def _quality_violations(content: str) -> list[str]:
     words = len(content.split())
     if words > MAX_POST_WORDS:
         violations.append(f"is {words} words — cut it to at most {MAX_POST_WORDS} words, keeping every section")
+    elif words < MIN_POST_WORDS:
+        violations.append(f"is {words} words — expand it to at least {MIN_POST_WORDS} words with more explanation "
+                          "and examples, without repeating any point")
     if "key points to remember" not in text:
         violations.append('missing the "Key points to remember" list at the end (4-6 lines starting with "- ")')
     paras = [len(p.split()) for p in content.split("\n") if p.strip()]
