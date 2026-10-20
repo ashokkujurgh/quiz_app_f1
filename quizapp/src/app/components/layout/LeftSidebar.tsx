@@ -91,7 +91,7 @@ export function LeftSidebar({ open, onClose, variant = 'permanent' }: Props) {
             >
               <ListItemIcon sx={{ minWidth: 40, color: isActive ? 'primary.main' : 'text.secondary' }}>
                 {badge > 0 ? (
-                  <Badge badgeContent={badge} color="primary">
+                  <Badge badgeContent={badge} color="error">
                     <Icon fontSize="small" />
                   </Badge>
                 ) : (

@@ -249,7 +249,7 @@ export function Navbar({ onMenuToggle }: Props) {
           {user && (
             <Tooltip title="Messages">
               <IconButton size="small" onClick={() => navigate('/messages')}>
-                <Badge badgeContent={unreadMessages} color="primary">
+                <Badge badgeContent={unreadMessages} color="error">
                   <Message />
                 </Badge>
               </IconButton>

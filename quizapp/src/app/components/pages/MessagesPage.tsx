@@ -37,7 +37,7 @@ function ConvItem({ conv, active, onClick }: { conv: Conversation; active: boole
     <Stack direction="row" spacing={1.5} alignItems="center" px={2} py={1.5} onClick={onClick}
       sx={{ cursor: 'pointer', bgcolor: active ? 'action.selected' : 'transparent', '&:hover': { bgcolor: 'action.hover' }, borderBottom: '1px solid', borderColor: 'divider' }}>
       {conv.otherUser ? (
-        <Badge badgeContent={unreadCount > 0 ? unreadCount : undefined} color="primary" overlap="circular" anchorOrigin={{ vertical: 'top', horizontal: 'right' }}>
+        <Badge badgeContent={unreadCount > 0 ? unreadCount : undefined} color="error" overlap="circular" anchorOrigin={{ vertical: 'top', horizontal: 'right' }}>
           <OnlineAvatar src={conv.otherUser.avatar ?? undefined} username={conv.otherUser.username} userId={conv.otherUser._id} size={44} />
         </Badge>
       ) : (

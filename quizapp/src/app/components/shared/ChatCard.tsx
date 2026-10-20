@@ -40,7 +40,7 @@ export function ChatCard({ chat }: Props) {
               )}
             </Typography>
             {chat.unreadCount > 0 && (
-              <Badge badgeContent={chat.unreadCount} color="primary" sx={{ ml: 1, '& .MuiBadge-badge': { position: 'relative', transform: 'none' } }} />
+              <Badge badgeContent={chat.unreadCount} color="error" sx={{ ml: 1, '& .MuiBadge-badge': { position: 'relative', transform: 'none' } }} />
             )}
           </Stack>
         </Box>

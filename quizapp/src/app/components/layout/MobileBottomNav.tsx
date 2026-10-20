@@ -21,7 +21,7 @@ export function MobileBottomNav() {
     },
     {
       label: 'Messages',
-      icon: <Badge badgeContent={unreadMessages || undefined} color="primary"><Message /></Badge>,
+      icon: <Badge badgeContent={unreadMessages || undefined} color="error"><Message /></Badge>,
       path: '/messages',
     },
     { label: 'Profile', icon: <Person />, path: '/profile' },
