@@ -1,13 +1,14 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Stack, Avatar, Typography,
   Checkbox, Box, CircularProgress, Alert, Chip, Divider, IconButton, InputAdornment,
 } from '@mui/material';
-import { Search, Edit, Check, Close, GroupAdd, ExitToApp, DeleteOutline } from '@mui/icons-material';
+import { Search, Edit, Check, Close, GroupAdd, ExitToApp, DeleteOutline, Groups, PhotoCamera } from '@mui/icons-material';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { fetchFriends } from '../../store/slices/friendsSlice';
 import { fetchConversations, setActiveConv, type Conversation, type MsgUser } from '../../store/slices/messagesSlice';
 import { apiFetch } from '../../utils/apiFetch';
+import { IMAGE_ACCEPT, uploadImageFile } from '../../utils/imageUpload';
 
 const NAME_MAX = 80;   // matches the Conversation model
 
@@ -128,6 +129,8 @@ export function GroupInfoDialog({ conv, open, onClose }: { conv: Conversation; o
   const [confirm, setConfirm] = useState<'delete' | 'leave' | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const photoInput = useRef<HTMLInputElement>(null);
+  const [photoUploading, setPhotoUploading] = useState(false);
 
   useEffect(() => {
     if (open) { setEditing(false); setName(conv.name ?? ''); setAdding(false); setToAdd([]); setConfirm(null); setError(''); }
@@ -146,6 +149,21 @@ export function GroupInfoDialog({ conv, open, onClose }: { conv: Conversation; o
     }
   };
 
+  const handlePhotoPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setPhotoUploading(true); setError('');
+    try {
+      await uploadImageFile(`/api/messages/groups/${conv._id}/icon`, 'icon', file);
+      await dispatch(fetchConversations());   // members get group:updated and refresh too
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setPhotoUploading(false);
+    }
+  };
+
   const saveName = () => run(() => call(`/api/messages/groups/${conv._id}`, 'PATCH', { name: name.trim() }), () => setEditing(false));
   const addMembers = () => run(() => call(`/api/messages/groups/${conv._id}/members`, 'POST', { userIds: toAdd }),
     () => { setAdding(false); setToAdd([]); });
@@ -157,6 +175,27 @@ export function GroupInfoDialog({ conv, open, onClose }: { conv: Conversation; o
       <DialogTitle fontWeight={700}>Group info</DialogTitle>
       <DialogContent>
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+
+        {/* Group photo — admins can change it */}
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 1 }}>
+          <Box sx={{ position: 'relative' }}>
+            <Avatar src={conv.icon ?? undefined} sx={{ width: 84, height: 84, bgcolor: 'secondary.main' }}>
+              <Groups sx={{ fontSize: 44 }} />
+            </Avatar>
+            {isAdmin && (
+              <>
+                <input ref={photoInput} type="file" accept={IMAGE_ACCEPT} hidden onChange={handlePhotoPick} />
+                <IconButton size="small" onClick={() => photoInput.current?.click()} disabled={photoUploading || busy}
+                  aria-label="Change group photo"
+                  sx={{ position: 'absolute', bottom: -4, right: -4, bgcolor: 'primary.main', color: 'white',
+                        border: '2px solid', borderColor: 'background.paper', '&:hover': { bgcolor: 'primary.dark' },
+                        '&.Mui-disabled': { bgcolor: 'primary.main', color: 'white' } }}>
+                  {photoUploading ? <CircularProgress size={16} color="inherit" /> : <PhotoCamera sx={{ fontSize: 16 }} />}
+                </IconButton>
+              </>
+            )}
+          </Box>
+        </Box>
 
         {/* Name */}
         {editing ? (

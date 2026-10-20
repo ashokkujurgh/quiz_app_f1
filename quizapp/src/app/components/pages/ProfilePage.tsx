@@ -1,11 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Box, Typography, Tabs, Tab, Stack, Card, CardContent, Button,
-  Avatar, Grid, CircularProgress,
+  Avatar, Grid, CircularProgress, IconButton, Tooltip, Snackbar, Alert,
 } from '@mui/material';
-import { Edit, Quiz, People, Article } from '@mui/icons-material';
+import { Edit, Quiz, People, Article, PhotoCamera } from '@mui/icons-material';
 import { useNavigate } from 'react-router';
-import { useAppSelector } from '../../store/hooks';
+import { useAppDispatch, useAppSelector } from '../../store/hooks';
+import { updateUser } from '../../store/slices/authSlice';
+import { IMAGE_ACCEPT, uploadImageFile } from '../../utils/imageUpload';
 import { apiFetch } from '../../utils/apiFetch';
 import { PostCard } from '../shared/PostCard';
 import { TopicChip } from '../shared/TopicChip';
@@ -34,6 +36,27 @@ interface FriendUser {
 export function ProfilePage() {
   const navigate = useNavigate();
   const { user } = useAppSelector((s) => s.auth);
+  const dispatch = useAppDispatch();
+
+  // Profile picture upload
+  const photoInput = useRef<HTMLInputElement>(null);
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const [photoMsg, setPhotoMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const handlePhotoPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';                       // choosing the same file again still fires
+    if (!file) return;
+    setPhotoUploading(true);
+    try {
+      const data = await uploadImageFile('/api/auth/upload/avatar', 'avatar', file);
+      dispatch(updateUser({ avatar: data.avatarUrl as string }));
+      setPhotoMsg({ ok: true, text: 'Profile picture updated.' });
+    } catch (err) {
+      setPhotoMsg({ ok: false, text: (err as Error).message });
+    } finally {
+      setPhotoUploading(false);
+    }
+  };
 
   const [tab, setTab]         = useState(0);
   const [posts, setPosts]     = useState<Post[]>([]);
@@ -105,10 +128,21 @@ export function ProfilePage() {
             <Box sx={{ position: 'relative' }}>
               <UserAvatar user={user} size={90} sx={{ border: '4px solid', borderColor: 'background.paper' }} />
               <Box sx={{
-                position: 'absolute', bottom: 4, right: 4,
+                position: 'absolute', bottom: 4, left: 4,
                 width: 14, height: 14, borderRadius: '50%',
                 bgcolor: 'success.main', border: '2px solid white',
               }} />
+              <input ref={photoInput} type="file" accept={IMAGE_ACCEPT} hidden onChange={handlePhotoPick} />
+              <Tooltip title="Change profile picture">
+                <span style={{ position: 'absolute', bottom: -2, right: -6 }}>
+                  <IconButton size="small" onClick={() => photoInput.current?.click()} disabled={photoUploading}
+                    aria-label="Change profile picture"
+                    sx={{ bgcolor: 'primary.main', color: 'white', border: '2px solid', borderColor: 'background.paper',
+                          '&:hover': { bgcolor: 'primary.dark' }, '&.Mui-disabled': { bgcolor: 'primary.main', color: 'white' } }}>
+                    {photoUploading ? <CircularProgress size={16} color="inherit" /> : <PhotoCamera sx={{ fontSize: 16 }} />}
+                  </IconButton>
+                </span>
+              </Tooltip>
             </Box>
             <Button variant="outlined" startIcon={<Edit />} size="small"
               onClick={() => navigate('/settings')}>
@@ -219,6 +253,13 @@ export function ProfilePage() {
             </Grid>
           )
       )}
+
+      <Snackbar open={!!photoMsg} autoHideDuration={4000} onClose={() => setPhotoMsg(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
+        <Alert severity={photoMsg?.ok ? 'success' : 'error'} onClose={() => setPhotoMsg(null)} variant="filled">
+          {photoMsg?.text}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

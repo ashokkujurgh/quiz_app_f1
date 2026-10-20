@@ -55,6 +55,8 @@ const authSlice = createSlice({
     updateUser: (state, action: PayloadAction<Partial<User>>) => {
       if (state.user) {
         state.user = { ...state.user, ...action.payload };
+        // Keep the stored copy in step, or a reload would bring back the old details (e.g. photo)
+        try { localStorage.setItem('auth_user', JSON.stringify(state.user)); } catch { /* storage blocked */ }
       }
     },
     tokenRefreshed: (state, action: PayloadAction<string>) => {
