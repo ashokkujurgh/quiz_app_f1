@@ -2,11 +2,11 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import {
   Box, Typography, Stack, Button, IconButton, Avatar, Badge,
-  CircularProgress, useTheme, useMediaQuery, Alert, LinearProgress,
+  CircularProgress, useTheme, useMediaQuery, Alert,
 } from '@mui/material';
 import {
   ArrowBack, Check, EmojiEvents, ArrowForward, Send,
-  AccessTime, Star, BlockOutlined,
+  AccessTime, Star, BlockOutlined, Home,
 } from '@mui/icons-material';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import { completeQuiz, resetQuiz } from '../../store/slices/quizSlice';
@@ -70,7 +70,7 @@ function CircleTimer({ value, max, isLow, label }: { value: number; max: number;
 }
 
 // ── Players sidebar ───────────────────────────────────────────────────────────
-function PlayersPanel({ players, totalQ, myScore, currentQ }: { players: LivePlayer[]; totalQ: number; myScore: number; currentQ: number }) {
+function PlayersPanel({ players }: { players: LivePlayer[] }) {
   return (
     <Box sx={{
       width: 240, flexShrink: 0,
@@ -81,55 +81,29 @@ function PlayersPanel({ players, totalQ, myScore, currentQ }: { players: LivePla
       <Stack direction="row" spacing={1} alignItems="center" mb={2.5}>
         <EmojiEvents sx={{ color: '#f59e0b', fontSize: 18 }} />
         <Typography variant="caption" fontWeight={800} sx={{ textTransform: 'uppercase', letterSpacing: 1, color: 'text.secondary' }}>
-          Live Players
+          Players
         </Typography>
         <Box sx={{ ml: 'auto', bgcolor: 'primary.main', color: 'white', borderRadius: 4, px: 0.75, py: 0.1 }}>
           <Typography sx={{ fontSize: '0.65rem', fontWeight: 700 }}>{players.length}</Typography>
         </Box>
       </Stack>
 
-      <Stack spacing={1.5}>
-        {players.map((p, i) => {
-          const medal = ['🥇', '🥈', '🥉'][i];
-          return (
-            <Box key={p.userId} sx={{
-              p: 1.25, borderRadius: 2,
-              bgcolor: i === 0 ? 'rgba(245,158,11,0.12)' : 'rgba(255,255,255,0.04)',
-              border: '1px solid', borderColor: i === 0 ? 'rgba(245,158,11,0.3)' : 'transparent',
-              transition: 'all 0.2s',
-            }}>
-              <Stack direction="row" spacing={1} alignItems="center" mb={0.75}>
-                <Typography sx={{ fontSize: '0.75rem', width: 18, flexShrink: 0 }}>{medal ?? `#${i + 1}`}</Typography>
-                <Badge overlap="circular" anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }} variant="dot"
-                  sx={{ '& .MuiBadge-badge': { bgcolor: '#22c55e', boxShadow: '0 0 0 2px #111936', width: 8, height: 8, borderRadius: '50%', minWidth: 'unset' } }}>
-                  <Avatar src={p.userAvatar} sx={{ width: 30, height: 30, fontSize: 12, bgcolor: `hsl(${(p.userName.charCodeAt(0) * 37) % 360},60%,50%)` }}>
-                    {p.userName[0]}
-                  </Avatar>
-                </Badge>
-                <Box flex={1} minWidth={0}>
-                  <Typography variant="caption" fontWeight={700} noWrap display="block" sx={{ fontSize: '0.72rem' }}>
-                    {p.userName}
-                  </Typography>
-                  <Stack direction="row" alignItems="center" spacing={0.5}>
-                    <Star sx={{ fontSize: 10, color: '#f59e0b' }} />
-                    <Typography sx={{ fontSize: '0.62rem', color: '#f59e0b', fontWeight: 700 }}>
-                      {p.score} pts
-                    </Typography>
-                  </Stack>
-                </Box>
-              </Stack>
-              <LinearProgress
-                variant="determinate"
-                value={totalQ > 0 ? (p.answered / totalQ) * 100 : 0}
-                sx={{
-                  height: 3, borderRadius: 2,
-                  bgcolor: 'rgba(255,255,255,0.1)',
-                  '& .MuiLinearProgress-bar': { bgcolor: i === 0 ? '#f59e0b' : 'primary.main', borderRadius: 2 },
-                }}
-              />
-            </Box>
-          );
-        })}
+      {/* Names only — no scores or ranking while the game is running */}
+      <Stack spacing={1}>
+        {players.map((p) => (
+          <Stack key={p.userId} direction="row" spacing={1} alignItems="center"
+            sx={{ p: 1, borderRadius: 2, bgcolor: 'rgba(255,255,255,0.04)' }}>
+            <Badge overlap="circular" anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }} variant="dot"
+              sx={{ '& .MuiBadge-badge': { bgcolor: '#22c55e', boxShadow: '0 0 0 2px #111936', width: 8, height: 8, borderRadius: '50%', minWidth: 'unset' } }}>
+              <Avatar src={p.userAvatar} sx={{ width: 30, height: 30, fontSize: 12, bgcolor: `hsl(${(p.userName.charCodeAt(0) * 37) % 360},60%,50%)` }}>
+                {p.userName[0]}
+              </Avatar>
+            </Badge>
+            <Typography variant="caption" fontWeight={700} noWrap sx={{ fontSize: '0.75rem', minWidth: 0 }}>
+              {p.userName}
+            </Typography>
+          </Stack>
+        ))}
       </Stack>
     </Box>
   );
@@ -140,20 +114,15 @@ function PlayerStrip({ players }: { players: LivePlayer[] }) {
   return (
     <Box sx={{ overflowX: 'auto', pb: 0.5, mb: 2 }}>
       <Stack direction="row" spacing={1.5} sx={{ minWidth: 'max-content' }}>
-        {players.map((p, i) => (
+        {players.map((p) => (
           <Stack key={p.userId} alignItems="center" spacing={0.5}>
             <Box sx={{ position: 'relative' }}>
               <Badge overlap="circular" anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }} variant="dot"
                 sx={{ '& .MuiBadge-badge': { bgcolor: '#22c55e', boxShadow: '0 0 0 2px #111936', width: 8, height: 8, borderRadius: '50%', minWidth: 'unset' } }}>
-                <Avatar src={p.userAvatar} sx={{ width: 38, height: 38, fontSize: 14, bgcolor: `hsl(${(p.userName.charCodeAt(0) * 37) % 360},60%,50%)`, border: i === 0 ? '2px solid #f59e0b' : 'none' }}>
+                <Avatar src={p.userAvatar} sx={{ width: 38, height: 38, fontSize: 14, bgcolor: `hsl(${(p.userName.charCodeAt(0) * 37) % 360},60%,50%)` }}>
                   {p.userName[0]}
                 </Avatar>
               </Badge>
-              {i < 3 && (
-                <Typography sx={{ position: 'absolute', top: -8, right: -6, fontSize: '0.65rem' }}>
-                  {['🥇', '🥈', '🥉'][i]}
-                </Typography>
-              )}
             </Box>
             <Typography variant="caption" fontWeight={700} noWrap sx={{ maxWidth: 52, fontSize: '0.6rem', color: 'rgba(255,255,255,0.8)' }}>
               {p.userName.split(' ')[0]}
@@ -528,7 +497,7 @@ export function QuizPlayPage() {
       <Box sx={{ display: 'flex', flex: 1, pt: '64px' }}>
 
         {/* Desktop players panel */}
-        {!isMobile && <PlayersPanel players={players} totalQ={totalQuestions} myScore={myScore} currentQ={currentQuestion?.questionIndex ?? 0} />}
+        {!isMobile && <PlayersPanel players={players} />}
 
         {/* Main content */}
         <Box sx={{ flex: 1, minWidth: 0, p: { xs: 2, md: 3 }, maxWidth: 760, mx: 'auto', width: '100%' }}>
@@ -715,8 +684,16 @@ export function QuizPlayPage() {
               {ttSubmitted && (
                 <Box sx={{ mb: 2, p: 1.5, borderRadius: 2, bgcolor: 'rgba(6,213,207,0.15)', border: '1px solid rgba(6,213,207,0.4)', textAlign: 'center' }}>
                   <Typography fontWeight={700} sx={{ color: '#7FEAE6' }}>
-                    {ttTimeLeft === 0 ? "⏱ Time's up! Your answers have been submitted." : '✅ Submitted! Waiting for quiz to end…'}
+                    {ttTimeLeft === 0 ? "⏱ Time's up! Your answers have been submitted." : '✅ Submitted! Your answers are saved.'}
                   </Typography>
+                  <Typography sx={{ color: 'rgba(255,255,255,0.65)', fontSize: '0.8rem', mt: 0.5 }}>
+                    Results appear in History when the quiz closes — you don't need to wait here.
+                  </Typography>
+                  {/* Games can stay open for hours, so don't leave players stuck on this screen */}
+                  <Button variant="contained" startIcon={<Home />} onClick={() => { dispatch(resetQuiz()); navigate('/home'); }}
+                    sx={{ mt: 1.25, borderRadius: 2, fontWeight: 700, color: 'white !important' }}>
+                    Go to Home
+                  </Button>
                 </Box>
               )}
 
