@@ -5,7 +5,7 @@ import {
   TextField, MenuItem, IconButton, CircularProgress, Alert, Typography, Skeleton, useMediaQuery,
 } from '@mui/material';
 import type { Theme } from '@mui/material/styles';
-import { Add, Image, Close, Login, PersonAdd, EditNote } from '@mui/icons-material';
+import { Add, Image, Close, Login, PersonAdd, EditNote, WorkOutline, ChevronRight } from '@mui/icons-material';
 import { useNavigate } from 'react-router';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import { setActiveTopic, addPost, setPosts, setLoading } from '../../store/slices/postsSlice';
@@ -19,6 +19,7 @@ import type { Post, QuizTopic } from '../../types';
 import { loadTopicsWithSubtopics } from '../../utils/topicsCache';
 import { apiFetch } from '../../utils/apiFetch';
 import { htmlToText } from '../../utils/html';
+import { EXAM_QUIZZES_PATH } from '../../utils/examQuiz';
 
 // The editor (TipTap + ProseMirror, ~100 kB gzipped) loads only when someone writes a post
 // Practised through quizzes only — no posts are written for these, so no category chip
@@ -316,6 +317,16 @@ export function HomePage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Govt exam practice quizzes */}
+      <Button
+        fullWidth variant="outlined" color="secondary" onClick={() => navigate(EXAM_QUIZZES_PATH)}
+        startIcon={<WorkOutline />} endIcon={<ChevronRight />}
+        sx={{ mb: 2, py: 1.1, borderRadius: 2, fontWeight: 700, justifyContent: 'flex-start',
+              '& .MuiButton-endIcon': { ml: 'auto' } }}
+      >
+        Govt Exam Practice Quizzes
+      </Button>
 
       {/* Live Games — only here when the right sidebar is hidden */}
       {sidebarHidden && <Box sx={{ mb: 2 }}><LiveGamesSection /></Box>}

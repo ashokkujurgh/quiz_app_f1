@@ -1,11 +1,11 @@
 import { memo, useCallback, useState, useEffect, useRef } from 'react';
-import { useNavigate, useLocation, Link as RouterLink } from 'react-router';
+import { useNavigate, useLocation, useSearchParams, Link as RouterLink } from 'react-router';
 import {
   Box, Grid, Typography, TextField, InputAdornment,
   CircularProgress, Alert, Button, Chip, Stack, Card, CardContent,
   CardMedia, Skeleton, Snackbar, Tabs, Tab,
 } from '@mui/material';
-import { Search, Timer, Quiz as QuizIcon, Add, EmojiEvents, Mail, History, PlayArrow } from '@mui/icons-material';
+import { Search, Timer, Quiz as QuizIcon, Add, EmojiEvents, Mail, History, PlayArrow, WorkOutline } from '@mui/icons-material';
 
 import { io } from 'socket.io-client';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
@@ -16,6 +16,7 @@ import { formatDuration } from '../../utils/formatDuration';
 import { QuizTypeSwitch } from '../shared/QuizTypeSwitch';
 import { useQuizType, useEngineeringTopicIds, quizTypeOf } from '../../utils/quizType';
 import { QUIZ_TOPICS } from '../../data/quizTopics';
+import { isExamQuiz } from '../../utils/examQuiz';
 
 const SOCKET_URL = import.meta.env.VITE_API_URL || window.location.origin;
 const API = import.meta.env.VITE_API_URL ?? '';
@@ -242,7 +243,17 @@ export function QuizzesPage() {
   const dispatch  = useAppDispatch();
   const { accessToken } = useAppSelector((s) => s.auth);
 
-  const [mainTab, setMainTab]       = useState(0);
+  // Tabs: 0 Active & Upcoming · 1 Past · 2 My Invites · 3 Exam Practice (?tab=exam opens it)
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [mainTab, setMainTabState]  = useState(searchParams.get('tab') === 'exam' ? 3 : 0);
+  const setMainTab = useCallback((v: number) => {
+    setMainTabState(v);
+    setSearchParams(v === 3 ? { tab: 'exam' } : {}, { replace: true });
+  }, [setSearchParams]);
+  useEffect(() => {   // a link to ?tab=exam while already on this page
+    if (searchParams.get('tab') === 'exam') setMainTabState(3);
+  }, [searchParams]);
+  const [examSearch, setExamSearch] = useState('');
   // GK / Engineering switch (shared with the Live Games sidebar)
   const [quizType] = useQuizType();
   const engIds     = useEngineeringTopicIds();
@@ -392,15 +403,24 @@ export function QuizzesPage() {
           <Typography variant="h5" fontWeight={800} mb={0.5}>Quizzes</Typography>
           <Typography variant="body2" color="text.secondary">Challenge yourself and compete with others</Typography>
         </Box>
-        {accessToken && (
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ flexShrink: 0, ml: 2 }}>
           <Button
-            variant="contained" startIcon={<Add />}
-            onClick={() => navigate('/quiz/create')}
-            sx={{ fontWeight: 700, borderRadius: 2, flexShrink: 0, ml: 2 }}
+            variant={mainTab === 3 ? 'contained' : 'outlined'} color="secondary" startIcon={<WorkOutline />}
+            onClick={() => setMainTab(3)}
+            sx={{ fontWeight: 700, borderRadius: 2 }}
           >
-            Create Quiz
+            Exam Practice
           </Button>
-        )}
+          {accessToken && (
+            <Button
+              variant="contained" startIcon={<Add />}
+              onClick={() => navigate('/quiz/create')}
+              sx={{ fontWeight: 700, borderRadius: 2 }}
+            >
+              Create Quiz
+            </Button>
+          )}
+        </Stack>
       </Stack>
 
       {/* Practice by topic — links to the public topic pages */}
@@ -436,14 +456,18 @@ export function QuizzesPage() {
 
       {/* Main tabs */}
       {/* GK / Engineering — filters every tab below */}
-      <Box sx={{ mb: 2 }}>
-        <QuizTypeSwitch />
-      </Box>
+      {mainTab !== 3 && (   // the Exam Practice tab lists both kinds, so the switch would do nothing there
+        <Box sx={{ mb: 2 }}>
+          <QuizTypeSwitch />
+        </Box>
+      )}
 
-      <Tabs value={mainTab} onChange={(_, v) => setMainTab(v)} sx={{ mb: 2.5, borderBottom: 1, borderColor: 'divider' }}>
+      <Tabs value={mainTab} onChange={(_, v) => setMainTab(v)} variant="scrollable" allowScrollButtonsMobile
+        sx={{ mb: 2.5, borderBottom: 1, borderColor: 'divider' }}>
         <Tab icon={<QuizIcon fontSize="small" />} iconPosition="start" label="Active & Upcoming" />
         <Tab icon={<EmojiEvents fontSize="small" />} iconPosition="start" label="Past Quizzes" />
         <Tab icon={<Mail fontSize="small" />} iconPosition="start" label="My Invites" />
+        <Tab icon={<WorkOutline fontSize="small" />} iconPosition="start" label="Exam Practice" />
       </Tabs>
 
       {/* ── Active & Upcoming tab ── */}
@@ -465,6 +489,22 @@ export function QuizzesPage() {
           playingId={playingId}
           emptyMsg="No completed quizzes yet."
         />
+      )}
+
+      {/* ── Exam Practice tab: govt-exam daily practice quizzes (both GK and Engineering) ── */}
+      {mainTab === 3 && (
+        <>
+          <Alert severity="info" icon={<WorkOutline />} sx={{ mb: 2 }}>
+            Daily practice quizzes for current government job exams — a new set of questions every day,
+            each open for 24 hours. State exams come in English and the state's language.
+          </Alert>
+          <QuizGrid
+            quizzes={activeQuizzes.filter(isExamQuiz)} loading={activeLoading} error={activeError}
+            search={examSearch} onSearchChange={setExamSearch}
+            onPlay={handlePlay} playingId={playingId}
+            emptyMsg="No exam practice quizzes right now — they start when a new government job is announced."
+          />
+        </>
       )}
 
       {/* ── My Invites tab ── */}

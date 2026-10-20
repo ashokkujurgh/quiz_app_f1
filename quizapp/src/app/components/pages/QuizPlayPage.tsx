@@ -226,7 +226,7 @@ function OptionButton({
           : <Typography sx={{ fontSize: '0.8rem', fontWeight: 800, color: 'white' }}>{OPTION_LABELS[idx]}</Typography>
         }
       </Box>
-      <Typography sx={{ fontWeight: isSelected ? 700 : 500, fontSize: '0.95rem', flex: 1, lineHeight: 1.4 }}>
+      <Typography sx={{ fontWeight: isSelected ? 700 : 500, fontSize: '0.95rem', flex: 1, lineHeight: 1.4, whiteSpace: 'pre-line' }}>
         {text}
       </Typography>
     </Box>
@@ -671,7 +671,7 @@ export function QuizPlayPage() {
                 border: '1px solid rgba(255,255,255,0.1)',
                 boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
               }}>
-                <Typography sx={{ fontSize: { xs: '1rem', md: '1.2rem' }, fontWeight: 700, lineHeight: 1.6, color: 'white' }}>
+                <Typography sx={{ fontSize: { xs: '1rem', md: '1.2rem' }, fontWeight: 700, lineHeight: 1.6, color: 'white', whiteSpace: 'pre-line' }}>
                   {currentQuestion.question}
                 </Typography>
               </Box>
@@ -728,7 +728,7 @@ export function QuizPlayPage() {
                 border: '1px solid rgba(255,255,255,0.1)',
                 boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
               }}>
-                <Typography sx={{ fontSize: { xs: '1rem', md: '1.2rem' }, fontWeight: 700, lineHeight: 1.6, color: 'white' }}>
+                <Typography sx={{ fontSize: { xs: '1rem', md: '1.2rem' }, fontWeight: 700, lineHeight: 1.6, color: 'white', whiteSpace: 'pre-line' }}>
                   {ttQ.question}
                 </Typography>
               </Box>
@@ -759,7 +759,7 @@ export function QuizPlayPage() {
                           : <Typography sx={{ fontSize: '0.8rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)' }}>{OPTION_LABELS[idx]}</Typography>
                         }
                       </Box>
-                      <Typography sx={{ fontWeight: isSelected ? 700 : 500, fontSize: '0.95rem', flex: 1, lineHeight: 1.4 }}>{opt}</Typography>
+                      <Typography sx={{ fontWeight: isSelected ? 700 : 500, fontSize: '0.95rem', flex: 1, lineHeight: 1.4, whiteSpace: 'pre-line' }}>{opt}</Typography>
                     </Box>
                   );
                 })}
