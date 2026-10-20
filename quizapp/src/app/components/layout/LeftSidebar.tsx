@@ -11,10 +11,11 @@ import {
 import { useState, useEffect } from 'react';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import { UserAvatar } from '../shared/UserAvatar';
-import { fetchIncoming } from '../../store/slices/friendsSlice';
+import { fetchIncoming, refreshIncoming } from '../../store/slices/friendsSlice';
 import { SHOW_LEADERBOARD } from '../../utils/features';
 
 const DRAWER_WIDTH = 260;
+const FRIEND_REQUEST_POLL_MS = 60_000;
 
 const navItems = [
   { label: 'Home',        icon: Home,       path: '/home',        auth: false },
@@ -41,8 +42,20 @@ export function LeftSidebar({ open, onClose, variant = 'permanent' }: Props) {
   const user = useAppSelector((s) => s.auth.user);
   const accessToken = useAppSelector((s) => s.auth.accessToken);
 
+  // Friend-request badge: load on login, then keep it current while browsing — every minute
+  // while the tab is visible, and straight away when you come back to the tab
   useEffect(() => {
-    if (accessToken) dispatch(fetchIncoming());
+    if (!accessToken) return;
+    dispatch(fetchIncoming());
+    const refresh = () => { if (document.visibilityState === 'visible') dispatch(refreshIncoming()); };
+    const timer = setInterval(refresh, FRIEND_REQUEST_POLL_MS);
+    document.addEventListener('visibilitychange', refresh);
+    window.addEventListener('focus', refresh);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', refresh);
+      window.removeEventListener('focus', refresh);
+    };
   }, [accessToken, dispatch]);
   const unreadMessages = useAppSelector((s) =>
     Object.values(s.messages.unreadByConv).reduce((a, c) => a + c, 0)

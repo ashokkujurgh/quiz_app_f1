@@ -46,6 +46,16 @@ export const fetchIncoming = createAsyncThunk('friends/fetchIncoming', async () 
   return data.data as IncomingRequest[];
 });
 
+// Background refresh of the friend-request count (sidebar / bottom-nav badge). Unlike
+// fetchIncoming it never touches `loading`, so the Friends page doesn't flash a spinner,
+// and a failed refresh just keeps the last count.
+export const refreshIncoming = createAsyncThunk('friends/refreshIncoming', async () => {
+  const res = await apiFetch('/api/friends/requests/incoming');
+  if (!res.ok) throw new Error('refresh failed');
+  const data = await res.json();
+  return data.data as IncomingRequest[];
+});
+
 export const fetchOutgoing = createAsyncThunk('friends/fetchOutgoing', async () => {
   const res = await apiFetch('/api/friends/requests/outgoing');
   const data = await res.json();
@@ -104,6 +114,7 @@ const friendsSlice = createSlice({
       .addCase(fetchIncoming.pending,   loading)
       .addCase(fetchIncoming.fulfilled, (state, a) => { state.loading = false; state.incoming   = a.payload; })
       .addCase(fetchIncoming.rejected,  failed)
+      .addCase(refreshIncoming.fulfilled, (state, a) => { if (Array.isArray(a.payload)) state.incoming = a.payload; })
 
       .addCase(fetchOutgoing.pending,   loading)
       .addCase(fetchOutgoing.fulfilled, (state, a) => { state.loading = false; state.outgoing   = a.payload; })
