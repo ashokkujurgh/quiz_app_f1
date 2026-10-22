@@ -41,6 +41,19 @@ const AboutPage              = lazyPage(() => import('../components/pages/AboutP
 const QuizTopicPage          = lazyPage(() => import('../components/pages/QuizTopicPage'), 'QuizTopicPage');
 const PrivacyPolicyPage      = lazyPage(() => import('../components/pages/PrivacyPolicyPage'), 'PrivacyPolicyPage');
 const ContactPage            = lazyPage(() => import('../components/pages/ContactPage'), 'ContactPage');
+// Plans, creators, reviewers
+const PlansPage              = lazyPage(() => import('../components/pages/monetization/PlansPage'), 'PlansPage');
+const SubscriptionPage       = lazyPage(() => import('../components/pages/monetization/SubscriptionPage'), 'SubscriptionPage');
+const CreatorHubPage         = lazyPage(() => import('../components/pages/monetization/CreatorHubPage'), 'CreatorHubPage');
+const CreatorGuidelinesPage  = lazyPage(() => import('../components/pages/monetization/CreatorHubPage'), 'CreatorGuidelinesPage');
+const PremiumPostEditorPage  = lazyPage(() => import('../components/pages/monetization/PremiumPostEditorPage'), 'PremiumPostEditorPage');
+const PostAnalyticsPage      = lazyPage(() => import('../components/pages/monetization/PostAnalyticsPage'), 'PostAnalyticsPage');
+const EarningsPage           = lazyPage(() => import('../components/pages/monetization/EarningsPage'), 'EarningsPage');
+const WithdrawPage           = lazyPage(() => import('../components/pages/monetization/WithdrawPage'), 'WithdrawPage');
+const WithdrawalsPage        = lazyPage(() => import('../components/pages/monetization/WithdrawalsPage'), 'WithdrawalsPage');
+const CreatorStandingPage    = lazyPage(() => import('../components/pages/monetization/CreatorStandingPage'), 'CreatorStandingPage');
+const ReviewQueuePage        = lazyPage(() => import('../components/pages/monetization/ReviewQueuePage'), 'ReviewQueuePage');
+const ReviewDetailPage       = lazyPage(() => import('../components/pages/monetization/ReviewDetailPage'), 'ReviewDetailPage');
 
 function PageLoader() {
   return (
@@ -110,6 +123,22 @@ const routes: RouteObject[] = [
       { path: 'notifications',  element: page(<RequireAuth><NotificationsPage /></RequireAuth>) },
       { path: 'settings',      element: page(<RequireAuth><SettingsPage /></RequireAuth>) },
       { path: 'admin',         element: page(<RequireAuth><AdminDashboard /></RequireAuth>) },
+      // Plans & subscription
+      { path: 'plans',                        element: page(<PlansPage />) },
+      { path: 'subscription',                 element: page(<RequireAuth><SubscriptionPage /></RequireAuth>) },
+      // Creator studio
+      { path: 'creator',                      element: page(<RequireAuth><CreatorHubPage /></RequireAuth>) },
+      { path: 'creator/guidelines',           element: page(<CreatorGuidelinesPage />) },
+      { path: 'creator/posts/new',            element: page(<RequireAuth><PremiumPostEditorPage /></RequireAuth>) },
+      { path: 'creator/posts/:id',            element: page(<RequireAuth><PremiumPostEditorPage /></RequireAuth>) },
+      { path: 'creator/posts/:id/analytics',  element: page(<RequireAuth><PostAnalyticsPage /></RequireAuth>) },
+      { path: 'creator/earnings',             element: page(<RequireAuth><EarningsPage /></RequireAuth>) },
+      { path: 'creator/withdraw',             element: page(<RequireAuth><WithdrawPage /></RequireAuth>) },
+      { path: 'creator/withdrawals',          element: page(<RequireAuth><WithdrawalsPage /></RequireAuth>) },
+      { path: 'creator/standing',             element: page(<RequireAuth><CreatorStandingPage /></RequireAuth>) },
+      // Content reviewers (the API checks the role)
+      { path: 'review',                       element: page(<RequireAuth><ReviewQueuePage /></RequireAuth>) },
+      { path: 'review/:revisionId',           element: page(<RequireAuth><ReviewDetailPage /></RequireAuth>) },
     ],
   },
   { path: '*', element: <NotFoundPage /> },

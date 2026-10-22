@@ -21,6 +21,8 @@ import { htmlToText } from '../../utils/html';
 import { isOfficialPost, withOfficialAvatar } from '../shared/officialAvatar';
 import { TopicChip } from '../shared/TopicChip';
 import type { Post, QuizTopic } from '../../types';
+import { PremiumBadge } from '../monetization/PremiumBadge';
+import { useViewReporter } from '../../hooks/useViewReporter';
 
 interface SeoMeta {
   metaTitle: string;
@@ -66,6 +68,7 @@ function mapPost(p: Record<string, unknown>): PostWithSeo {
     content: p['content'] as string,
     image: p['image'] as string | undefined,
     isAiImage: (p['isAiImage'] as boolean) ?? false,
+    isPremium: (p['isPremium'] as boolean) ?? false,
     topic: (p['topic'] ?? 'General') as QuizTopic,
     subTopic: (p['subTopic'] as string | null) ?? null,
     userType: (p['userType'] as 'user' | 'admin') ?? 'user',
@@ -146,6 +149,9 @@ export function PostDetailPage() {
   const [submitting, setSubmitting] = useState(false);
   const [commentError, setCommentError] = useState('');
   const [related, setRelated] = useState<PostWithSeo[]>([]);
+  const [viewToken, setViewToken] = useState<string | null>(null);
+  // Premium posts: the server counts the view once the post has been on screen for a few seconds
+  useViewReporter(post?.id, viewToken);
 
   // Fetch main post
   useLayoutEffect(() => {
@@ -156,7 +162,7 @@ export function PostDetailPage() {
       headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
     })
       .then((r) => r.json())
-      .then((d) => { if (d.success) setPost(mapPost(d.post)); })
+      .then((d) => { if (d.success) { setPost(mapPost(d.post)); setViewToken(d.viewToken ?? null); } })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [id, accessToken]);
@@ -273,6 +279,7 @@ export function PostDetailPage() {
           {/* Article header: topic · reading time · date, then title and author */}
           <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap" useFlexGap mb={1.5}>
             <TopicChip topic={(post.subTopic ?? post.topic) as QuizTopic} />
+            {post.isPremium && <PremiumBadge />}
             <Typography variant="caption" color="text.secondary">
               {readingMinutes} min read · {formatDistanceToNow(new Date(post.timestamp), { addSuffix: true })}
             </Typography>

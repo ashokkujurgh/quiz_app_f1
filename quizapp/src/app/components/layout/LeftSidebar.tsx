@@ -6,7 +6,7 @@ import {
 } from '@mui/material';
 import {
   Home, Quiz, People, Message, EmojiEvents, History,
-  Person, Lock, Article,
+  Person, Lock, Article, WorkspacePremium, Create, FactCheck,
 } from '@mui/icons-material';
 import { useState, useEffect } from 'react';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
@@ -26,6 +26,8 @@ const navItems = [
   { label: 'My Posts',    icon: Article,    path: '/posts',       auth: true },
   { label: 'History',     icon: History,    path: '/history',     auth: true },
   { label: 'Profile',     icon: Person,     path: '/profile',     auth: true },
+  { label: 'Plans',       icon: WorkspacePremium, path: '/plans', auth: false },
+  { label: 'Creator Studio', icon: Create,  path: '/creator',     auth: true },
 ];
 
 interface Props {
@@ -92,7 +94,11 @@ export function LeftSidebar({ open, onClose, variant = 'permanent' }: Props) {
 
       {/* Nav */}
       <List sx={{ px: 1, flex: 1, pt: 1 }}>
-        {navItems.map(({ label, icon: Icon, path, auth }) => {
+        {[
+          ...navItems,
+          // Content reviewers and admins (the review API re-checks the role)
+          ...(user?.role === 'reviewer' || user?.role === 'admin' ? [{ label: 'Review queue', icon: FactCheck, path: '/review', auth: true }] : []),
+        ].map(({ label, icon: Icon, path, auth }) => {
           const isActive = location.pathname === path;
           const badge = label === 'Messages' ? unreadMessages : label === 'Friends' ? friendRequestCount : 0;
           const locked = auth && !accessToken;

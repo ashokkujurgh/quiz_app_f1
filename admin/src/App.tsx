@@ -7,6 +7,10 @@ import Topics from './pages/Topics';
 import Questions from './pages/Questions';
 import Posts from './pages/Posts';
 import ApprovePost from './pages/ApprovePost';
+import Payouts from './pages/Payouts';
+import Subscriptions from './pages/Subscriptions';
+import Creators from './pages/Creators';
+import Reviewers from './pages/Reviewers';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -80,6 +84,54 @@ export default function App() {
                   <Layout>
                     <ErrorBoundary>
                       <Posts />
+                    </ErrorBoundary>
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/payouts"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <ErrorBoundary>
+                      <Payouts />
+                    </ErrorBoundary>
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/subscriptions"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <ErrorBoundary>
+                      <Subscriptions />
+                    </ErrorBoundary>
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/creators"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <ErrorBoundary>
+                      <Creators />
+                    </ErrorBoundary>
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/reviewers"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <ErrorBoundary>
+                      <Reviewers />
                     </ErrorBoundary>
                   </Layout>
                 </ProtectedRoute>

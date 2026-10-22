@@ -169,6 +169,7 @@ import { withOfficialAvatar } from './officialAvatar';
 import { formatDuration } from '../../utils/formatDuration';
 import { htmlToText } from '../../utils/html';
 import { TopicChip } from './TopicChip';
+import { PremiumBadge } from '../monetization/PremiumBadge';
 import { formatDistanceToNow } from 'date-fns';
 
 interface ApiComment {
@@ -346,6 +347,7 @@ function PostCardImpl({ post }: Props) {
               )}
               <Typography variant="caption" color="text.secondary">@{post.author.username}</Typography>
               <TopicChip topic={(post.subTopic ?? post.topic) as QuizTopic} />
+              {post.isPremium && <PremiumBadge />}
             </Stack>
             <Typography variant="caption" color="text.secondary">{timeAgo}</Typography>
           </Box>

@@ -7,7 +7,7 @@ export interface User {
   bio?: string;
   coverImage?: string;
   isOnline?: boolean;
-  role: 'user' | 'admin';
+  role: 'user' | 'reviewer' | 'admin';
   stats: {
     friends: number;
     posts: number;
@@ -26,6 +26,8 @@ export interface Post {
   image?: string;
   images?: string[];
   isAiImage?: boolean;
+  /** Approved creator (premium) post — free to read, shows a badge */
+  isPremium?: boolean;
   topic: QuizTopic;
   subTopic?: string | null;
   userType?: 'user' | 'admin';

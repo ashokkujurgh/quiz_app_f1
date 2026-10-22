@@ -22,6 +22,7 @@ import {
   type PlayerInfo,
 } from '../../hooks/useQuizSocket';
 import { startQuiz } from '../../store/slices/quizSlice';
+import { UpgradePrompt } from '../monetization/UpgradePrompt';
 
 const API = import.meta.env.VITE_API_URL ?? '';
 
@@ -247,6 +248,7 @@ export function QuizPlayPage() {
   const [gameStarted, setGameStarted] = useState(false);
   const [gameOver, setGameOver]   = useState(false);
   const [error, setError]         = useState('');
+  const [errorCode, setErrorCode] = useState<string | undefined>();
   const [alreadyAttempted, setAlreadyAttempted] = useState(false);
 
   // ── Per-question state ────────────────────────────────────────────────────
@@ -347,7 +349,7 @@ export function QuizPlayPage() {
       onQuestion:      handleQuestion,
       onQuestionEnded: handleQuestionEnded,
       onGameOver:      handleGameOver,
-      onGameError:     ({ message }) => setError(message),
+      onGameError:     ({ message, code }) => { setError(message); setErrorCode(code); },
       onPlayerJoined:  upsertPlayer,
       onPlayerLeft:    ({ userId }) => setPlayers((prev) => prev.filter((p) => p.userId !== userId)),
       onPlayersList:   ({ players: list }) => setPlayers(list.map((p) => ({ ...p, score: 0, answered: 0 }))),
@@ -505,7 +507,9 @@ export function QuizPlayPage() {
           {/* Mobile players */}
           {isMobile && players.length > 0 && <PlayerStrip players={players} />}
 
-          {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
+          {error && (errorCode === 'QUOTA_EXCEEDED'
+            ? <Box sx={{ mb: 2 }}><UpgradePrompt title="Daily limit reached" message={error} onClose={() => setError('')} /></Box>
+            : <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>)}
 
           {/* Header row */}
           <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>

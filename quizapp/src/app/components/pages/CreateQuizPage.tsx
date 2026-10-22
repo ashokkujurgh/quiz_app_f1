@@ -13,6 +13,8 @@ import {
 import { useAppSelector } from '../../store/hooks';
 import { Navbar } from '../layout/Navbar';
 import { loadTopicsWithSubtopics } from '../../utils/topicsCache';
+import { QuotaBanner } from '../monetization/QuotaBanner';
+import { UpgradePrompt } from '../monetization/UpgradePrompt';
 
 const API = import.meta.env.VITE_API_URL ?? '';
 
@@ -274,11 +276,13 @@ export function CreateQuizPage() {
   // Submit state
   const [submitting, setSubmitting] = useState(false);
   const [error, setError]           = useState('');
+  const [errorCode, setErrorCode]   = useState<string | undefined>();
+  const [blockedInvites, setBlockedInvites] = useState<string[]>([]);
 
   const isManual = selectionTab === 1;
 
   const handleSubmit = async () => {
-    setError('');
+    setError(''); setErrorCode(undefined);
     if (!title.trim()) { setError('Quiz title is required.'); return; }
     if (isManual && selectedQuestions.length === 0) { setError('Please select at least one question.'); return; }
     if (!isManual && !selectedTopic) { setError('Please select a topic for random questions.'); return; }
@@ -331,7 +335,7 @@ export function CreateQuizPage() {
         body:    JSON.stringify(body),
       });
       const data = await res.json();
-      if (!data.success) throw new Error(data.message ?? 'Failed to create quiz.');
+      if (!data.success) { setErrorCode(data.code); throw new Error(data.message ?? 'Failed to create quiz.'); }
 
       const quizId = data.quiz._id;
 
@@ -346,6 +350,12 @@ export function CreateQuizPage() {
         if (!addData.success) throw new Error(addData.message ?? 'Failed to add questions.');
       }
 
+      // Invitees who already used today's free play were not invited — tell the host who
+      const blocked = ((data.inviteResults ?? []) as { userId: string; status: string }[]).filter((r) => r.status === 'blocked');
+      if (blocked.length) {
+        setBlockedInvites(blocked.map((b) => participants.find((u) => u._id === b.userId)?.name ?? 'A player'));
+        return;
+      }
       navigate('/quizzes', { state: { created: true } });
     } catch (e) {
       setError((e as Error).message);
@@ -369,7 +379,15 @@ export function CreateQuizPage() {
           </Box>
         </Stack>
 
-        {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
+        {user?.role !== 'admin' && <QuotaBanner show={['quiz_create']} />}
+        {error && (errorCode === 'QUOTA_EXCEEDED'
+          ? <Box sx={{ mb: 2 }}><UpgradePrompt title="Daily limit reached" message={error} onClose={() => setError('')} /></Box>
+          : <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>)}
+        {blockedInvites.length > 0 && (
+          <Alert severity="info" sx={{ mb: 2 }} action={<Button color="inherit" size="small" onClick={() => navigate('/quizzes', { state: { created: true } })}>Done</Button>}>
+            Your quiz was created. {blockedInvites.join(', ')} {blockedInvites.length === 1 ? 'was' : 'were'} not invited because they have used their free quiz for today.
+          </Alert>
+        )}
 
         <Stack spacing={2.5}>
 

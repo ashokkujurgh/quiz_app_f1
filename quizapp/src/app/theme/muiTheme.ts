@@ -67,6 +67,8 @@ const getDesignTokens = (mode: ThemeMode): ThemeOptions => ({
           background: mode === 'light'
             ? `linear-gradient(135deg, ${brand.navy} 0%, ${brand.navyLight} 100%)`
             : `linear-gradient(135deg, ${brand.teal} 0%, #04B5B0 100%)`,
+          // Without this the gradient hides MUI's grey disabled style and the label becomes unreadable
+          '&.Mui-disabled': { background: 'none' },
         },
       },
     },

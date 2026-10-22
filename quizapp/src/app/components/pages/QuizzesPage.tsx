@@ -14,6 +14,8 @@ import { EmptyState } from '../shared/EmptyState';
 import type { Quiz, QuizQuestion, QuizTopic } from '../../types';
 import { formatDuration } from '../../utils/formatDuration';
 import { QuizTypeSwitch } from '../shared/QuizTypeSwitch';
+import { GameInvitesCard } from '../monetization/GameInvitesCard';
+import { QuotaBanner } from '../monetization/QuotaBanner';
 import { useQuizType, useEngineeringTopicIds, quizTypeOf } from '../../utils/quizType';
 import { QUIZ_TOPICS } from '../../data/quizTopics';
 import { isExamQuiz } from '../../utils/examQuiz';
@@ -397,6 +399,8 @@ export function QuizzesPage() {
 
   return (
     <Box>
+      {accessToken && <QuotaBanner show={['quiz_play']} />}
+      {accessToken && <GameInvitesCard />}
       {/* Header row */}
       <Stack direction="row" justifyContent="space-between" alignItems="flex-start" mb={2}>
         <Box>

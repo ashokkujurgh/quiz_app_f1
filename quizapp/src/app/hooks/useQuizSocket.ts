@@ -88,7 +88,7 @@ interface Handlers {
   onQuestion?:          (e: QuestionEvent)              => void;
   onQuestionEnded?:     (e: QuestionEndedEvent)         => void;
   onGameOver?:          (e: GameOverEvent)              => void;
-  onGameError?:         (e: { message: string })        => void;
+  onGameError?:         (e: { message: string; code?: string; upgradeTo?: string }) => void;
   onPlayerJoined?:      (p: PlayerInfo)                 => void;
   onPlayerLeft?:        (e: { userId: string })         => void;
   onPlayersList?:       (e: { players: PlayerInfo[] })  => void;
@@ -139,7 +139,7 @@ export function useQuizSocket(
     socket.on('question',           (e: QuestionEvent)             => handlersRef.current.onQuestion?.(e));
     socket.on('question_ended',     (e: QuestionEndedEvent)        => handlersRef.current.onQuestionEnded?.(e));
     socket.on('game_over',          (e: GameOverEvent)             => handlersRef.current.onGameOver?.(e));
-    socket.on('game_error',         (e: { message: string })       => handlersRef.current.onGameError?.(e));
+    socket.on('game_error',         (e: { message: string; code?: string; upgradeTo?: string }) => handlersRef.current.onGameError?.(e));
     socket.on('player_joined',      (p: PlayerInfo)                => handlersRef.current.onPlayerJoined?.(p));
     socket.on('player_left',        (e: { userId: string })        => handlersRef.current.onPlayerLeft?.(e));
     socket.on('players_list',       (e: { players: PlayerInfo[] }) => handlersRef.current.onPlayersList?.(e));
