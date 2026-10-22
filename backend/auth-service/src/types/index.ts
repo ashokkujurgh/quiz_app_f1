@@ -2,7 +2,8 @@ import { Request } from 'express';
 import { Document, Types } from 'mongoose';
 
 // ── User roles ────────────────────────────────────────────
-export type UserRole = 'user' | 'admin';
+// 'reviewer' = Content Reviewer: may approve/reject premium posts; granted and revoked only by admins
+export type UserRole = 'user' | 'reviewer' | 'admin';
 export type AuthProvider = 'email' | 'google' | 'firebase';
 
 // ── Refresh token subdocument ─────────────────────────────

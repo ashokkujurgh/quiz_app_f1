@@ -8,6 +8,9 @@ import { AuthRequest } from '../middleware/auth';
 import { scheduleQuiz, cancelQuiz } from '../jobs/scheduler';
 import { deleteImageByUrl } from '../config/spaces';
 import { startGameSession } from '../socket/gameController';
+import { reserveCredit, consumeCredit, releaseCredit, QuotaError } from '../services/billingClient';
+import { inviteUsers, InviteResult } from '../services/inviteService';
+import { closeOccurrence } from '../services/occurrence';
 
 const QUESTION_URL = process.env.QUESTION_SERVICE_URL ?? 'http://localhost:4003';
 const AUTH_SERVICE_URL = process.env.AUTH_SERVICE_URL ?? 'http://auth-service:4001';
@@ -66,19 +69,42 @@ export const createQuiz: RequestHandler = async (req: AuthRequest, res: Response
     if (!title?.trim())  { res.status(400).json({ success: false, message: 'title is required.' }); return; }
     if (!questionCount)  { res.status(400).json({ success: false, message: 'questionCount is required.' }); return; }
     if (!scheduledAt)    { res.status(400).json({ success: false, message: 'scheduledAt is required.' }); return; }
+    if ((allowedUsers ?? []).some((id) => !Types.ObjectId.isValid(String(id)))) {
+      res.status(400).json({ success: false, message: 'allowedUsers contains an invalid user id.' }); return;
+    }
 
     const mode = selectionMode ?? 'random';
     let questionIds: string[] = [];
 
-    if (mode === 'random') {
-      if (!topic) { res.status(400).json({ success: false, message: 'topic is required for random selection.' }); return; }
-      questionIds = await fetchRandomQuestions(topic, subTopic ?? null, questionCount);
+    if (mode === 'random' && !topic) { res.status(400).json({ success: false, message: 'topic is required for random selection.' }); return; }
+
+    // Admin quizzes (incl. the daily-games agent) are 'daily'; anyone else's are 'custom' and,
+    // on the Free plan, use the one quiz-creation credit per IST day.
+    const isAdmin  = req.user!.role === 'admin';
+    const quizId   = new Types.ObjectId();
+    const createKey = `create:${quizId.toString()}`;
+    if (!isAdmin) {
+      try {
+        await reserveCredit(req.user!.id, 'quiz_create', createKey);
+      } catch (err) {
+        if (err instanceof QuotaError) {
+          res.status(err.status).json({ success: false, message: err.message, code: err.code, ...(err.upgradeTo ? { upgradeTo: err.upgradeTo } : {}) });
+          return;
+        }
+        throw err;
+      }
     }
 
-    const image = // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (req as any).file?.location ?? null;
+    let quiz;
+    try {
+      if (mode === 'random') questionIds = await fetchRandomQuestions(topic!, subTopic ?? null, questionCount);
 
-    const quiz = await Quiz.create({
+      const image = // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (req as any).file?.location ?? null;
+
+      quiz = await Quiz.create({
+      _id:             quizId,
+      kind:            isAdmin ? 'daily' : 'custom',
       title:           title.trim(),
       description:     description?.trim() ?? '',
       image,
@@ -93,14 +119,34 @@ export const createQuiz: RequestHandler = async (req: AuthRequest, res: Response
       timeLimitPerQuestion: timeLimitPerQuestion ?? null,
       scheduleType:    scheduleType ?? 'once',
       participation:   participation ?? 'public',
-      allowedUsers:    (allowedUsers ?? []).map((id) => new Types.ObjectId(id)),
+      allowedUsers:    [],
       status:          mode === 'manual' ? 'draft' : 'scheduled',
       createdBy:       new Types.ObjectId(req.user!.id),
     });
+    } catch (err) {
+      // Creation failed — the credit was only reserved, so give it back
+      if (!isAdmin) await releaseCredit(req.user!.id, 'quiz_create', createKey, 'create_failed');
+      throw err;
+    }
+    if (!isAdmin) await consumeCredit(req.user!.id, 'quiz_create', createKey).catch((e) => console.error('[quota] consume create:', e));
+
+    // Invitees go through the invite flow so each one's play credit is checked
+    let inviteResults: InviteResult[] = [];
+    if (allowedUsers?.length) {
+      try {
+        inviteResults = await inviteUsers(quiz, req.user!.id, allowedUsers.map(String));
+        quiz = (await Quiz.findById(quiz._id))!;
+      } catch (err) {
+        // Billing unreachable: keep the old behaviour (they may join; the play credit is still checked on join)
+        console.error('[invites] on create:', err);
+        await Quiz.updateOne({ _id: quiz._id }, { $addToSet: { allowedUsers: { $each: allowedUsers.map((id) => new Types.ObjectId(String(id))) } } });
+        quiz = (await Quiz.findById(quiz._id))!;
+      }
+    }
 
     if (quiz.status === 'scheduled') scheduleQuiz(quiz);
 
-    res.status(201).json({ success: true, quiz });
+    res.status(201).json({ success: true, quiz, inviteResults });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Failed to create quiz.';
     console.error(err);
@@ -157,6 +203,8 @@ export const updateQuiz: RequestHandler = async (req: AuthRequest, res: Response
       return;
     }
 
+    const before = { _id: quiz._id, scheduledAt: quiz.scheduledAt, durationMinutes: quiz.durationMinutes, startedAt: quiz.startedAt };
+
     const editable = [
       'title', 'description', 'questionCount', 'timezone',
       'scheduledAt', 'durationMinutes', 'timeLimitPerQuestion', 'scheduleType', 'endDate',
@@ -180,6 +228,11 @@ export const updateQuiz: RequestHandler = async (req: AuthRequest, res: Response
 
     await quiz.save();
 
+    // Cancelled or moved: credits held for the old occurrence go back to invitees
+    if (quiz.status === 'cancelled' || new Date(before.scheduledAt).getTime() !== new Date(quiz.scheduledAt).getTime()) {
+      closeOccurrence(before, quiz.status === 'cancelled' ? 'cancelled' : 'rescheduled').catch(console.error);
+    }
+
     cancelQuiz(quiz.id as string);
     if (quiz.status === 'scheduled') scheduleQuiz(quiz);
 
@@ -197,6 +250,7 @@ export const deleteQuiz: RequestHandler = async (req, res): Promise<void> => {
     const quiz = await Quiz.findByIdAndDelete(req.params.id);
     if (!quiz) { res.status(404).json({ success: false, message: 'Quiz not found.' }); return; }
     cancelQuiz(req.params.id);
+    closeOccurrence(quiz, 'cancelled').catch(console.error);
     res.json({ success: true, message: 'Quiz deleted.' });
   } catch (err) {
     console.error(err);
@@ -320,6 +374,7 @@ export const endQuiz: RequestHandler = async (req, res): Promise<void> => {
     quiz.endedAt = new Date();
     await quiz.save();
     cancelQuiz(req.params.id);
+    closeOccurrence(quiz, 'completed').catch(console.error);
     res.json({ success: true, quiz });
   } catch (err) {
     console.error(err);

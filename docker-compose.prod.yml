@@ -87,3 +87,8 @@ services:
     ports: !override
       - "127.0.0.1:7210:4007"
     environment: *origins
+
+  billing-service:
+    ports: !override
+      - "127.0.0.1:7211:4008"
+    environment: *origins

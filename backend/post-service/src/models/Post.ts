@@ -44,6 +44,15 @@ export interface IComment {
   createdAt: Date;
 }
 
+// ── Premium meta (only on approved premium posts) ─────────────────────────────
+export interface IPremiumMeta {
+  premiumPostId: Types.ObjectId;
+  revisionId:    Types.ObjectId;
+  version:       number;
+  tags:          string[];
+  approvedAt:    Date;
+}
+
 // ── Post ──────────────────────────────────────────────────────────────────────
 export interface ISeoMeta {
   metaTitle: string;
@@ -77,6 +86,9 @@ export interface IPost extends Document {
   isActive: boolean;
   isAiImage: boolean;
   approvalStatus: 'pending' | 'approved' | 'rejected';
+  // Premium (creator, monetised) posts. Ordinary posts leave these unset / false.
+  isPremium: boolean;
+  premium: IPremiumMeta | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -169,6 +181,17 @@ const postSchema = new Schema<IPost>(
     isActive:       { type: Boolean, default: true },
     isAiImage:      { type: Boolean, default: false },
     approvalStatus: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'approved' },
+    isPremium:      { type: Boolean, default: false },
+    premium: {
+      type: new Schema<IPremiumMeta>({
+        premiumPostId: { type: Schema.Types.ObjectId, required: true },
+        revisionId:    { type: Schema.Types.ObjectId, required: true },
+        version:       { type: Number, required: true },
+        tags:          { type: [String], default: [] },
+        approvedAt:    { type: Date, required: true },
+      }, { _id: false }),
+      default: null,
+    },
   },
   { timestamps: true }
 );
@@ -177,6 +200,7 @@ postSchema.index({ 'author.userId': 1 });
 postSchema.index({ topic: 1, createdAt: -1 });
 postSchema.index({ createdAt: -1 });
 postSchema.index({ slug: 1 }, { unique: true, sparse: true });
+postSchema.index({ isPremium: 1, createdAt: -1 });
 
 const Post: Model<IPost> = mongoose.model<IPost>('Post', postSchema);
 export default Post;

@@ -13,6 +13,7 @@ import rabbitMQ from './config/rabbitmq';
 import { initSocket } from './config/socket';
 import authRoutes from './routes/auth';
 import adminRoutes from './routes/admin';
+import internalRoutes from './routes/internal';
 
 const app = express();
 app.set('trust proxy', 1);
@@ -80,6 +81,8 @@ app.get('/health', (_req, res) => {
 app.use('/api/auth',        authLimiter, authRoutes);
 app.use('/api/admin',       adminRoutes);
 app.use('/api/auth/upload', uploadLimiter);
+// Service-to-service (outside /api, so the public nginx /api/ proxy never reaches it)
+app.use('/internal', internalRoutes);
 
 // ── 404 ───────────────────────────────────────────────────
 app.use((req, res) => {

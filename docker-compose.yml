@@ -80,8 +80,11 @@ services:
     environment:
       ALLOWED_ORIGINS: http://localhost:7203,http://localhost:7204
       POST_FILTER_URL: http://post-filter:5100
+      # Creator plans (INTERNAL_SERVICE_SECRET goes in backend/post-service/.env)
+      BILLING_SERVICE_URL: http://billing-service:4008
     depends_on:
       - post-filter
+      - billing-service
     restart: unless-stopped
 
   # ── Question service ─────────────────────────────────────
@@ -114,6 +117,8 @@ services:
       TOPIC_SERVICE_URL: http://topic-service:4002
       POST_SERVICE_URL: http://post-service:4004
       AUTH_SERVICE_URL: http://auth-service:4001
+      # Daily quiz limits (INTERNAL_SERVICE_SECRET goes in backend/quiz-service/.env)
+      BILLING_SERVICE_URL: http://billing-service:4008
       DO_SPACES_KEY: DO00M8M3Q9LGTPAGNH8L
       DO_SPACES_SECRET: DO00M8M3Q9LGTPAGNH8L
       DO_SPACES_ENDPOINT: https://quiz-ashok.sfo3.digitaloceanspaces.com
@@ -124,6 +129,7 @@ services:
       - question-service
       - topic-service
       - auth-service
+      - billing-service
     restart: unless-stopped
 
   # ── Agentic question generator (cron every 10 min) ───────
@@ -233,6 +239,20 @@ services:
       - ./backend/message-service/.env
     depends_on:
       - auth-service
+    restart: unless-stopped
+
+  # ── Billing service (plans, Razorpay, entitlements, quotas) ──
+  billing-service:
+    build:
+      context: ./backend/billing-service
+      dockerfile: Dockerfile
+    container_name: quizhub-billing
+    ports:
+      - "7211:4008"
+    env_file:
+      - ./backend/billing-service/.env
+    environment:
+      ALLOWED_ORIGINS: http://localhost:7203,http://localhost:7204
     restart: unless-stopped
 
 volumes:

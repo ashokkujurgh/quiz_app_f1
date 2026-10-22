@@ -10,6 +10,7 @@ import {
   getGlobalLeaderboard, getCompletedQuizzes,
 } from '../controllers/quizController';
 import { quizImageUploader } from '../config/spaces';
+import { createInvites, getMyInvites, acceptInvite, declineInvite, cancelInvite, listQuizInvites } from '../controllers/inviteController';
 
 const router = express.Router();
 
@@ -18,6 +19,7 @@ router.get('/active',              getActiveQuizzes);
 router.get('/my/history',          protect, getMyHistory);
 router.get('/my/quizzes',          protect, getMyQuizzes);
 router.get('/my/invited',          protect, getInvitedQuizzes);
+router.get('/my/invites',          protect, getMyInvites);
 router.get('/leaderboard/global',  getGlobalLeaderboard);
 router.get('/completed/list',      getCompletedQuizzes);
 router.get('/',                    getQuizzes);
@@ -27,6 +29,13 @@ router.get('/:id',          getQuiz);
 router.post('/',                          protect, createQuiz);
 router.patch('/:id',                      protect, adminOnly, updateQuiz);
 router.delete('/:id',                     protect, adminOnly, deleteQuiz);
+
+// Game invites (accepting holds a Free user's daily play credit)
+router.post('/invites/:inviteId/accept',  protect, acceptInvite);
+router.post('/invites/:inviteId/decline', protect, declineInvite);
+router.post('/invites/:inviteId/cancel',  protect, cancelInvite);
+router.get('/:id/invites',                protect, listQuizInvites);
+router.post('/:id/invites',               protect, createInvites);
 
 // Questions on a quiz
 router.get('/:id/questions',              getQuizQuestions);

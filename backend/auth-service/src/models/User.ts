@@ -59,7 +59,7 @@ const userSchema = new Schema<IUser>(
     avatar:     { type: String, default: null },
     coverImage: { type: String, default: null },
     bio:        { type: String, maxlength: [200, 'Bio cannot exceed 200 characters'], default: '' },
-    role:       { type: String, enum: ['user', 'admin'] as UserRole[], default: 'user' },
+    role:       { type: String, enum: ['user', 'reviewer', 'admin'] as UserRole[], default: 'user' },
 
     authProvider: {
       type: String,

@@ -1,4 +1,6 @@
 import cron from 'node-cron';
+import { closeOccurrence } from '../services/occurrence';
+import { expireInvites } from '../services/inviteService';
 import Quiz, { IQuiz } from '../models/Quiz';
 import { startGameSession } from '../socket/gameController';
 import { recoverMissingPosts } from '../services/quizPostService';
@@ -82,6 +84,9 @@ async function activateQuiz(quizId: string): Promise<void> {
 }
 
 async function rescheduleRecurring(quiz: IQuiz): Promise<void> {
+  // This occurrence is over: unused reserved play credits go back, open invites close
+  await closeOccurrence(quiz, 'completed').catch((e) => console.error('[quota] close occurrence:', e));
+
   if (quiz.scheduleType === 'once') {
     cancelQuiz((quiz._id as { toString(): string }).toString());
     return;
@@ -229,4 +234,11 @@ export function startPostRecoveryJob(): void {
     recoverMissingPosts().catch((err) => console.error('[PostRecoveryJob] error:', err));
   }, { timezone: 'UTC' });
   console.log('📝 Post-recovery job scheduled (every 5 min).');
+}
+
+// ── Invite expiry — every 5 minutes ───────────────────────────────────────────
+export function startInviteExpiryJob(): void {
+  cron.schedule('*/5 * * * *', () => {
+    expireInvites().catch((err) => console.error('[InviteExpiryJob] error:', err));
+  }, { timezone: 'UTC' });
 }

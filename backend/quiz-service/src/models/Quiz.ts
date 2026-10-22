@@ -4,6 +4,8 @@ export type SelectionMode  = 'manual' | 'random';
 export type ScheduleType   = 'once' | 'daily' | 'weekly' | 'monthly';
 export type Participation  = 'public' | 'private' | 'invite_only';
 export type QuizStatus     = 'draft' | 'scheduled' | 'active' | 'completed' | 'cancelled';
+// 'daily' = made by an admin / the daily-games agent; 'custom' = made by a user. Both use the play credit.
+export type QuizKind       = 'daily' | 'custom';
 
 export interface IQuiz extends Document {
   _id: Types.ObjectId;
@@ -40,6 +42,7 @@ export interface IQuiz extends Document {
   startedAt: Date | null;
   endedAt: Date | null;
   postCreated: boolean;
+  kind: QuizKind;
 
   createdBy: Types.ObjectId;
   createdAt: Date;
@@ -74,6 +77,7 @@ const quizSchema = new Schema<IQuiz>(
     startedAt:   { type: Date, default: null },
     endedAt:     { type: Date, default: null },
     postCreated: { type: Boolean, default: false },
+    kind:        { type: String, enum: ['daily', 'custom'], default: 'custom' },
 
     createdBy: { type: Schema.Types.ObjectId, required: true },
   },

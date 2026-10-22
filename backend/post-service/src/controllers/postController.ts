@@ -6,6 +6,9 @@ import { AuthRequest } from '../middleware/auth';
 import { sendNewPostNotification, sendCommentNotification } from '../services/notificationService';
 import { notifyIndexNow } from './seoController';
 import { sanitizePostContent, toPlainText } from '../utils/html';
+import { generateSlug, uniqueSlug } from '../utils/slug';
+import PremiumPost from '../models/PremiumPost';
+import * as views from '../services/viewTracking';
 
 // ── OpenAI client ─────────────────────────────────────────────────────────────
 const openai = process.env.OPENAI_API_KEY
@@ -17,26 +20,6 @@ const openai = process.env.OPENAI_API_KEY
 const isValidId = (id: string) => mongoose.Types.ObjectId.isValid(id);
 
 const toObjId = (id: string) => new mongoose.Types.ObjectId(id);
-
-function generateSlug(title: string): string {
-  return title
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, '')
-    .trim()
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-')
-    .slice(0, 80);
-}
-
-async function uniqueSlug(base: string): Promise<string> {
-  let slug = base;
-  let n = 0;
-  while (await Post.exists({ slug })) {
-    n++;
-    slug = `${base}-${n}`;
-  }
-  return slug;
-}
 
 // Build a lean post with per-user flags (liked / saved)
 function withUserFlags(post: Record<string, unknown>, userId?: string) {
@@ -105,8 +88,21 @@ export const getPost: RequestHandler = async (req: AuthRequest, res: Response) =
         : Post.findOne({ slug: param }).lean()
     );
     if (!post || !post.isActive) { res.status(404).json({ success: false, message: 'Post not found.' }); return; }
+    // Unapproved posts (pending/rejected) are visible only to their author and admins
+    const canSeeUnapproved = req.user?.role === 'admin' || post.author.userId.toString() === req.user?.id;
+    if (post.approvalStatus !== 'approved' && !canSeeUnapproved) { res.status(404).json({ success: false, message: 'Post not found.' }); return; }
 
-    res.json({ success: true, post: withUserFlags(post as Record<string, unknown>, req.user?.id) });
+    // Premium posts: hand out a short-lived signed view token (views are counted server-side only)
+    let viewToken: string | undefined;
+    if (post.isPremium && post.approvalStatus === 'approved' && views.trackingEnabled() && !views.isBot(req.headers['user-agent'])) {
+      const viewerKey = views.viewerKeyFor(req, res);
+      if (req.user) await views.rememberBrowser(req);
+      if (viewerKey && viewerKey !== `u:${post.author.userId.toString()}` && (await views.linkedUser(viewerKey)) !== post.author.userId.toString()) {
+        viewToken = views.issueViewToken(post._id.toString(), viewerKey);
+      }
+    }
+
+    res.json({ success: true, post: withUserFlags(post as Record<string, unknown>, req.user?.id), ...(viewToken ? { viewToken } : {}) });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: 'Failed to fetch post.' });
@@ -369,6 +365,10 @@ export const updatePost: RequestHandler = async (req: AuthRequest, res: Response
     if (!isOwner && !isAdmin) {
       res.status(403).json({ success: false, message: 'Not authorised.' }); return;
     }
+    // Premium posts change only through review (creator dashboard), never by direct edit
+    if (post.isPremium && !isAdmin) {
+      res.status(409).json({ success: false, message: 'Premium posts are edited from the creator dashboard and go through review.', code: 'PREMIUM_EDIT_VIA_REVIEW' }); return;
+    }
 
     const { title, content, image, topic, subTopic, timezone, isActive, isAiImage, seo } = req.body as {
       title?: string | null; content?: string; image?: string; topic?: string; subTopic?: string | null; timezone?: string; isActive?: boolean; isAiImage?: boolean;
@@ -406,6 +406,10 @@ export const deletePost: RequestHandler = async (req: AuthRequest, res: Response
 
     if (!isOwner && !isAdmin) {
       res.status(403).json({ success: false, message: 'Not authorised to delete this post.' }); return;
+    }
+    // Deleting would orphan view/earnings history — creators unpublish instead
+    if (post.isPremium && !isAdmin) {
+      res.status(409).json({ success: false, message: 'Premium posts cannot be deleted. Unpublish it from the creator dashboard instead.', code: 'PREMIUM_UNPUBLISH_INSTEAD' }); return;
     }
 
     await post.deleteOne();
@@ -686,7 +690,7 @@ export const getUserPosts: RequestHandler = async (req: AuthRequest, res: Respon
 // ── GET /api/posts/admin/pending  (admin: list pending AI posts) ──────────────
 export const getPendingPosts: RequestHandler = async (_req: AuthRequest, res: Response) => {
   try {
-    const posts = await Post.find({ approvalStatus: 'pending' })
+    const posts = await Post.find({ approvalStatus: 'pending', isPremium: { $ne: true } })
       .sort({ createdAt: -1 })
       .lean();
     res.json({ success: true, posts });
@@ -736,5 +740,37 @@ export const rejectPost: RequestHandler = async (req: AuthRequest, res: Response
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: 'Failed to reject post.' });
+  }
+};
+
+// ── POST /api/posts/:id/view  { viewToken } — count a premium-post view ──────────
+// Always answers 200 { success: true } so the page can't learn which checks a view failed.
+export const recordPostView: RequestHandler = async (req: AuthRequest, res: Response) => {
+  try {
+    if (!views.trackingEnabled()) { res.json({ success: true }); return; }
+    const check = views.verifyViewToken((req.body as { viewToken?: unknown })?.viewToken);
+    if (!check.ok) { res.json({ success: true }); return; }
+    if (views.isBot(req.headers['user-agent'])) { res.json({ success: true }); return; }
+
+    // The token belongs to this post and to this viewer (same account or same anonymous cookie)
+    const viewerKey = views.viewerKeyFor(req);
+    if (!viewerKey || viewerKey !== check.viewerKey || !isValidId(req.params.id) || req.params.id !== check.postId) { res.json({ success: true }); return; }
+    if (views.overViewerCap(viewerKey)) { res.json({ success: true }); return; }
+
+    const post = await Post.findById(req.params.id).select('isPremium approvalStatus isActive author premium').lean();
+    if (!post || !post.isPremium || post.approvalStatus !== 'approved' || !post.isActive || !post.premium) { res.json({ success: true }); return; }
+    const creatorId = post.author.userId.toString();
+    if (viewerKey === `u:${creatorId}` || (await views.linkedUser(viewerKey)) === creatorId) { res.json({ success: true }); return; } // self-view
+    const pp = await PremiumPost.findById(post.premium.premiumPostId).select('status deletedAt').lean();
+    if (!pp || pp.status !== 'published' || pp.deletedAt) { res.json({ success: true }); return; }
+
+    await views.sendView({
+      postId: post._id.toString(), premiumPostId: post.premium.premiumPostId.toString(), creatorId,
+      viewerKey, ipHash: views.ipHash(req.ip), occurredAt: new Date(),
+    }, check.issuedAt);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[views] record failed:', err);
+    res.json({ success: true });
   }
 };

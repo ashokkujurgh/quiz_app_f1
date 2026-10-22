@@ -18,7 +18,9 @@ import {
   getPendingPosts,
   approvePost,
   rejectPost,
+  recordPostView,
 } from '../controllers/postController';
+import rateLimit from 'express-rate-limit';
 
 const router = express.Router();
 
@@ -43,6 +45,11 @@ router.get('/:id',                                        optionalAuth, getPost)
 router.post('/',                                          protect,      createPost);
 router.patch('/:id',                                      protect,      updatePost);
 router.delete('/:id',                                     protect,      deletePost);
+
+// ── Premium view counting (signed token from GET; per-IP limit against scripted traffic) ──
+const viewLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 300, standardHeaders: false, legacyHeaders: false,
+  handler: (_req, res) => { res.json({ success: true }); } });
+router.post('/:id/view',                                  viewLimiter, optionalAuth, recordPostView);
 
 // ── Reactions ─────────────────────────────────────────────────────────────────
 router.post('/:id/like',                                  protect,      toggleLike);

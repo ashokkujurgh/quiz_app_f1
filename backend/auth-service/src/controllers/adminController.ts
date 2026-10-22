@@ -1,5 +1,7 @@
 import { Response, RequestHandler } from 'express';
+import { Types } from 'mongoose';
 import User from '../models/User';
+import RoleChangeLog from '../models/RoleChangeLog';
 import { signAccessToken } from '../utils/jwt';
 import rabbitMQ from '../config/rabbitmq';
 import { AuthRequest } from '../types';
@@ -202,5 +204,61 @@ export const createAdminUser: RequestHandler = async (req: AuthRequest, res: Res
   } catch (err) {
     console.error('Create admin user error:', err);
     res.status(500).json({ success: false, message: 'Failed to create admin user.' });
+  }
+};
+
+// ═══════════════════════════════════════════════════════════
+// GET /api/admin/reviewers — Content Reviewers
+// ═══════════════════════════════════════════════════════════
+export const listReviewers: RequestHandler = async (_req: AuthRequest, res: Response) => {
+  try {
+    const reviewers = await User.find({ role: 'reviewer' }).select('name username email avatar isActive createdAt').sort({ name: 1 }).lean();
+    res.json({ success: true, reviewers });
+  } catch (err) {
+    console.error('List reviewers error:', err);
+    res.status(500).json({ success: false, message: 'Failed to fetch reviewers.' });
+  }
+};
+
+// ═══════════════════════════════════════════════════════════
+// POST /api/admin/users/:id/reviewer   { grant: boolean, reason }
+// Only admins grant or revoke the Content Reviewer role. Logged.
+// ═══════════════════════════════════════════════════════════
+export const setReviewerRole: RequestHandler = async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { grant, reason } = req.body as { grant?: boolean; reason?: string };
+    if (!Types.ObjectId.isValid(id)) { res.status(400).json({ success: false, message: 'Invalid user id.' }); return; }
+    if (typeof grant !== 'boolean') { res.status(400).json({ success: false, message: 'grant must be true or false.' }); return; }
+    if (!reason?.trim()) { res.status(400).json({ success: false, message: 'A reason is required.' }); return; }
+    if (id === req.user!._id.toString()) { res.status(400).json({ success: false, message: 'You cannot change your own role.' }); return; }
+
+    const from = grant ? 'user' : 'reviewer';
+    const to   = grant ? 'reviewer' : 'user';
+    // Conditional update: never touches admins, and only moves user ⇄ reviewer
+    const user = await User.findOneAndUpdate({ _id: id, role: from }, { $set: { role: to } }, { new: true }).select('name username email role');
+    if (!user) {
+      const exists = await User.findById(id).select('role').lean();
+      if (!exists) { res.status(404).json({ success: false, message: 'User not found.' }); return; }
+      res.status(409).json({ success: false, message: exists.role === to ? `User is already ${to === 'reviewer' ? 'a reviewer' : 'not a reviewer'}.` : 'Admins cannot be changed here.' });
+      return;
+    }
+    await RoleChangeLog.create({ userId: user._id, actorId: req.user!._id, fromRole: from, toRole: to, reason: reason.trim().slice(0, 300) });
+    res.json({ success: true, user });
+  } catch (err) {
+    console.error('Set reviewer role error:', err);
+    res.status(500).json({ success: false, message: 'Failed to update role.' });
+  }
+};
+
+// GET /api/admin/users/:id/role-history
+export const roleHistory: RequestHandler = async (req: AuthRequest, res: Response) => {
+  try {
+    if (!Types.ObjectId.isValid(req.params.id)) { res.status(400).json({ success: false, message: 'Invalid user id.' }); return; }
+    const history = await RoleChangeLog.find({ userId: req.params.id }).sort({ createdAt: -1 }).limit(100).lean();
+    res.json({ success: true, history });
+  } catch (err) {
+    console.error('Role history error:', err);
+    res.status(500).json({ success: false, message: 'Failed to fetch role history.' });
   }
 };

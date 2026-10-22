@@ -8,6 +8,10 @@ import LeaderboardEntry from '../models/LeaderboardEntry';
 import GameHistory from '../models/GameHistory';
 import { Types } from 'mongoose';
 import { createQuizEndedPost } from '../services/quizPostService';
+import { consumeCredit, reserveCredit, releaseCredit, QuotaError } from '../services/billingClient';
+import { playRefKey, playExpiry, playDay } from '../services/quotaKeys';
+import { hasAcceptedInvite } from '../services/inviteService';
+import { closeOccurrence } from '../services/occurrence';
 
 const QUESTION_URL = process.env.QUESTION_SERVICE_URL ?? 'http://localhost:4003';
 const JWT_SECRET   = process.env.JWT_SECRET!;
@@ -89,6 +93,13 @@ export function initGameSocket(httpServer: HttpServer): IOServer {
           message: 'You have already attempted this quiz. You cannot re-enter once you have left.',
         });
         console.log(`[GameSocket] ${user.id} blocked re-entry into quiz:${quizId}`);
+        return;
+      }
+
+      // ── Access + daily play credit (checked before the player enters the room) ──
+      const gate = await admitPlayer(quizId, user);
+      if (!gate.ok) {
+        socket.emit('game_error', { quizId, message: gate.message, code: gate.code, ...(gate.upgradeTo ? { upgradeTo: gate.upgradeTo } : {}) });
         return;
       }
 
@@ -215,6 +226,12 @@ export function initGameSocket(httpServer: HttpServer): IOServer {
         io.to(`quiz:${quizId}`).emit('player_left', { userId });
         socketMeta.delete(socket.id);
 
+        // Left the lobby before the game started: give back the held play credit,
+        // unless it belongs to an accepted invite (that one is released if the invite closes)
+        if (!activeGames.has(quizId)) {
+          releaseLobbyCredit(quizId, userId).catch((e) => console.error('[quota] lobby release:', e));
+        }
+
         // If the game is still active, mark this user as exited so they can't rejoin
         if (activeGames.has(quizId)) {
           if (!exitedPlayers.has(quizId)) exitedPlayers.set(quizId, new Set());
@@ -230,6 +247,60 @@ export function initGameSocket(httpServer: HttpServer): IOServer {
 }
 
 export function getIO(): IOServer { return io; }
+
+// ── Access and quota ──────────────────────────────────────────────────────────
+
+type Gate = { ok: true } | { ok: false; message: string; code: string; upgradeTo?: string };
+
+/**
+ * Who may enter a game and what it costs:
+ * - invite-only / private games: only invited users, the host and admins;
+ * - the host never pays to play their own game;
+ * - everyone else uses the daily play credit (unlimited on paid plans): consumed now if the
+ *   game is running, held (reserved) if they are waiting in the lobby — used when it starts.
+ */
+export async function admitPlayer(quizId: string, user: JwtPayload): Promise<Gate> {
+  if (!Types.ObjectId.isValid(quizId)) return { ok: false, message: 'Game not found.', code: 'NOT_FOUND' };
+  const quiz = await Quiz.findById(quizId).select('participation allowedUsers createdBy status scheduledAt durationMinutes startedAt').lean();
+  if (!quiz) return { ok: false, message: 'Game not found.', code: 'NOT_FOUND' };
+  if (quiz.status === 'completed' || quiz.status === 'cancelled') return { ok: false, message: 'This game has ended.', code: 'GAME_ENDED' };
+
+  const isHost  = quiz.createdBy.toString() === user.id;
+  const isAdmin = user.role === 'admin';
+  if (quiz.participation !== 'public' && !isHost && !isAdmin && !quiz.allowedUsers.some((u) => u.toString() === user.id)) {
+    return { ok: false, message: 'This game is for invited players only.', code: 'NOT_INVITED' };
+  }
+  if (isHost) return { ok: true };
+
+  try {
+    const refKey = playRefKey(quiz);
+    if (quiz.status === 'active') await consumeCredit(user.id, 'quiz_play', refKey, playExpiry(quiz), playDay(quiz));
+    else                          await reserveCredit(user.id, 'quiz_play', refKey, playExpiry(quiz), playDay(quiz));
+    return { ok: true };
+  } catch (err) {
+    if (err instanceof QuotaError) return { ok: false, message: err.message, code: err.code, upgradeTo: err.upgradeTo };
+    console.error('[GameSocket] admit error:', err);
+    return { ok: false, message: 'Could not join the game. Please try again.', code: 'JOIN_FAILED' };
+  }
+}
+
+async function releaseLobbyCredit(quizId: string, userId: string): Promise<void> {
+  const quiz = await Quiz.findById(quizId).select('createdBy status scheduledAt durationMinutes startedAt').lean();
+  if (!quiz || quiz.status === 'active' || quiz.createdBy.toString() === userId) return;
+  const refKey = playRefKey(quiz);
+  if (await hasAcceptedInvite(quizId, userId, refKey)) return;
+  await releaseCredit(userId, 'quiz_play', refKey, 'left_lobby');
+}
+
+/** The game has started: everyone waiting in the lobby now uses the credit they were holding. */
+async function consumeLobbyCredits(quiz: { _id: Types.ObjectId; createdBy: Types.ObjectId; scheduledAt: Date; durationMinutes: number; startedAt: Date | null }, players: Iterable<string>): Promise<void> {
+  const refKey = playRefKey(quiz);
+  for (const userId of players) {
+    if (userId === quiz.createdBy.toString()) continue;
+    await consumeCredit(userId, 'quiz_play', refKey, playExpiry(quiz), playDay(quiz))
+      .catch((e) => console.error(`[quota] consume at start for ${userId}:`, (e as Error).message));
+  }
+}
 
 // ── Game loop ─────────────────────────────────────────────────────────────────
 
@@ -381,6 +452,8 @@ export async function startGameSession(quizId: string): Promise<void> {
 
     await GameAnswer.deleteMany({ quizId: new Types.ObjectId(quizId) });
 
+    consumeLobbyCredits(quiz, preGamePlayers.keys()).catch(console.error);
+
     // Notify everyone on the quiz list that this quiz is live
     io.emit('quiz_activated', { quizId, title: quiz.title });
 
@@ -430,6 +503,7 @@ export async function startGameSession(quizId: string): Promise<void> {
       await Quiz.findByIdAndUpdate(quizId, { status: 'completed', endedAt: new Date() });
 
       io.to(room).emit('game_over', { quizId, leaderboard });
+      closeOccurrence(quiz, 'completed').catch(console.error);
 
       // Auto-create a feed post for public quizzes
       createQuizEndedPost({
@@ -541,6 +615,7 @@ export async function startGameSession(quizId: string): Promise<void> {
       await Quiz.findByIdAndUpdate(quizId, { status: 'completed', endedAt: new Date() });
 
       io.to(room).emit('game_over', { quizId, leaderboard });
+      closeOccurrence(quiz, 'completed').catch(console.error);
 
       // Auto-create a feed post for public quizzes
       createQuizEndedPost({
